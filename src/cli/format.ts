@@ -1,5 +1,6 @@
 import type { RepositoryMap } from "../core/repository-map.js";
 import type { IndexedFileInspection, IndexSummary } from "../core/repository-index.js";
+import type { RepositoryGraphInspection } from "../core/repository-graph.js";
 
 const MAXIMUM_TEXT_ENTRIES = 200;
 
@@ -63,16 +64,60 @@ export function formatIndexText(summary: IndexSummary): string {
     `  Failed: ${summary.files.failed}`,
     `Symbols: ${summary.symbols}`,
     `Imports: ${summary.imports}`,
+    `Resolved imports: ${summary.graph.resolvedImports}`,
+    `Graph edges: ${summary.graph.edges}`,
+    `  Import edges: ${summary.graph.importEdges}`,
+    `  Test edges: ${summary.graph.testEdges}`,
+    `  Documentation edges: ${summary.graph.documentationEdges}`,
+    `Git signals: ${summary.graph.gitStatus}`,
     "",
     `Duration: ${summary.performance.totalMs.toFixed(1)} ms`,
     `Grammar initialization: ${summary.performance.grammarInitializationMs.toFixed(1)} ms`,
     `Parsing: ${summary.performance.parsingMs.toFixed(1)} ms`,
     `SQLite write: ${summary.performance.sqliteWriteMs.toFixed(1)} ms`,
+    `Graph build: ${summary.performance.graphTotalMs.toFixed(1)} ms`,
+    `  Import resolution: ${summary.performance.importResolutionMs.toFixed(1)} ms`,
+    `  Test relationships: ${summary.performance.testRelationshipMs.toFixed(1)} ms`,
+    `  Documentation relationships: ${summary.performance.documentationRelationshipMs.toFixed(1)} ms`,
+    `  Git signals: ${summary.performance.gitSignalsMs.toFixed(1)} ms`,
     `Throughput: ${summary.performance.filesPerSecond.toFixed(1)} files/sec`,
   ];
   if (summary.diagnostics.length > 0) {
     lines.push("", "Diagnostics");
     for (const diagnostic of summary.diagnostics) lines.push(`  ${diagnostic}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatGraphJson(inspection: RepositoryGraphInspection): string {
+  return `${JSON.stringify(inspection, null, 2)}\n`;
+}
+
+export function formatGraphText(inspection: RepositoryGraphInspection): string {
+  const lines = ["ContextForge Repository Graph", "", inspection.file, "", "Imports"];
+  if (inspection.imports.length === 0) lines.push("  (none)");
+  for (const item of inspection.imports) lines.push(`  → ${item.target}  [${item.confidence.toFixed(2)}; ${item.evidence.join("; ")}]`);
+  lines.push("", "Imported By");
+  if (inspection.importedBy.length === 0) lines.push("  (none)");
+  for (const item of inspection.importedBy) lines.push(`  ← ${item.target}  [${item.confidence.toFixed(2)}; ${item.evidence.join("; ")}]`);
+  lines.push("", "Related Tests");
+  if (inspection.tests.length === 0) lines.push("  (none)");
+  for (const item of inspection.tests) lines.push(`  → ${item.target}  [${item.confidence.toFixed(2)}; ${item.evidence.join("; ")}]`);
+  lines.push("", "Related Documentation");
+  if (inspection.documentation.length === 0) lines.push("  (none)");
+  for (const item of inspection.documentation) lines.push(`  → ${item.target}  [${item.confidence.toFixed(2)}; ${item.evidence.join("; ")}]`);
+  lines.push("", "Git Signals", `  Status: ${inspection.git.status}`);
+  if (inspection.git.status === "available") {
+    lines.push(`  HEAD: ${inspection.git.head ?? "(unborn)"}`, `  Branch: ${inspection.git.branch ?? "(detached)"}`);
+    if (inspection.git.file !== null) {
+      lines.push(
+        `  Working tree: ${inspection.git.file.workingTreeStatus}`,
+        `  Recent commit count: ${inspection.git.file.recentCommitCount}`,
+        `  Last relevant commit: ${inspection.git.file.lastChangedCommit ?? "(none in bounded window)"}`,
+      );
+    }
+  } else {
+    lines.push(`  ${inspection.git.diagnostic ?? "Git signals unavailable."}`);
   }
   return `${lines.join("\n")}\n`;
 }

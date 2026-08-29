@@ -80,6 +80,18 @@ try {
   ) {
     throw new Error("Installed CLI could not inspect packaged-parser output from SQLite.");
   }
+  const graphOutput = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "graph", "src/main.ts", fixtureRoot, "--json"],
+    installRoot,
+  );
+  const graph = JSON.parse(graphOutput);
+  if (
+    graph.imports?.some((edge) => edge.target === "src/ready.ts" && edge.confidence === 1) !== true ||
+    graph.importResolutions?.some((record) => record.moduleSpecifier === "./ready.js" && record.status === "resolved_internal") !== true
+  ) {
+    throw new Error("Installed CLI could not inspect the packaged Repository Graph.");
+  }
 
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
@@ -103,7 +115,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, and inspect.\n");
+  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, inspect, and graph.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }

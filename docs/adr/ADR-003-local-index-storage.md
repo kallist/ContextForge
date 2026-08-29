@@ -49,7 +49,7 @@ Rejected by the local-first V1 scope.
 - WAL relies on same-host shared memory and is unsuitable for network filesystems.
 - Holding one atomic generation transaction is the simplest correct V1 design but may increase WAL size for large repositories; performance and disk behavior must be benchmarked before optimizing to staged generations.
 - Generation duplication stores metadata, not repository source. Retention must remain bounded.
-- The Phase 2 schema contains only `repository_state`, `index_generation`, `indexed_file`, `symbol`, and `import_record`. Graph edges, ranking, candidates, embeddings, Memory, and MCP tables are not pre-created.
+- The Phase 2 baseline schema contained only `repository_state`, `index_generation`, `indexed_file`, `symbol`, and `import_record`. Phase 3 migrates it to schema version 2 and adds generation-bound import-resolution, graph-edge, and Git-signal tables. Ranking, candidates, embeddings, Memory, and MCP tables are not pre-created.
 - A generation is a complete snapshot. Identical SHA-256 plus a compatible analysis version copies normalized analysis into the new generation without reparsing; mtime and size are metadata, not reuse proof.
 - The implementation retains the active generation and its previous completed generation. Cleanup runs only after activation and is reported as a non-fatal warning if deferred.
 

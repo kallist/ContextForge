@@ -13,11 +13,29 @@ import {
   type RepositoryIndexSnapshot,
 } from "../../core/repository-index.js";
 import type { FileAnalysis, ParserStatus, SupportedLanguage } from "../../core/language-analysis.js";
+import {
+  REPOSITORY_GRAPH_SCHEMA_VERSION,
+  REPOSITORY_GRAPH_VERSION,
+  createGraphEdgeId,
+  isNormalizedRepositoryPath,
+  unavailableGitSignals,
+  type GitWorkingTreeStatus,
+  type GraphDerivation,
+  type GraphEdgeKind,
+  type ImportResolutionStatus,
+  type RepositoryGraphSnapshot,
+} from "../../core/repository-graph.js";
 import type { ContentStatus, FileCategory } from "../../core/repository-map.js";
 
 const DEFAULT_BUSY_TIMEOUT_MS = 750;
 
-export type SqliteIndexWritePoint = "after_files" | "after_symbols" | "before_activation";
+export type SqliteIndexWritePoint =
+  | "after_files"
+  | "after_symbols"
+  | "after_resolved_imports"
+  | "after_test_relationships"
+  | "after_documentation_relationships"
+  | "before_activation";
 
 export interface SqliteIndexTestHooks {
   onWritePoint?(point: SqliteIndexWritePoint): void | Promise<void>;
@@ -33,6 +51,7 @@ interface GenerationRow {
   readonly id: number;
   readonly analysis_version: string;
   readonly completed_at: string;
+  readonly graph_version: string | null;
 }
 
 interface FileRow {
@@ -72,6 +91,43 @@ interface ImportRow {
   readonly end_line: number;
   readonly start_column: number;
   readonly end_column: number;
+}
+
+interface ResolvedImportRow {
+  readonly source_file_path: string;
+  readonly import_ordinal: number;
+  readonly module_specifier: string;
+  readonly status: string;
+  readonly target_path: string | null;
+  readonly candidates_json: string;
+  readonly evidence_json: string;
+}
+
+interface GraphEdgeRow {
+  readonly edge_id: string;
+  readonly kind: string;
+  readonly source_path: string;
+  readonly target_path: string;
+  readonly confidence: number;
+  readonly derivation: string;
+  readonly evidence_json: string;
+}
+
+interface GitRepositoryRow {
+  readonly status: string;
+  readonly head: string | null;
+  readonly branch: string | null;
+  readonly recent_commit_limit: number;
+  readonly diagnostic: string | null;
+}
+
+interface GitFileRow {
+  readonly file_path: string;
+  readonly tracked: number;
+  readonly working_tree_status: string;
+  readonly recent_commit_count: number;
+  readonly last_changed_commit: string | null;
+  readonly last_changed_at: string | null;
 }
 
 function booleanFromSql(value: number | null): boolean | null {
@@ -183,11 +239,15 @@ export class SqliteIndexRepository implements IndexRepository {
         id INTEGER PRIMARY KEY,
         status TEXT NOT NULL CHECK (status IN ('BUILDING', 'COMPLETE')),
         analysis_version TEXT NOT NULL,
+        graph_version TEXT NULL,
         created_at TEXT NOT NULL,
         completed_at TEXT NULL,
         file_count INTEGER NOT NULL DEFAULT 0,
         symbol_count INTEGER NOT NULL DEFAULT 0,
-        import_count INTEGER NOT NULL DEFAULT 0
+        import_count INTEGER NOT NULL DEFAULT 0,
+        resolved_import_count INTEGER NOT NULL DEFAULT 0,
+        graph_edge_count INTEGER NOT NULL DEFAULT 0,
+        git_file_signal_count INTEGER NOT NULL DEFAULT 0
       ) STRICT;
 
       CREATE TABLE IF NOT EXISTS indexed_file (
@@ -240,18 +300,84 @@ export class SqliteIndexRepository implements IndexRepository {
         FOREIGN KEY (generation_id, file_path) REFERENCES indexed_file(generation_id, relative_path) ON DELETE CASCADE
       ) STRICT;
 
+      CREATE TABLE IF NOT EXISTS resolved_import (
+        generation_id INTEGER NOT NULL,
+        source_file_path TEXT NOT NULL,
+        import_ordinal INTEGER NOT NULL,
+        module_specifier TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('resolved_internal', 'external', 'unresolved', 'ambiguous', 'unsafe')),
+        target_path TEXT NULL,
+        candidates_json TEXT NOT NULL,
+        evidence_json TEXT NOT NULL,
+        PRIMARY KEY (generation_id, source_file_path, import_ordinal),
+        FOREIGN KEY (generation_id, source_file_path, import_ordinal)
+          REFERENCES import_record(generation_id, file_path, ordinal) ON DELETE CASCADE,
+        FOREIGN KEY (generation_id, target_path)
+          REFERENCES indexed_file(generation_id, relative_path)
+      ) STRICT;
+
+      CREATE TABLE IF NOT EXISTS graph_edge (
+        generation_id INTEGER NOT NULL,
+        edge_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('FILE_IMPORTS_FILE', 'TEST_RELATES_TO_FILE', 'DOCUMENT_RELATES_TO_FILE')),
+        source_path TEXT NOT NULL,
+        target_path TEXT NOT NULL,
+        confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+        derivation TEXT NOT NULL CHECK (derivation IN ('structural', 'heuristic')),
+        evidence_json TEXT NOT NULL,
+        PRIMARY KEY (generation_id, edge_id),
+        UNIQUE (generation_id, kind, source_path, target_path),
+        FOREIGN KEY (generation_id, source_path) REFERENCES indexed_file(generation_id, relative_path) ON DELETE CASCADE,
+        FOREIGN KEY (generation_id, target_path) REFERENCES indexed_file(generation_id, relative_path) ON DELETE CASCADE
+      ) STRICT;
+
+      CREATE TABLE IF NOT EXISTS git_repository_signal (
+        generation_id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL CHECK (status IN ('available', 'unavailable')),
+        head TEXT NULL,
+        branch TEXT NULL,
+        recent_commit_limit INTEGER NOT NULL CHECK (recent_commit_limit >= 0),
+        diagnostic TEXT NULL,
+        FOREIGN KEY (generation_id) REFERENCES index_generation(id) ON DELETE CASCADE
+      ) STRICT;
+
+      CREATE TABLE IF NOT EXISTS git_file_signal (
+        generation_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        tracked INTEGER NOT NULL CHECK (tracked IN (0, 1)),
+        working_tree_status TEXT NOT NULL CHECK (working_tree_status IN ('clean', 'modified', 'added', 'deleted', 'untracked', 'renamed', 'conflicted')),
+        recent_commit_count INTEGER NOT NULL CHECK (recent_commit_count >= 0),
+        last_changed_commit TEXT NULL,
+        last_changed_at TEXT NULL,
+        PRIMARY KEY (generation_id, file_path),
+        FOREIGN KEY (generation_id) REFERENCES index_generation(id) ON DELETE CASCADE
+      ) STRICT;
+
       CREATE INDEX IF NOT EXISTS symbol_file_lookup ON symbol(generation_id, file_path, start_line);
       CREATE INDEX IF NOT EXISTS symbol_name_lookup ON symbol(generation_id, name);
       CREATE INDEX IF NOT EXISTS import_file_lookup ON import_record(generation_id, file_path, ordinal);
+      CREATE INDEX IF NOT EXISTS resolved_import_target_lookup ON resolved_import(generation_id, target_path);
+      CREATE INDEX IF NOT EXISTS graph_edge_outgoing_lookup ON graph_edge(generation_id, source_path, kind, target_path);
+      CREATE INDEX IF NOT EXISTS graph_edge_incoming_lookup ON graph_edge(generation_id, target_path, kind, source_path);
 
       INSERT INTO repository_state(singleton_id, schema_version, active_generation_id)
       VALUES (1, ${INDEX_SCHEMA_VERSION}, NULL)
       ON CONFLICT(singleton_id) DO NOTHING;
     `);
+    const generationColumns = database.prepare("PRAGMA table_info(index_generation)").all() as unknown as { name: string }[];
+    const columnNames = new Set(generationColumns.map(({ name }) => name));
+    if (!columnNames.has("graph_version")) database.exec("ALTER TABLE index_generation ADD COLUMN graph_version TEXT NULL");
+    if (!columnNames.has("resolved_import_count")) database.exec("ALTER TABLE index_generation ADD COLUMN resolved_import_count INTEGER NOT NULL DEFAULT 0");
+    if (!columnNames.has("graph_edge_count")) database.exec("ALTER TABLE index_generation ADD COLUMN graph_edge_count INTEGER NOT NULL DEFAULT 0");
+    if (!columnNames.has("git_file_signal_count")) database.exec("ALTER TABLE index_generation ADD COLUMN git_file_signal_count INTEGER NOT NULL DEFAULT 0");
     const state = database.prepare("SELECT schema_version FROM repository_state WHERE singleton_id = 1").get() as
       | { schema_version?: unknown }
       | undefined;
-    if (state?.schema_version !== INDEX_SCHEMA_VERSION) throw new Error("Unsupported index schema version.");
+    if (state?.schema_version === 1 && INDEX_SCHEMA_VERSION === 2) {
+      database.prepare("UPDATE repository_state SET schema_version = ? WHERE singleton_id = 1").run(INDEX_SCHEMA_VERSION);
+    } else if (state?.schema_version !== INDEX_SCHEMA_VERSION) {
+      throw new Error("Unsupported index schema version.");
+    }
   }
 
   async #prepareDatabase(): Promise<DatabaseSync> {
@@ -267,9 +393,17 @@ export class SqliteIndexRepository implements IndexRepository {
   }
 
   #readActiveSnapshot(database: DatabaseSync): RepositoryIndexSnapshot | null {
+    const repositoryState = database.prepare("SELECT schema_version FROM repository_state WHERE singleton_id = 1").get() as
+      | { schema_version: number }
+      | undefined;
+    if (repositoryState === undefined || (repositoryState.schema_version !== 1 && repositoryState.schema_version !== INDEX_SCHEMA_VERSION)) {
+      throw new Error("Unsupported index schema version.");
+    }
+    const generationColumns = database.prepare("PRAGMA table_info(index_generation)").all() as unknown as { name: string }[];
+    const hasGraphVersion = generationColumns.some(({ name }) => name === "graph_version");
     const generation = database
       .prepare(`
-        SELECT g.id, g.analysis_version, g.completed_at
+        SELECT g.id, g.analysis_version, g.completed_at, ${hasGraphVersion ? "g.graph_version" : "NULL AS graph_version"}
         FROM repository_state r
         JOIN index_generation g ON g.id = r.active_generation_id
         WHERE r.singleton_id = 1 AND g.status = 'COMPLETE'
@@ -296,6 +430,75 @@ export class SqliteIndexRepository implements IndexRepository {
         FROM import_record WHERE generation_id = ? ORDER BY file_path, ordinal
       `)
       .all(generation.id) as unknown as ImportRow[];
+    let graph: RepositoryGraphSnapshot | null = null;
+    if (generation.graph_version !== null) {
+      if (generation.graph_version !== REPOSITORY_GRAPH_VERSION) throw new Error("Unsupported repository graph version.");
+      const resolvedImports = database
+        .prepare(`
+          SELECT source_file_path, import_ordinal, module_specifier, status, target_path, candidates_json, evidence_json
+          FROM resolved_import WHERE generation_id = ? ORDER BY source_file_path, import_ordinal
+        `)
+        .all(generation.id) as unknown as ResolvedImportRow[];
+      const edgeRows = database
+        .prepare(`
+          SELECT edge_id, kind, source_path, target_path, confidence, derivation, evidence_json
+          FROM graph_edge WHERE generation_id = ? ORDER BY kind, source_path, target_path, edge_id
+        `)
+        .all(generation.id) as unknown as GraphEdgeRow[];
+      const gitRepository = database
+        .prepare(`
+          SELECT status, head, branch, recent_commit_limit, diagnostic
+          FROM git_repository_signal WHERE generation_id = ?
+        `)
+        .get(generation.id) as GitRepositoryRow | undefined;
+      if (gitRepository === undefined) throw new Error("Repository graph is missing its Git availability record.");
+      const gitFiles = database
+        .prepare(`
+          SELECT file_path, tracked, working_tree_status, recent_commit_count, last_changed_commit, last_changed_at
+          FROM git_file_signal WHERE generation_id = ? ORDER BY file_path
+        `)
+        .all(generation.id) as unknown as GitFileRow[];
+      graph = {
+        schemaVersion: REPOSITORY_GRAPH_SCHEMA_VERSION,
+        version: REPOSITORY_GRAPH_VERSION,
+        resolvedImports: resolvedImports.map((item) => ({
+          sourcePath: item.source_file_path,
+          importOrdinal: item.import_ordinal,
+          moduleSpecifier: item.module_specifier,
+          status: item.status as ImportResolutionStatus,
+          targetPath: item.target_path,
+          candidates: parseJsonArray(item.candidates_json),
+          evidence: parseJsonArray(item.evidence_json),
+        })),
+        edges: edgeRows.map((edge) => ({
+          id: edge.edge_id,
+          kind: edge.kind as GraphEdgeKind,
+          sourcePath: edge.source_path,
+          targetPath: edge.target_path,
+          confidence: edge.confidence,
+          derivation: edge.derivation as GraphDerivation,
+          evidence: parseJsonArray(edge.evidence_json),
+        })),
+        git:
+          gitRepository.status === "available"
+            ? {
+                status: "available",
+                head: gitRepository.head,
+                branch: gitRepository.branch,
+                recentCommitLimit: gitRepository.recent_commit_limit,
+                files: gitFiles.map((file) => ({
+                  relativePath: file.file_path,
+                  tracked: file.tracked === 1,
+                  workingTreeStatus: file.working_tree_status as GitWorkingTreeStatus,
+                  recentCommitCount: file.recent_commit_count,
+                  lastChangedCommit: file.last_changed_commit,
+                  lastChangedAt: file.last_changed_at,
+                })),
+                diagnostic: null,
+              }
+            : unavailableGitSignals(gitRepository.diagnostic ?? "Git signals were unavailable.", gitRepository.recent_commit_limit),
+      };
+    }
 
     const symbolsByFile = Map.groupBy(symbols, (row) => row.file_path);
     const importsByFile = Map.groupBy(imports, (row) => row.file_path);
@@ -344,6 +547,7 @@ export class SqliteIndexRepository implements IndexRepository {
       analysisVersion: generation.analysis_version,
       completedAt: generation.completed_at,
       files: indexedFiles,
+      graph,
     };
   }
 
@@ -475,15 +679,175 @@ export class SqliteIndexRepository implements IndexRepository {
         });
       }
 
+      const graph = generation.graph;
+      let resolvedImportCount = 0;
+      let graphEdgeCount = 0;
+      let gitFileSignalCount = 0;
+      if (graph !== undefined) {
+        if (graph.schemaVersion !== REPOSITORY_GRAPH_SCHEMA_VERSION || graph.version !== REPOSITORY_GRAPH_VERSION) {
+          throw new Error("Generation repository graph version is unsupported.");
+        }
+        const filePaths = new Set(generation.files.map((file) => file.relativePath));
+        const filesByPath = new Map(generation.files.map((file) => [file.relativePath, file]));
+        const previousFilePaths = new Set(previous?.files.map((file) => file.relativePath) ?? []);
+        const importsByIdentity = new Map<string, FileAnalysis["imports"][number]>();
+        for (const file of generation.files) {
+          file.analysis.imports.forEach((imported, ordinal) => importsByIdentity.set(`${file.relativePath}\u0000${ordinal}`, imported));
+        }
+        if (graph.resolvedImports.length !== importsByIdentity.size) throw new Error("Every raw import must have exactly one resolution record.");
+        const insertResolvedImport = database.prepare(`
+          INSERT INTO resolved_import(
+            generation_id, source_file_path, import_ordinal, module_specifier, status,
+            target_path, candidates_json, evidence_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const resolutionIdentities = new Set<string>();
+        for (const resolved of graph.resolvedImports) {
+          const identity = `${resolved.sourcePath}\u0000${resolved.importOrdinal}`;
+          const rawImport = importsByIdentity.get(identity);
+          if (rawImport === undefined || resolutionIdentities.has(identity)) throw new Error("Resolved import does not match one unique raw import.");
+          if (rawImport.moduleSpecifier !== resolved.moduleSpecifier) throw new Error("Resolved import changed the raw module specifier.");
+          if (!isNormalizedRepositoryPath(resolved.sourcePath)) throw new Error("Resolved import source path is invalid.");
+          if (resolved.targetPath !== null && !filePaths.has(resolved.targetPath)) throw new Error("Resolved import target is not in this generation.");
+          if (resolved.status === "resolved_internal" && resolved.targetPath === null) throw new Error("Internal import is missing its target.");
+          if (resolved.status !== "resolved_internal" && resolved.targetPath !== null) throw new Error("Non-internal import cannot have a graph target.");
+          if (resolved.candidates.some((candidate) => !filePaths.has(candidate))) throw new Error("Import candidate is not in this generation.");
+          if (resolved.status === "resolved_internal" && (resolved.candidates.length !== 1 || resolved.candidates[0] !== resolved.targetPath)) {
+            throw new Error("Internal import must have exactly its resolved target as candidate.");
+          }
+          if (resolved.status === "ambiguous" && resolved.candidates.length < 2) throw new Error("Ambiguous import requires multiple candidates.");
+          if (resolved.status !== "resolved_internal" && resolved.status !== "ambiguous" && resolved.candidates.length !== 0) {
+            throw new Error("External, unresolved, and unsafe imports cannot retain internal candidates.");
+          }
+          insertResolvedImport.run(
+            generationId,
+            resolved.sourcePath,
+            resolved.importOrdinal,
+            resolved.moduleSpecifier,
+            resolved.status,
+            resolved.targetPath,
+            JSON.stringify(resolved.candidates),
+            JSON.stringify(resolved.evidence),
+          );
+          resolutionIdentities.add(identity);
+          resolvedImportCount += 1;
+        }
+        await this.#testHooks?.onWritePoint?.("after_resolved_imports");
+
+        const insertGraphEdge = database.prepare(`
+          INSERT INTO graph_edge(
+            generation_id, edge_id, kind, source_path, target_path, confidence, derivation, evidence_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const resolvedImportPairs = new Set(
+          graph.resolvedImports
+            .filter((item) => item.status === "resolved_internal" && item.targetPath !== null)
+            .map((item) => `${item.sourcePath}\u0000${item.targetPath ?? ""}`),
+        );
+        for (const kind of ["FILE_IMPORTS_FILE", "TEST_RELATES_TO_FILE", "DOCUMENT_RELATES_TO_FILE"] as const) {
+          for (const edge of graph.edges.filter((candidate) => candidate.kind === kind)) {
+            if (!filePaths.has(edge.sourcePath) || !filePaths.has(edge.targetPath)) throw new Error("Graph edge references a file outside this generation.");
+            if (edge.id !== createGraphEdgeId(edge.kind, edge.sourcePath, edge.targetPath)) throw new Error("Graph edge identity is not stable.");
+            if (edge.confidence < 0 || edge.confidence > 1 || edge.evidence.length === 0) throw new Error("Graph edge evidence is invalid.");
+            if (
+              edge.kind === "FILE_IMPORTS_FILE" &&
+              (edge.derivation !== "structural" || edge.confidence !== 1 || !resolvedImportPairs.has(`${edge.sourcePath}\u0000${edge.targetPath}`))
+            ) {
+              throw new Error("Import edge must be a structural fact backed by a resolved import.");
+            }
+            if (edge.kind === "TEST_RELATES_TO_FILE" && filesByPath.get(edge.sourcePath)?.category !== "test") {
+              throw new Error("Test relationship source must be an indexed test file.");
+            }
+            if (edge.kind === "DOCUMENT_RELATES_TO_FILE" && filesByPath.get(edge.sourcePath)?.category !== "documentation") {
+              throw new Error("Documentation relationship source must be an indexed documentation file.");
+            }
+            insertGraphEdge.run(
+              generationId,
+              edge.id,
+              edge.kind,
+              edge.sourcePath,
+              edge.targetPath,
+              edge.confidence,
+              edge.derivation,
+              JSON.stringify(edge.evidence),
+            );
+            graphEdgeCount += 1;
+          }
+          if (kind === "TEST_RELATES_TO_FILE") await this.#testHooks?.onWritePoint?.("after_test_relationships");
+          if (kind === "DOCUMENT_RELATES_TO_FILE") await this.#testHooks?.onWritePoint?.("after_documentation_relationships");
+        }
+
+        if (
+          (graph.git.status === "unavailable" &&
+            (graph.git.files.length !== 0 || graph.git.head !== null || graph.git.branch !== null || graph.git.diagnostic.length === 0)) ||
+          (graph.git.status === "available" && graph.git.diagnostic !== null)
+        ) {
+          throw new Error("Git availability record is inconsistent.");
+        }
+        database.prepare(`
+          INSERT INTO git_repository_signal(generation_id, status, head, branch, recent_commit_limit, diagnostic)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(
+          generationId,
+          graph.git.status,
+          graph.git.head,
+          graph.git.branch,
+          graph.git.recentCommitLimit,
+          graph.git.diagnostic,
+        );
+        const insertGitFile = database.prepare(`
+          INSERT INTO git_file_signal(
+            generation_id, file_path, tracked, working_tree_status, recent_commit_count,
+            last_changed_commit, last_changed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const file of graph.git.files) {
+          if (!isNormalizedRepositoryPath(file.relativePath)) throw new Error("Git file signal path is invalid.");
+          if (
+            !filePaths.has(file.relativePath) &&
+            (file.workingTreeStatus !== "deleted" || !previousFilePaths.has(file.relativePath))
+          ) {
+            throw new Error("Only a deleted file from the previous safe generation may lack a current file node.");
+          }
+          insertGitFile.run(
+            generationId,
+            file.relativePath,
+            file.tracked ? 1 : 0,
+            file.workingTreeStatus,
+            file.recentCommitCount,
+            file.lastChangedCommit,
+            file.lastChangedAt,
+          );
+          gitFileSignalCount += 1;
+        }
+      }
+
       const actual = database
         .prepare(`
           SELECT
             (SELECT COUNT(*) FROM indexed_file WHERE generation_id = ?) AS files,
             (SELECT COUNT(*) FROM symbol WHERE generation_id = ?) AS symbols,
-            (SELECT COUNT(*) FROM import_record WHERE generation_id = ?) AS imports
+            (SELECT COUNT(*) FROM import_record WHERE generation_id = ?) AS imports,
+            (SELECT COUNT(*) FROM resolved_import WHERE generation_id = ?) AS resolved_imports,
+            (SELECT COUNT(*) FROM graph_edge WHERE generation_id = ?) AS graph_edges,
+            (SELECT COUNT(*) FROM git_file_signal WHERE generation_id = ?) AS git_files
         `)
-        .get(generationId, generationId, generationId) as { files: number; symbols: number; imports: number };
-      if (actual.files !== generation.files.length || actual.symbols !== symbolCount || actual.imports !== importCount) {
+        .get(generationId, generationId, generationId, generationId, generationId, generationId) as {
+          files: number;
+          symbols: number;
+          imports: number;
+          resolved_imports: number;
+          graph_edges: number;
+          git_files: number;
+        };
+      if (
+        actual.files !== generation.files.length ||
+        actual.symbols !== symbolCount ||
+        actual.imports !== importCount ||
+        actual.resolved_imports !== resolvedImportCount ||
+        actual.graph_edges !== graphEdgeCount ||
+        actual.git_files !== gitFileSignalCount
+      ) {
         throw new Error("Generation validation count mismatch.");
       }
       const foreignKeyProblems = database.prepare("PRAGMA foreign_key_check").all();
@@ -494,10 +858,21 @@ export class SqliteIndexRepository implements IndexRepository {
       database
         .prepare(`
           UPDATE index_generation
-          SET status = 'COMPLETE', completed_at = ?, file_count = ?, symbol_count = ?, import_count = ?
+          SET status = 'COMPLETE', completed_at = ?, file_count = ?, symbol_count = ?, import_count = ?,
+              graph_version = ?, resolved_import_count = ?, graph_edge_count = ?, git_file_signal_count = ?
           WHERE id = ? AND status = 'BUILDING'
         `)
-        .run(completedAt, generation.files.length, symbolCount, importCount, generationId);
+        .run(
+          completedAt,
+          generation.files.length,
+          symbolCount,
+          importCount,
+          graph?.version ?? null,
+          resolvedImportCount,
+          graphEdgeCount,
+          gitFileSignalCount,
+          generationId,
+        );
       database.prepare("UPDATE repository_state SET active_generation_id = ? WHERE singleton_id = 1").run(generationId);
       database.exec("COMMIT");
       committedGeneration = generationId;

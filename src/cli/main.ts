@@ -6,9 +6,11 @@ import { parseArgs } from "node:util";
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
 import { FileSystemRepositorySourceReader } from "../adapters/filesystem/repository-source-reader.js";
 import { TreeSitterLanguageAnalyzer } from "../adapters/parser/tree-sitter-language-analyzer.js";
+import { ReadOnlyGitSignalsReader } from "../adapters/git/git-signals-reader.js";
 import { SqliteIndexRepository } from "../adapters/sqlite/sqlite-index-repository.js";
 import { buildIndex } from "../application/build-index.js";
 import { inspectIndex } from "../application/inspect-index.js";
+import { inspectRepositoryGraph } from "../application/inspect-repository-graph.js";
 import { mapRepository } from "../application/map-repository.js";
 import { ContextForgeError } from "../core/errors.js";
 import {
@@ -16,6 +18,8 @@ import {
   formatIndexText,
   formatInspectionJson,
   formatInspectionText,
+  formatGraphJson,
+  formatGraphText,
   formatJson,
   formatText,
 } from "./format.js";
@@ -26,6 +30,7 @@ Usage:
   contextforge map [repository] [--json]
   contextforge index [repository] [--json]
   contextforge inspect <relative-path> [repository] [--json]
+  contextforge graph <relative-path> [repository] [--json]
   contextforge --help
   contextforge --version
 
@@ -33,6 +38,7 @@ Commands:
   map       Discover and classify repository files without emitting file contents.
   index     Analyze safe source files and atomically activate a durable index generation.
   inspect   Read one file's symbols and imports from the active index (no ranking).
+  graph     Inspect one file's structural relationships and Git signals (no ranking).
 
 Options:
   --json    Emit the selected command's stable JSON contract.
@@ -98,6 +104,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
       new TreeSitterLanguageAnalyzer(),
       repositoryFactory,
       { repositoryPath: first ?? workingDirectory },
+      new ReadOnlyGitSignalsReader(),
     );
     process.stdout.write(parsed.values.json === true ? formatIndexJson(summary) : formatIndexText(summary));
     return 0;
@@ -106,6 +113,12 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     if (first === undefined) throw usageError("The inspect command requires a repository-relative file path.");
     const inspection = await inspectIndex(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
     process.stdout.write(parsed.values.json === true ? formatInspectionJson(inspection) : formatInspectionText(inspection));
+    return 0;
+  }
+  if (command === "graph") {
+    if (first === undefined) throw usageError("The graph command requires a repository-relative file path.");
+    const inspection = await inspectRepositoryGraph(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
+    process.stdout.write(parsed.values.json === true ? formatGraphJson(inspection) : formatGraphText(inspection));
     return 0;
   }
   throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);

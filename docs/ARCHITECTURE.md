@@ -2,9 +2,9 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–2 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–3 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index. Phase 3 and later product modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals. Phase 4 and later product modules remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
@@ -17,7 +17,7 @@ Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phase 2).
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-30, Phase 0–2 are implemented and locally exercised on Windows. Benchmark fixtures/results, graph/retrieval/ranking, packing, MCP, remote providers, and release artifacts remain absent.
+- As of 2026-08-30, Phase 0–3 are implemented and locally exercised on Windows. Benchmark fixtures/results, task retrieval/ranking/expansion, packing, MCP, remote providers, and release artifacts remain absent.
 
 ### Existing Assets
 
@@ -79,12 +79,12 @@ This environment demonstrates why consumer-side native compilation must not be r
 | Lint | ESLint with TypeScript rules | Explicit static quality gate |
 | MCP | Deferred stdio adapter using the stable official TypeScript SDK at implementation time | Keeps protocol churn and transport out of core |
 
-See ADR-001 through ADR-003 for alternatives and consequences.
+See ADR-001 through ADR-004 for alternatives and consequences.
 
 ## Dependency Direction
 
 ```text
-CLI Adapter (MAP IMPLEMENTED)                 MCP Adapter (DEFERRED)
+CLI Adapter (MAP/INDEX/INSPECT/GRAPH)          MCP Adapter (DEFERRED)
           \                                        /
            └──────── Application Use Cases ───────┘
                               │
@@ -113,7 +113,7 @@ The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tre
 
 ## Proposed Source Layout
 
-The Phase 0–2 subset now exists; Git, token, graph, retrieval, ranking, and MCP adapters remain planned:
+The Phase 0–3 subset now exists; token, retrieval, ranking, and MCP adapters remain planned:
 
 ```text
 src/
@@ -141,6 +141,7 @@ Use folders to enforce meaningful dependency boundaries, not to create one-file 
 
 - `MapRepository`: safely discover and summarize eligible repository content.
 - `BuildIndex`: create and atomically activate one repository index generation.
+- `InspectRepositoryGraph`: query one active generation's forward/reverse imports, containment, tests, documentation, import statuses, and Git signals without ranking.
 - `SearchRepository`: retrieve explainable candidates without packing.
 - `BuildContextPack`: run the full task-aware selection and hard-budget pipeline.
 - `ExplainContext`: expose scores, reasons, exclusions, and budget decisions from a manifest.
@@ -332,7 +333,9 @@ discover + hash current eligible files
               │
 reuse unchanged records; parse changed files; omit deleted files
               │
-validate generation N+1 and diagnostics
+resolve imports + derive bounded graph/docs/tests/Git signals
+              │
+validate generation N+1 graph, identities, foreign keys, and diagnostics
               │
 mark N+1 COMPLETE + set active_generation_id = N+1
               │
@@ -346,7 +349,7 @@ bounded checkpoint and old-generation cleanup
 - Only one writer is allowed. `BEGIN IMMEDIATE` either obtains the writer slot or fails after the timeout as `INDEX_BUSY`.
 - Readers start a read transaction, capture `active_generation_id`, and see one historical snapshot throughout the use case.
 - Any handled write failure explicitly rolls back. Process death before commit lets SQLite roll back and leaves generation N active.
-- Hash every eligible file for correctness; reuse symbol/edge records only on identical hash and compatible parser/index version.
+- Hash every eligible file for correctness; reuse language analysis only on identical hash and compatible parser/index version. Rebuild derived Graph metadata from normalized generation records without reparsing unchanged files.
 - Parser failure is recorded per file. Safe lexical fallback may be indexed; the generation can complete with a declared degraded-file count.
 - Before output, rehash selected files. Changed/deleted files cause an explicit stale error or bounded refresh; stale ranges are never paired with new content.
 - Cleanup keeps the active generation and one previous completed generation by default. Cleanup failure is diagnostic, not activation failure.
@@ -419,7 +422,13 @@ The implemented SQLite transaction holds one bounded generation build under `BEG
 
 ### Phase 3 — Repository Graph and Signals
 
-Add file/symbol nodes, import/definition edges, related-test discovery, task-aware documentation discovery, and optional bounded Git signals. Prove graph limits and absence of Git fallback.
+**IMPLEMENTED.** Resolve every raw import to `resolved_internal`, `external`, `unresolved`, `ambiguous`, or `unsafe`; persist unique internal import edges; derive explainable test and task-independent documentation relationships; and collect optional bounded, read-only Git signals. The Graph uses repository-relative stable identities and shares the Phase 2 generation/transaction/activation boundary.
+
+File nodes are existing `indexed_file` rows and symbol nodes are existing `symbol` rows. File containment and symbol parentage remain normalized rather than duplicated as edges. Persisted file edges are limited to `FILE_IMPORTS_FILE`, `TEST_RELATES_TO_FILE`, and `DOCUMENT_RELATES_TO_FILE`; reverse dependencies are indexed queries over forward edges. Structural facts and heuristic relationships remain explicitly distinct through derivation, confidence, and evidence.
+
+JavaScript/TypeScript resolution covers repository-relative literal imports/re-exports/require/dynamic imports, common source extensions, directory indexes, and unique NodeNext compiled-extension mappings. Python covers ordinary repository-root packages with `__init__.py` and explicit relative imports. Alias/compiler-complete resolution, advanced Python import machinery, and non-literal dynamic imports remain out of scope and become unresolved/external rather than guessed.
+
+Graph derivation intentionally performs a full metadata rebuild per generation while Phase 2 parsing remains incremental. Documentation input is bounded to 2,000 approved files or 16 MiB, individual reference/module heuristics are capped, and Git history is bounded to 100 commits by default. `contextforge graph` is inspection only; Phase 4 task retrieval, scoring, and expansion are not present. See ADR-004.
 
 ### Phase 4 — Task Retrieval and Explainable Ranking
 
@@ -523,7 +532,7 @@ The design was challenged against the requested review questions.
 
 - **Over-engineering:** The first slice excludes parser, SQLite, graph, ranking, and packing. Ports exist only at real I/O boundaries; no service mesh, plugin framework, worker pool, or polyglot runtime was added.
 - **Not just code RAG:** The differentiator is safe repository structure, typed graph relations, tests/docs/Git signals, explainable scores, semantic ranges, and section-aware hard-budget packing—not split/search/top-k.
-- **Structural retrieval:** Direct and reverse imports, definitions, tests, governing instructions, graph distance, and bounded expansion are explicit ranking evidence.
+- **Structural retrieval:** Phase 3 now supplies direct/reverse imports, containment, test/documentation relationships, and Git signals. Graph distance, bounded task expansion, and ranking remain Phase 4.
 - **Explainability:** Every score contribution has a reason and evidence; caps and deterministic ties prevent opaque ranking.
 - **Token budget:** Both final serializations are measured after rendering with explicit failure when no useful pack fits.
 - **Benchmarkability:** Ranking versions, estimator versions, manifests, deterministic ordering, and production-path benchmark use make results reproducible.
@@ -546,7 +555,8 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Boundary, sensitive-file, binary, size, encoding, symlink/junction policies | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
 | Parser and language adapters | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
 | SQLite index and concurrency | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| Graph, retrieval, ranking | NOT IMPLEMENTED / NOT TESTED |
+| Repository Graph, import resolution, tests/docs/Git signals, and graph CLI | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
+| Task retrieval, ranking, and bounded graph expansion | NOT IMPLEMENTED / NOT TESTED |
 | Token estimator and Context Pack | NOT IMPLEMENTED / NOT TESTED |
 | Benchmark harness/results | NOT IMPLEMENTED / NOT RUN |
 | MCP adapter | NOT IMPLEMENTED / DEFERRED |

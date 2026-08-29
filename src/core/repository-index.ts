@@ -1,7 +1,8 @@
 import type { FileAnalysis } from "./language-analysis.js";
+import type { RepositoryGraphSnapshot } from "./repository-graph.js";
 import type { ContentStatus, FileCategory } from "./repository-map.js";
 
-export const INDEX_SCHEMA_VERSION = 1;
+export const INDEX_SCHEMA_VERSION = 2;
 
 export interface IndexedFile {
   readonly relativePath: string;
@@ -18,11 +19,13 @@ export interface RepositoryIndexSnapshot {
   readonly analysisVersion: string;
   readonly completedAt: string;
   readonly files: readonly IndexedFile[];
+  readonly graph: RepositoryGraphSnapshot | null;
 }
 
 export interface NewIndexGeneration {
   readonly analysisVersion: string;
   readonly files: readonly IndexedFile[];
+  readonly graph?: RepositoryGraphSnapshot;
 }
 
 export interface GenerationActivationResult {
@@ -56,11 +59,24 @@ export interface IndexSummary {
   };
   readonly symbols: number;
   readonly imports: number;
+  readonly graph: {
+    readonly resolvedImports: number;
+    readonly edges: number;
+    readonly importEdges: number;
+    readonly testEdges: number;
+    readonly documentationEdges: number;
+    readonly gitStatus: "available" | "unavailable";
+  };
   readonly performance: {
     readonly totalMs: number;
     readonly grammarInitializationMs: number;
     readonly parsingMs: number;
     readonly sqliteWriteMs: number;
+    readonly graphTotalMs: number;
+    readonly importResolutionMs: number;
+    readonly testRelationshipMs: number;
+    readonly documentationRelationshipMs: number;
+    readonly gitSignalsMs: number;
     readonly filesPerSecond: number;
   };
   readonly diagnostics: readonly string[];

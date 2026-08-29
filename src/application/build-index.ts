@@ -2,6 +2,8 @@ import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import type { RepositoryScanner, ScanOptions } from "./map-repository.js";
+import { buildRepositoryGraph } from "./build-repository-graph.js";
+import type { GitSignalsReader } from "./git-signals.js";
 import type { RepositorySourceReader } from "./repository-source.js";
 import {
   LANGUAGE_ANALYSIS_SCHEMA_VERSION,
@@ -16,10 +18,14 @@ import type {
   IndexSummary,
 } from "../core/repository-index.js";
 import type { RepositoryMapEntry } from "../core/repository-map.js";
+import { unavailableGitSignals, type DocumentationSource, type GraphBuildPerformance } from "../core/repository-graph.js";
 
 export interface BuildIndexRequest extends ScanOptions {
   readonly repositoryPath: string;
 }
+
+const MAXIMUM_DOCUMENT_GRAPH_FILES = 2_000;
+const MAXIMUM_DOCUMENT_GRAPH_BYTES = 16 * 1024 * 1024;
 
 function failedAnalysis(entry: RepositoryMapEntry, diagnosticCode: string): FileAnalysis {
   return {
@@ -39,6 +45,9 @@ export async function buildIndex(
   analyzer: LanguageAnalyzer,
   repositoryFactory: IndexRepositoryFactory,
   request: BuildIndexRequest,
+  gitReader: GitSignalsReader = {
+    inspect: () => Promise.resolve(unavailableGitSignals("Git signals reader was not configured.")),
+  },
 ): Promise<IndexSummary> {
   const started = performance.now();
   const rootScan = await scanner.scan(request.repositoryPath, request);
@@ -48,6 +57,16 @@ export async function buildIndex(
   let reused = 0;
   let parsed = 0;
   let files: IndexedFile[] = [];
+  let graphPerformance: GraphBuildPerformance = {
+    importResolutionMs: 0,
+    testRelationshipMs: 0,
+    documentationRelationshipMs: 0,
+    gitSignalsMs: 0,
+    totalMs: 0,
+  };
+  let graph = null as Awaited<ReturnType<typeof buildRepositoryGraph>>["graph"] | null;
+  let documentationGraphBytes = 0;
+  let documentationGraphTruncated = false;
   const activation = await repository.buildAndActivate(analyzer.analysisVersion, async (previous) => {
     const scan = await scanner.scan(request.repositoryPath, request);
     if (scan.rootRealPath !== rootScan.rootRealPath) throw new Error("Repository root changed while acquiring the index writer slot.");
@@ -61,6 +80,7 @@ export async function buildIndex(
     }
 
     const nextFiles: IndexedFile[] = [];
+    const documentationSources: DocumentationSource[] = [];
     for (const entry of eligibleEntries) {
       if (entry.content !== "text") {
         nextFiles.push({
@@ -87,6 +107,19 @@ export async function buildIndex(
           analysis: failedAnalysis(entry, source.diagnosticCode),
         });
         continue;
+      }
+
+      if (entry.category === "documentation") {
+        const sourceBytes = Buffer.byteLength(source.source, "utf8");
+        if (
+          documentationSources.length < MAXIMUM_DOCUMENT_GRAPH_FILES &&
+          documentationGraphBytes + sourceBytes <= MAXIMUM_DOCUMENT_GRAPH_BYTES
+        ) {
+          documentationSources.push({ relativePath: entry.path, source: source.source });
+          documentationGraphBytes += sourceBytes;
+        } else {
+          documentationGraphTruncated = true;
+        }
       }
 
       const old = previousFiles.get(entry.path);
@@ -117,10 +150,28 @@ export async function buildIndex(
       });
     }
     files = nextFiles;
-    return { analysisVersion: analyzer.analysisVersion, files: nextFiles };
+    const gitApprovedRelativePaths = [...new Set([
+      ...nextFiles.map((file) => file.relativePath),
+      ...(previous?.files.map((file) => file.relativePath) ?? []),
+    ])].sort();
+    const graphBuild = await buildRepositoryGraph(
+      scan.rootRealPath,
+      nextFiles,
+      documentationSources,
+      gitReader,
+      gitApprovedRelativePaths,
+    );
+    graph = graphBuild.graph;
+    graphPerformance = graphBuild.performance;
+    return { analysisVersion: analyzer.analysisVersion, files: nextFiles, graph };
   });
   const totalMs = performance.now() - started;
-  const diagnostics = activation.cleanupWarning === null ? [] : [activation.cleanupWarning];
+  const diagnostics = [
+    ...(activation.cleanupWarning === null ? [] : [activation.cleanupWarning]),
+    ...(documentationGraphTruncated
+      ? ["Documentation relationship derivation reached its 2,000-file or 16 MiB work limit; remaining documents stay indexed without document edges."]
+      : []),
+  ];
   return {
     schemaVersion: "1.0",
     repository: { name: basename(rootScan.rootRealPath), root: "." },
@@ -135,11 +186,24 @@ export async function buildIndex(
     },
     symbols: files.reduce((count, file) => count + file.analysis.symbols.length, 0),
     imports: files.reduce((count, file) => count + file.analysis.imports.length, 0),
+    graph: {
+      resolvedImports: graph?.resolvedImports.length ?? 0,
+      edges: graph?.edges.length ?? 0,
+      importEdges: graph?.edges.filter((edge) => edge.kind === "FILE_IMPORTS_FILE").length ?? 0,
+      testEdges: graph?.edges.filter((edge) => edge.kind === "TEST_RELATES_TO_FILE").length ?? 0,
+      documentationEdges: graph?.edges.filter((edge) => edge.kind === "DOCUMENT_RELATES_TO_FILE").length ?? 0,
+      gitStatus: graph?.git.status ?? "unavailable",
+    },
     performance: {
       totalMs,
       grammarInitializationMs,
       parsingMs,
       sqliteWriteMs: activation.sqliteWriteMs,
+      graphTotalMs: graphPerformance.totalMs,
+      importResolutionMs: graphPerformance.importResolutionMs,
+      testRelationshipMs: graphPerformance.testRelationshipMs,
+      documentationRelationshipMs: graphPerformance.documentationRelationshipMs,
+      gitSignalsMs: graphPerformance.gitSignalsMs,
       filesPerSecond: totalMs === 0 ? 0 : files.length / (totalMs / 1000),
     },
     diagnostics,

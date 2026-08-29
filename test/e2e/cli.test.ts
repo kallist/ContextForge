@@ -161,3 +161,56 @@ test("compiled CLI rejects unsafe inspect paths and missing active indexes", asy
   assert.equal(nonCanonical.status, 2);
   assert.match(nonCanonical.stderr, /normalized repository-relative/u);
 });
+
+test("compiled CLI indexes and deterministically inspects repository graph JSON and text", async (context) => {
+  const root = await createTemporaryDirectory("cli-graph");
+  context.after(() => removeTemporaryDirectory(root));
+  await writeFixture(root, "src/dependency.ts", "export const dependency = true;\n");
+  await writeFixture(root, "src/main.ts", 'import { dependency } from "./dependency.js";\nexport class Main { run() { return dependency; } }\n');
+  await writeFixture(root, "tests/main.test.ts", 'import { Main } from "../src/main.js";\nnew Main().run();\n');
+  await writeFixture(root, "docs/MAIN_DESIGN.md", "See `src/main.ts` and `Main`.\n");
+
+  const indexed = runCli(["index", root, "--json"]);
+  assert.equal(indexed.status, 0, indexed.stderr);
+  const summary = JSON.parse(indexed.stdout) as { graph: { edges: number; gitStatus: string } };
+  assert.ok(summary.graph.edges >= 3);
+  assert.equal(summary.graph.gitStatus, "unavailable");
+
+  const first = runCli(["graph", "src/main.ts", root, "--json"]);
+  const second = runCli(["graph", "src/main.ts", root, "--json"]);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(second.stdout, first.stdout);
+  const graph = JSON.parse(first.stdout) as {
+    schemaVersion: string;
+    file: string;
+    imports: { target: string; confidence: number; evidence: string[] }[];
+    tests: { target: string }[];
+    documentation: { target: string }[];
+    symbols: { qualifiedName: string }[];
+    symbolParents: { child: string; parent: string }[];
+    git: { status: string };
+  };
+  assert.equal(graph.schemaVersion, "1.0");
+  assert.equal(graph.file, "src/main.ts");
+  assert.deepEqual(graph.imports.map(({ target }) => target), ["src/dependency.ts"]);
+  assert.equal(graph.imports[0]?.confidence, 1);
+  assert.ok((graph.imports[0]?.evidence.length ?? 0) > 0);
+  assert.deepEqual(graph.tests.map(({ target }) => target), ["tests/main.test.ts"]);
+  assert.deepEqual(graph.documentation.map(({ target }) => target), ["docs/MAIN_DESIGN.md"]);
+  assert.ok(graph.symbols.some(({ qualifiedName }) => qualifiedName === "Main.run"));
+  assert.deepEqual(graph.symbolParents, [{ child: "Main.run", parent: "Main" }]);
+  assert.equal(graph.git.status, "unavailable");
+  assert.equal(first.stdout.includes(root), false);
+
+  const text = runCli(["graph", "src/main.ts", root]);
+  assert.equal(text.status, 0, text.stderr);
+  assert.match(text.stdout, /ContextForge Repository Graph/u);
+  assert.match(text.stdout, /Imported By/u);
+  assert.match(text.stdout, /Related Tests/u);
+  assert.match(text.stdout, /Git Signals/u);
+
+  const unsafe = runCli(["graph", "../outside.ts", root, "--json"]);
+  assert.equal(unsafe.status, 2);
+  assert.match(unsafe.stderr, /normalized repository-relative/u);
+});
