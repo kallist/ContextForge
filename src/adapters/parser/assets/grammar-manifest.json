@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "runtime": {
+    "package": "web-tree-sitter",
+    "version": "0.26.13",
+    "file": "web-tree-sitter.wasm",
+    "sha256": "99fa2281fc4c6da713ccdadce72e81571b032ab9901b751be2d5aa127c843aaf",
+    "languageAbi": 15,
+    "minimumCompatibleAbi": 13,
+    "license": "MIT"
+  },
+  "assetSource": {
+    "package": "tree-sitter-wasm",
+    "version": "1.1.6",
+    "npmIntegrity": "sha512-jn/q9cOBIcTOA8QqtrPXNbibislSDuVChO4ws//aFy+DKjrUs9wzE4R6QXFx6yunEAYaxaVvpMW4+yX/ijQ7BQ=="
+  },
+  "grammars": [
+    {
+      "id": "javascript",
+      "upstream": "tree-sitter/tree-sitter-javascript",
+      "version": "0.25.0",
+      "file": "tree-sitter-javascript.wasm",
+      "sha256": "163a9ace4029f98a9e7a8e7d0b2e814b8453ae00074f389bc8f6e1ce09e29719",
+      "abi": 15,
+      "license": "MIT"
+    },
+    {
+      "id": "typescript",
+      "upstream": "tree-sitter/tree-sitter-typescript",
+      "version": "0.23.2",
+      "file": "tree-sitter-typescript.wasm",
+      "sha256": "0df5e286c944afd0e3ef1fd6ca973a5b017d7ec3e2d5b08fe0861ed9d6c8d337",
+      "abi": 15,
+      "license": "MIT"
+    },
+    {
+      "id": "tsx",
+      "upstream": "tree-sitter/tree-sitter-typescript",
+      "version": "0.23.2",
+      "file": "tree-sitter-tsx.wasm",
+      "sha256": "d8c62a9dbf83f2c72269697213b29687bc3828745c33c6a097decb249d987831",
+      "abi": 15,
+      "license": "MIT"
+    },
+    {
+      "id": "python",
+      "upstream": "tree-sitter/tree-sitter-python",
+      "version": "0.25.0",
+      "file": "tree-sitter-python.wasm",
+      "sha256": "fa16de5f853ef7c5361930979d7c4b91f266a7decfcad3125eebc19e2ecb895b",
+      "abi": 15,
+      "license": "MIT"
+    }
+  ]
+}

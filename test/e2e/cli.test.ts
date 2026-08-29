@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createTemporaryDirectory, removeTemporaryDirectory, writeFixture } from "../helpers/fixtures.js";
@@ -84,4 +85,79 @@ test("compiled CLI never leaks sensitive-file content to stdout, stderr, or JSON
   assert.equal(json.status, 0, json.stderr);
   assert.equal(`${text.stdout}${text.stderr}${json.stdout}${json.stderr}`.includes(sentinel), false);
   assert.equal(`${text.stdout}${json.stdout}`.includes(".env.local"), false);
+});
+
+test("compiled CLI indexes incrementally and inspects structured active data", async (context) => {
+  const root = await createTemporaryDirectory("cli-index");
+  context.after(() => removeTemporaryDirectory(root));
+  const sentinel = "CONTEXTFORGE_CLI_INDEX_SECRET";
+  await writeFixture(root, ".env", sentinel);
+  await writeFixture(root, "src/repository.ts", "export const save = () => true;\n");
+  await writeFixture(
+    root,
+    "src/memory.ts",
+    'import { save } from "./repository.js";\nexport class MemoryService { finalizeRun() { return save(); } }\n',
+  );
+  await writeFixture(root, "README.md", "# Fixture\n");
+
+  const first = runCli(["index", root, "--json"]);
+  assert.equal(first.status, 0, first.stderr);
+  const firstJson = JSON.parse(first.stdout) as {
+    schemaVersion: unknown;
+    generation: unknown;
+    files: { parsed: unknown; reused: unknown };
+  };
+  assert.equal(firstJson.schemaVersion, "1.0");
+  assert.equal(firstJson.generation, 1);
+  assert.equal(firstJson.files.parsed, 2);
+  assert.equal(firstJson.files.reused, 0);
+
+  const second = runCli(["index", root, "--json"]);
+  assert.equal(second.status, 0, second.stderr);
+  const secondJson = JSON.parse(second.stdout) as { generation: unknown; files: { parsed: unknown; reused: unknown } };
+  assert.equal(secondJson.generation, 2);
+  assert.equal(secondJson.files.parsed, 0);
+  assert.equal(secondJson.files.reused, 3);
+
+  const inspection = runCli(["inspect", "src/memory.ts", root, "--json"]);
+  assert.equal(inspection.status, 0, inspection.stderr);
+  const inspected = JSON.parse(inspection.stdout) as {
+    schemaVersion: unknown;
+    generation: unknown;
+    file: {
+      relativePath: unknown;
+      analysis: {
+        language: unknown;
+        symbols: { qualifiedName: string }[];
+        imports: { moduleSpecifier: string }[];
+      };
+    };
+  };
+  assert.equal(inspected.schemaVersion, "1.0");
+  assert.equal(inspected.generation, 2);
+  assert.equal(inspected.file.relativePath, "src/memory.ts");
+  assert.equal(inspected.file.analysis.language, "typescript");
+  assert.ok(inspected.file.analysis.symbols.some(({ qualifiedName }) => qualifiedName === "MemoryService.finalizeRun"));
+  assert.ok(inspected.file.analysis.imports.some(({ moduleSpecifier }) => moduleSpecifier === "./repository.js"));
+
+  const output = `${first.stdout}${first.stderr}${second.stdout}${second.stderr}${inspection.stdout}${inspection.stderr}`;
+  assert.equal(output.includes(sentinel), false);
+  const database = await readFile(join(root, ".contextforge", "index.sqlite"));
+  assert.equal(database.includes(Buffer.from(sentinel)), false);
+  assert.equal(database.includes(Buffer.from("finalizeRun() { return save(); }")), false);
+});
+
+test("compiled CLI rejects unsafe inspect paths and missing active indexes", async (context) => {
+  const root = await createTemporaryDirectory("cli-inspect-errors");
+  context.after(() => removeTemporaryDirectory(root));
+  await writeFixture(root, "src/main.ts", "export {};\n");
+  const missing = runCli(["inspect", "src/main.ts", root, "--json"]);
+  assert.equal(missing.status, 8);
+  assert.match(missing.stderr, /INDEX_NOT_FOUND/u);
+  const unsafe = runCli(["inspect", "../outside.ts", root, "--json"]);
+  assert.equal(unsafe.status, 2);
+  assert.match(unsafe.stderr, /normalized repository-relative/u);
+  const nonCanonical = runCli(["inspect", "src/../src/main.ts", root, "--json"]);
+  assert.equal(nonCanonical.status, 2);
+  assert.match(nonCanonical.stderr, /normalized repository-relative/u);
 });

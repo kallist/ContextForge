@@ -1,4 +1,13 @@
-export type ContextForgeErrorCode = "USAGE" | "PATH" | "ACCESS" | "UNSAFE_ROOT" | "SCAN_LIMIT";
+export type ContextForgeErrorCode =
+  | "USAGE"
+  | "PATH"
+  | "ACCESS"
+  | "UNSAFE_ROOT"
+  | "SCAN_LIMIT"
+  | "PARSER_UNAVAILABLE"
+  | "INDEX"
+  | "INDEX_BUSY"
+  | "INDEX_NOT_FOUND";
 
 const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   USAGE: 2,
@@ -6,6 +15,10 @@ const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   ACCESS: 3,
   UNSAFE_ROOT: 3,
   SCAN_LIMIT: 4,
+  PARSER_UNAVAILABLE: 5,
+  INDEX: 6,
+  INDEX_BUSY: 7,
+  INDEX_NOT_FOUND: 8,
 };
 
 export class ContextForgeError extends Error {

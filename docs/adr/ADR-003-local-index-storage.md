@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for V1 on 2026-08-29. Storage schema and code remain `NOT IMPLEMENTED / NOT TESTED`.
+Accepted for V1 on 2026-08-29. Implemented for Phase 2 on 2026-08-30 and locally tested against real temporary SQLite databases on Windows with Node 24.20.0. Hosted cross-platform validation remains `NOT RUN`.
 
 ## Context
 
@@ -49,6 +49,9 @@ Rejected by the local-first V1 scope.
 - WAL relies on same-host shared memory and is unsuitable for network filesystems.
 - Holding one atomic generation transaction is the simplest correct V1 design but may increase WAL size for large repositories; performance and disk behavior must be benchmarked before optimizing to staged generations.
 - Generation duplication stores metadata, not repository source. Retention must remain bounded.
+- The Phase 2 schema contains only `repository_state`, `index_generation`, `indexed_file`, `symbol`, and `import_record`. Graph edges, ranking, candidates, embeddings, Memory, and MCP tables are not pre-created.
+- A generation is a complete snapshot. Identical SHA-256 plus a compatible analysis version copies normalized analysis into the new generation without reparsing; mtime and size are metadata, not reuse proof.
+- The implementation retains the active generation and its previous completed generation. Cleanup runs only after activation and is reported as a non-fatal warning if deferred.
 
 ## Sources
 

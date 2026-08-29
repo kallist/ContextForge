@@ -4,22 +4,38 @@ import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
+import { FileSystemRepositorySourceReader } from "../adapters/filesystem/repository-source-reader.js";
+import { TreeSitterLanguageAnalyzer } from "../adapters/parser/tree-sitter-language-analyzer.js";
+import { SqliteIndexRepository } from "../adapters/sqlite/sqlite-index-repository.js";
+import { buildIndex } from "../application/build-index.js";
+import { inspectIndex } from "../application/inspect-index.js";
 import { mapRepository } from "../application/map-repository.js";
 import { ContextForgeError } from "../core/errors.js";
-import { formatJson, formatText } from "./format.js";
+import {
+  formatIndexJson,
+  formatIndexText,
+  formatInspectionJson,
+  formatInspectionText,
+  formatJson,
+  formatText,
+} from "./format.js";
 
 const HELP = `ContextForge — safe repository context discovery
 
 Usage:
   contextforge map [repository] [--json]
+  contextforge index [repository] [--json]
+  contextforge inspect <relative-path> [repository] [--json]
   contextforge --help
   contextforge --version
 
 Commands:
   map       Discover and classify repository files without emitting file contents.
+  index     Analyze safe source files and atomically activate a durable index generation.
+  inspect   Read one file's symbols and imports from the active index (no ranking).
 
 Options:
-  --json    Emit the stable Repository Map JSON contract.
+  --json    Emit the selected command's stable JSON contract.
   --help    Show this help.
   --version Show the package version.
 `;
@@ -63,17 +79,36 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     process.stdout.write(`${version}\n`);
     return 0;
   }
-  const [command, repositoryPath, ...extra] = parsed.positionals;
-  if (command !== "map") throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);
+  const [command, first, second, ...extra] = parsed.positionals;
   if (extra.length > 0) throw usageError("Too many positional arguments.");
+  const scanner = new FileSystemRepositoryScanner();
+  const repositoryFactory = (rootRealPath: string): SqliteIndexRepository => new SqliteIndexRepository(rootRealPath);
 
-  const map = await mapRepository(
-    new FileSystemRepositoryScanner(),
-    { repositoryPath: repositoryPath ?? workingDirectory },
-    version,
-  );
-  process.stdout.write(parsed.values.json === true ? formatJson(map) : formatText(map));
-  return 0;
+  if (command === "map") {
+    if (second !== undefined) throw usageError("Too many positional arguments.");
+    const map = await mapRepository(scanner, { repositoryPath: first ?? workingDirectory }, version);
+    process.stdout.write(parsed.values.json === true ? formatJson(map) : formatText(map));
+    return 0;
+  }
+  if (command === "index") {
+    if (second !== undefined) throw usageError("Too many positional arguments.");
+    const summary = await buildIndex(
+      scanner,
+      new FileSystemRepositorySourceReader(),
+      new TreeSitterLanguageAnalyzer(),
+      repositoryFactory,
+      { repositoryPath: first ?? workingDirectory },
+    );
+    process.stdout.write(parsed.values.json === true ? formatIndexJson(summary) : formatIndexText(summary));
+    return 0;
+  }
+  if (command === "inspect") {
+    if (first === undefined) throw usageError("The inspect command requires a repository-relative file path.");
+    const inspection = await inspectIndex(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
+    process.stdout.write(parsed.values.json === true ? formatInspectionJson(inspection) : formatInspectionText(inspection));
+    return 0;
+  }
+  throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);
 }
 
 async function main(): Promise<void> {

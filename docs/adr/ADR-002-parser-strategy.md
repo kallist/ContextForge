@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for V1 on 2026-08-29. Parser implementation and packaged grammar validation remain `NOT IMPLEMENTED / NOT TESTED`.
+Accepted for V1 on 2026-08-29. Implemented for Phase 2 on 2026-08-30 and locally tested on Windows with Node 24.20.0. Hosted cross-platform validation remains `NOT RUN`.
 
 ## Context
 
@@ -19,7 +19,7 @@ Tree-sitter provides consistent concrete syntax trees and language grammars, but
 - Load runtime and language assets relative to the installed ESM module location, not the current working directory.
 - Validate all packaged grammars on Windows, macOS, and Linux using parse fixtures before publishing.
 - Implement language adapters that convert syntax trees into common symbol/import records. Grammar-specific node names must not leak beyond an adapter.
-- On a missing grammar, load failure, parse exception, timeout/work-limit breach, or unusable tree, record a bounded diagnostic and fall back to safe textual indexing. Text fallback may provide lexical/path retrieval, but must not invent AST symbols, imports, or source relationships.
+- A missing, checksum-invalid, ABI-incompatible, or unloadable required packaged grammar is a system-level `PARSER_UNAVAILABLE` failure; the index command does not silently publish a structurally empty index. A malformed individual source file may retain partial AST structure as `degraded` with a bounded diagnostic. An individual parse failure records no invented symbols or imports and does not abort other files.
 - Regex may assist task normalization, filenames, or textual fallback. It must not masquerade as an AST parser.
 
 ## Alternatives Considered
@@ -47,6 +47,8 @@ Rejected. It violates offline-by-default behavior, weakens reproducibility, and 
 - The package is larger because runtime and language WASM assets are included.
 - ABI/version/checksum validation and package-content smoke tests become mandatory release gates.
 - Parser adapters remain replaceable, so an optional native accelerator or specialized parser can be evaluated later without changing core domain contracts.
+- Phase 2 uses `web-tree-sitter` 0.26.13 and byte-for-byte grammar assets from `tree-sitter-wasm` 1.1.6. `grammar-manifest.json` records the runtime/package versions, npm integrity, upstream grammar versions, ABI 15, SHA-256 values, filenames, and licenses. Each asset checksum is verified before initialization.
+- JavaScript and JSX share the JavaScript grammar; TypeScript and TSX remain separate grammar assets. Parser instances are cached and concurrent work is serialized per grammar to avoid shared parser-state races.
 
 ## Sources
 

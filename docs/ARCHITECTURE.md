@@ -2,22 +2,22 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–1 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–2 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 now provide a tested Safe Repository Map vertical slice. Phase 2 and later product modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index. Phase 3 and later product modules remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
 ## Repository Audit
 
-Audit date: 2026-08-29.
+Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phase 2).
 
 ### Current State
 
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
-- The repository contains documentation and one `.gitignore`; it contains no product source, tests, package manifest, lockfile, build configuration, workflow, Docker file, benchmark fixtures, or generated benchmark data.
-- This audit described the pre-implementation repository. As of 2026-08-29, the Phase 0 package foundation and Phase 1 Safe Repository Map are implemented and locally tested on Windows with Node 24.20.0.
+- The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
+- As of 2026-08-30, Phase 0–2 are implemented and locally exercised on Windows. Benchmark fixtures/results, graph/retrieval/ranking, packing, MCP, remote providers, and release artifacts remain absent.
 
 ### Existing Assets
 
@@ -29,9 +29,9 @@ Audit date: 2026-08-29.
 
 ### Audited Environment
 
-The local environment is Windows x64 (`Microsoft Windows 10.0.26200`) with PowerShell 7.6.4, Git 2.40.1, Node 24.10.0, npm 11.6.2, Corepack 0.34.0, and pnpm 10.18.2. Python is available only through the Windows launcher (3.10.6). Yarn, Rust/Cargo, standalone SQLite, Clang, CMake, and Make were not found. A local in-memory `node:sqlite` transaction smoke succeeded, but Node 24.10 emitted an ExperimentalWarning.
+The host environment remains Windows x64 (`Microsoft Windows 10.0.26200`) with PowerShell 7.6.4 and Git 2.40.1. Its default Node is 24.10.0, below the accepted SQLite gate. Phase 2 validation uses an official portable Node 24.20.0 archive after verifying the published SHA-256; no engine requirement is weakened. Python is available only through the Windows launcher (3.10.6). Rust/Cargo, a standalone SQLite CLI, Clang, CMake, and Make are not required.
 
-This environment supports foundation development and demonstrates why consumer-side native compilation must not be required. It must be patch-upgraded to Node 24.15 or newer before the accepted full V1/SQLite gate is run.
+This environment demonstrates why consumer-side native compilation must not be required. Commands run with the default Node 24.10 remain outside the accepted storage baseline; Phase 2 SQLite evidence is valid only for the verified Node 24.20.0 runs.
 
 ### Hard Constraints
 
@@ -47,11 +47,8 @@ This environment supports foundation development and demonstrates why consumer-s
 
 ### Remaining Foundations
 
-- hosted execution evidence for the committed Ubuntu/Windows CI workflow;
+- hosted execution evidence for the committed Ubuntu/Windows/macOS CI workflow;
 - macOS package and filesystem validation;
-- packaged parser runtime/grammar assets and their license/checksum manifest;
-- SQLite schema/migrations;
-- CLI implementation and configuration contract;
 - benchmark fixtures and harness.
 
 ### Principal Risks
@@ -116,7 +113,7 @@ The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tre
 
 ## Proposed Source Layout
 
-This is the approved direction. The Phase 0–1 subset (`cli`, `application`, `core`, and `adapters/filesystem`) now exists; later adapters remain planned:
+The Phase 0–2 subset now exists; Git, token, graph, retrieval, ranking, and MCP adapters remain planned:
 
 ```text
 src/
@@ -127,15 +124,14 @@ src/
     filesystem/
     git/
     parser/
-    storage/
+    sqlite/
     token/
 test/
   unit/
   integration/
   security/
   e2e/
-assets/
-  grammars/
+    parser/assets/
 benchmarks/
 ```
 
@@ -415,7 +411,11 @@ Implement root resolution, safe walking, ignore policy, secret/binary/size/encod
 
 ### Phase 2 — Language Analysis and Durable Index
 
-Package and validate compatible Tree-sitter WASM assets; implement JavaScript, TypeScript/TSX, and Python adapters plus textual fallback; define SQLite schema/migrations; build generation-based cold/incremental indexing with atomic activation and parser diagnostics.
+**IMPLEMENTED.** Package and checksum-validate compatible Tree-sitter WASM assets; implement JavaScript/JSX, TypeScript/TSX, and Python normalized adapters; define the minimal SQLite schema; build generation-based cold/incremental indexing with content-hash reuse, atomic activation, parser diagnostics, and read-only inspection. Required parser-asset failure is explicit; per-file malformed source degrades without invented AST records.
+
+The implemented symbol ID hashes repository-relative path, kind, qualified name, and same-name occurrence. Source range is deliberately excluded, so unrelated line insertions do not churn identity; inserting an earlier duplicate declaration with the same kind and qualified name can still renumber that duplicate set. Lines are one-based. Columns are one-based UTF-8 byte positions and the end column is exclusive, matching Tree-sitter's UTF-8 contract after conversion.
+
+The implemented SQLite transaction holds one bounded generation build under `BEGIN IMMEDIATE`. This maximizes crash consistency and reader simplicity at the cost of one writer lock for the entire synchronous write. Real tests prove WAL activation, rollback at three injected boundaries, an old reader snapshot during activation, and a bounded `INDEX_BUSY` result for a second writer. Network/UNC WAL placement is rejected where detectable; mapped or otherwise opaque network filesystems remain a documented limitation.
 
 ### Phase 3 — Repository Graph and Signals
 
@@ -544,10 +544,10 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Git repository and `.gitignore` | IMPLEMENTED |
 | Repository discovery/product CLI | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
 | Boundary, sensitive-file, binary, size, encoding, symlink/junction policies | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
-| Parser and language adapters | NOT IMPLEMENTED / NOT TESTED |
-| SQLite index and concurrency | NOT IMPLEMENTED / NOT TESTED |
+| Parser and language adapters | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
+| SQLite index and concurrency | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Graph, retrieval, ranking | NOT IMPLEMENTED / NOT TESTED |
 | Token estimator and Context Pack | NOT IMPLEMENTED / NOT TESTED |
 | Benchmark harness/results | NOT IMPLEMENTED / NOT RUN |
 | MCP adapter | NOT IMPLEMENTED / DEFERRED |
-| Hosted CI workflow | IMPLEMENTED / NOT RUN |
+| Hosted CI workflow | IMPLEMENTED (Ubuntu/Windows/macOS matrix) / NOT RUN |

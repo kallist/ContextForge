@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0 + Phase 1 implemented — Safe Repository Map**
+**Status: Phase 0–2 implemented — Safe Repository Map, Language Analysis, and Durable Index**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -20,9 +20,9 @@ The product goal is to preserve the context needed to complete a task while redu
 
 ## Current State
 
-ContextForge now has its first working vertical slice: a buildable, installable TypeScript CLI that safely discovers and maps a local repository. It provides deterministic text and JSON output while enforcing ignore, sensitive-file, binary, file-size, encoding, symlink, junction, and repository-boundary policies.
+ContextForge now has two working vertical slices. It safely discovers a repository, parses approved JavaScript/JSX, TypeScript/TSX, and Python files with packaged Tree-sitter WASM grammars, extracts symbols and imports, and atomically activates a durable SQLite index. Text and JSON inspection expose indexed structure without storing full source content.
 
-Task-aware selection, parsers, symbols, SQLite indexing, repository graphs, ranking, token budgeting, Context Packs, benchmarks, MCP, remote providers, and a web UI remain **NOT IMPLEMENTED**.
+Repository graphs, task-aware retrieval, ranking, token budgeting, Context Packs, benchmark scoring, MCP, remote providers, and a web UI remain **NOT IMPLEMENTED**.
 
 ## Requirements
 
@@ -45,6 +45,8 @@ The compiled CLI can then be run directly:
 node dist/cli/main.js --help
 node dist/cli/main.js map .
 node dist/cli/main.js map . --json
+node dist/cli/main.js index .
+node dist/cli/main.js inspect src/services/memory.ts . --json
 ```
 
 To verify the installable artifact without publishing it:
@@ -54,6 +56,18 @@ npm run package:smoke
 ```
 
 That smoke test runs `npm pack`, installs the tarball into a fresh temporary project, and invokes the installed `contextforge` binary. It does not publish the package.
+
+## Language analysis and index behavior
+
+`contextforge index [repository]` starts from the Safe Repository Map; no parser or import record can bypass its ignore, sensitive-file, binary, size, encoding, or repository-boundary decisions. JavaScript and JSX use the packaged JavaScript grammar; TypeScript, TSX, and Python use distinct packaged grammars. Runtime and grammar initialization is centralized and cached. A syntax-error tree is retained as `degraded` with a bounded diagnostic when Tree-sitter can still recover structure. Missing or checksum-invalid required grammar assets fail the command explicitly.
+
+Symbols include deterministic repository-relative IDs, qualified names such as `MemoryService.finalizeRun`, kind, parent identity, export/public metadata where structural evidence exists, and one-based line/UTF-8-byte-column ranges. Imports retain the raw module specifier, import kind, useful names, and source range. V1 currently recognizes static JavaScript imports, side-effect imports, common `require`, dynamic `import`, re-exports, and Python `import`/`from ... import`; it deliberately does not resolve them to repository files or construct a graph.
+
+The local database is `.contextforge/index.sqlite`, and `.contextforge/` remains a non-negatable built-in scan exclusion. SQLite runs with WAL, foreign keys, defensive mode, disabled extension loading, and a bounded writer timeout. One `BEGIN IMMEDIATE` transaction writes and validates a complete generation, marks it complete, changes `active_generation_id`, and commits. A failure before commit rolls back the generation and leaves the old active snapshot visible. Readers keep their old WAL snapshot through a concurrent activation. A second writer returns `INDEX_BUSY` after the bounded timeout.
+
+Every eligible text file is hashed with SHA-256. A later index reuses analysis only when the repository-relative path, content hash, and analysis version match; changed and added files are parsed, deleted files disappear from the new complete snapshot. Metadata such as size and mtime is retained for inspection but is never trusted instead of the content hash. Files that keep changing after one bounded retry are recorded as failed without aborting the rest of the generation.
+
+`contextforge inspect <relative-path> [repository] [--json]` is a read-only proof/diagnostic command over the active SQLite generation. It is not task-aware search or ranking. The database stores metadata, hashes, ranges, symbols, imports, and bounded diagnostics—not full source content.
 
 ## Repository Map Behavior
 
@@ -75,10 +89,10 @@ An ignored directory contributes one exclusion count; unvisited descendants are 
 ## Project Documents
 
 - [Product Specification](docs/PRODUCT_SPEC.md) — required product behavior, scope, and V1 acceptance criteria.
-- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and the implementation status of the safe Repository Map vertical slice.
+- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and the implementation status of the Safe Repository Map and Durable Index vertical slices.
 - [Architecture Decision Records](docs/adr/) — accepted runtime, parser, and local-storage decisions with alternatives and consequences.
 - [Benchmark](docs/BENCHMARK.md) — evaluation protocol, metric definitions, targets, and current not-run status.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
 
-The next planned engineering phase is **Phase 2 — Language Analysis and Durable Index**, defined in `docs/ARCHITECTURE.md`. It is not part of the current implementation.
+The next planned engineering phase is **Phase 3 — Repository Graph and Signals**, defined in `docs/ARCHITECTURE.md`. It is not part of the current implementation.

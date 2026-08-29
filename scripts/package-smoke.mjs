@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -29,7 +29,12 @@ try {
   await mkdir(installRoot, { recursive: true });
   await mkdir(join(fixtureRoot, "src"), { recursive: true });
   await writeFile(join(installRoot, "package.json"), '{"name":"contextforge-smoke","private":true}', "utf8");
-  await writeFile(join(fixtureRoot, "src", "main.ts"), "export const ready = true;\n", "utf8");
+  await writeFile(
+    join(fixtureRoot, "src", "main.ts"),
+    'import { ready } from "./ready.js";\nexport class Smoke { run() { return ready; } }\n',
+    "utf8",
+  );
+  await writeFile(join(fixtureRoot, "src", "ready.ts"), "export const ready = true;\n", "utf8");
 
   const packedOutput = run(
     process.execPath,
@@ -54,9 +59,51 @@ try {
     throw new Error("Installed CLI did not produce the expected Repository Map.");
   }
 
+  const indexOutput = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "index", fixtureRoot, "--json"],
+    installRoot,
+  );
+  const index = JSON.parse(indexOutput);
+  if (index.schemaVersion !== "1.0" || index.files?.parsed !== 2 || index.symbols < 2) {
+    throw new Error("Installed CLI did not parse and index the fixture repository.");
+  }
+  const inspectOutput = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "inspect", "src/main.ts", fixtureRoot, "--json"],
+    installRoot,
+  );
+  const inspection = JSON.parse(inspectOutput);
+  if (
+    inspection.file?.analysis?.symbols?.some((symbol) => symbol.qualifiedName === "Smoke.run") !== true ||
+    inspection.file?.analysis?.imports?.some((record) => record.moduleSpecifier === "./ready.js") !== true
+  ) {
+    throw new Error("Installed CLI could not inspect packaged-parser output from SQLite.");
+  }
+
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
-  process.stdout.write("Package smoke passed: pack, fresh install, --help, and map --json.\n");
+  const parserAssetRoot = join(
+    installRoot,
+    "node_modules",
+    "contextforge",
+    "dist",
+    "adapters",
+    "parser",
+    "assets",
+  );
+  for (const asset of [
+    "web-tree-sitter.wasm",
+    "tree-sitter-javascript.wasm",
+    "tree-sitter-typescript.wasm",
+    "tree-sitter-tsx.wasm",
+    "tree-sitter-python.wasm",
+    "grammar-manifest.json",
+    "THIRD_PARTY_NOTICES.md",
+  ]) {
+    await access(join(parserAssetRoot, asset));
+  }
+  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, and inspect.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }

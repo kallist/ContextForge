@@ -17,8 +17,8 @@
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json",
-    "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json",
+    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json && node scripts/copy-parser-assets.mjs dist/adapters/parser/assets",
+    "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/copy-parser-assets.mjs .test-dist/src/adapters/parser/assets",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build && npm run build:test",
@@ -28,13 +28,15 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "ignore": "^7.0.6"
+    "ignore": "^7.0.6",
+    "web-tree-sitter": "0.26.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",
     "eslint": "^10.0.0",
     "globals": "^17.11.0",
+    "tree-sitter-wasm": "1.1.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0"
   }

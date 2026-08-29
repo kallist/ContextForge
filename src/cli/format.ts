@@ -1,4 +1,5 @@
 import type { RepositoryMap } from "../core/repository-map.js";
+import type { IndexedFileInspection, IndexSummary } from "../core/repository-index.js";
 
 const MAXIMUM_TEXT_ENTRIES = 200;
 
@@ -39,6 +40,72 @@ export function formatText(map: RepositoryMap): string {
   if (map.exclusions.length > 0) {
     lines.push("", "Exclusions");
     for (const exclusion of map.exclusions) lines.push(`  ${exclusion.reason}: ${exclusion.count}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatIndexJson(summary: IndexSummary): string {
+  return `${JSON.stringify(summary, null, 2)}\n`;
+}
+
+export function formatIndexText(summary: IndexSummary): string {
+  const lines = [
+    "ContextForge Index",
+    "",
+    `Repository: ${summary.repository.name}`,
+    `Generation: ${summary.generation}`,
+    "",
+    `Files: ${summary.files.indexed} indexed`,
+    `  Parsed this run: ${summary.files.parsed}`,
+    `  Reused: ${summary.files.reused}`,
+    `  Unsupported: ${summary.files.unsupported}`,
+    `  Degraded: ${summary.files.degraded}`,
+    `  Failed: ${summary.files.failed}`,
+    `Symbols: ${summary.symbols}`,
+    `Imports: ${summary.imports}`,
+    "",
+    `Duration: ${summary.performance.totalMs.toFixed(1)} ms`,
+    `Grammar initialization: ${summary.performance.grammarInitializationMs.toFixed(1)} ms`,
+    `Parsing: ${summary.performance.parsingMs.toFixed(1)} ms`,
+    `SQLite write: ${summary.performance.sqliteWriteMs.toFixed(1)} ms`,
+    `Throughput: ${summary.performance.filesPerSecond.toFixed(1)} files/sec`,
+  ];
+  if (summary.diagnostics.length > 0) {
+    lines.push("", "Diagnostics");
+    for (const diagnostic of summary.diagnostics) lines.push(`  ${diagnostic}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function formatInspectionJson(inspection: IndexedFileInspection): string {
+  return `${JSON.stringify(inspection, null, 2)}\n`;
+}
+
+export function formatInspectionText(inspection: IndexedFileInspection): string {
+  const { file } = inspection;
+  const lines = [
+    "ContextForge Index Inspection",
+    "",
+    `Generation: ${inspection.generation}`,
+    `File: ${file.relativePath}`,
+    `Language: ${file.analysis.language ?? "unsupported"}`,
+    `Parser status: ${file.analysis.parserStatus}`,
+    "",
+    "Symbols",
+  ];
+  if (file.analysis.symbols.length === 0) lines.push("  (none)");
+  for (const symbol of file.analysis.symbols) {
+    lines.push(`  ${symbol.kind} ${symbol.qualifiedName} (${symbol.startLine}:${symbol.startColumn}-${symbol.endLine}:${symbol.endColumn})`);
+  }
+  lines.push("", "Imports");
+  if (file.analysis.imports.length === 0) lines.push("  (none)");
+  for (const imported of file.analysis.imports) {
+    const names = imported.names.length === 0 ? "" : ` [${imported.names.join(", ")}]`;
+    lines.push(`  ${imported.kind} ${imported.moduleSpecifier}${names}`);
+  }
+  if (file.analysis.diagnostics.length > 0) {
+    lines.push("", "Diagnostics");
+    for (const diagnostic of file.analysis.diagnostics) lines.push(`  ${diagnostic.code}: ${diagnostic.message}`);
   }
   return `${lines.join("\n")}\n`;
 }
