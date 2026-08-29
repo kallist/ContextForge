@@ -1,0 +1,41 @@
+{
+  "name": "contextforge",
+  "version": "0.1.0-dev.0",
+  "description": "Local-first, task-aware context compiler for coding agents",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15 <25"
+  },
+  "bin": {
+    "contextforge": "dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json",
+    "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build && npm run build:test",
+    "test": "node --test \".test-dist/test/**/*.test.js\"",
+    "smoke": "node dist/cli/main.js --help",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ignore": "^7.0.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "eslint": "^10.0.0",
+    "globals": "^17.11.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0"
+  }
+}

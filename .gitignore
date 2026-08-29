@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.test-dist/
+.npm-cache-temp/
+.portable-node/
+*.tsbuildinfo
+
+# ContextForge local state and generated packs
+.contextforge/
+/context.md
+/context.json
+
+# Local secrets and logs
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
