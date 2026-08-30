@@ -12,7 +12,9 @@ import { buildIndex } from "../application/build-index.js";
 import { inspectIndex } from "../application/inspect-index.js";
 import { inspectRepositoryGraph } from "../application/inspect-repository-graph.js";
 import { mapRepository } from "../application/map-repository.js";
+import { searchRepository } from "../application/search-repository.js";
 import { ContextForgeError } from "../core/errors.js";
+import { STRUCTURAL_V1 } from "../core/ranking/structural-v1.js";
 import {
   formatIndexJson,
   formatIndexText,
@@ -21,6 +23,8 @@ import {
   formatGraphJson,
   formatGraphText,
   formatJson,
+  formatSearchJson,
+  formatSearchText,
   formatText,
 } from "./format.js";
 
@@ -31,6 +35,7 @@ Usage:
   contextforge index [repository] [--json]
   contextforge inspect <relative-path> [repository] [--json]
   contextforge graph <relative-path> [repository] [--json]
+  contextforge search <task> [repository] [--limit <n>] [--json]
   contextforge --help
   contextforge --version
 
@@ -39,9 +44,11 @@ Commands:
   index     Analyze safe source files and atomically activate a durable index generation.
   inspect   Read one file's symbols and imports from the active index (no ranking).
   graph     Inspect one file's structural relationships and Git signals (no ranking).
+  search    Retrieve and explain task-relevant ranked candidates from the active index.
 
 Options:
   --json    Emit the selected command's stable JSON contract.
+  --limit   Limit search output (default ${STRUCTURAL_V1.cli.defaultLimit}, maximum ${STRUCTURAL_V1.cli.maximumLimit}).
   --help    Show this help.
   --version Show the package version.
 `;
@@ -68,6 +75,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
       options: {
         help: { type: "boolean" },
         json: { type: "boolean" },
+        limit: { type: "string" },
         version: { type: "boolean" },
       },
     });
@@ -91,12 +99,14 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
   const repositoryFactory = (rootRealPath: string): SqliteIndexRepository => new SqliteIndexRepository(rootRealPath);
 
   if (command === "map") {
+    if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (second !== undefined) throw usageError("Too many positional arguments.");
     const map = await mapRepository(scanner, { repositoryPath: first ?? workingDirectory }, version);
     process.stdout.write(parsed.values.json === true ? formatJson(map) : formatText(map));
     return 0;
   }
   if (command === "index") {
+    if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (second !== undefined) throw usageError("Too many positional arguments.");
     const summary = await buildIndex(
       scanner,
@@ -110,15 +120,36 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     return 0;
   }
   if (command === "inspect") {
+    if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (first === undefined) throw usageError("The inspect command requires a repository-relative file path.");
     const inspection = await inspectIndex(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
     process.stdout.write(parsed.values.json === true ? formatInspectionJson(inspection) : formatInspectionText(inspection));
     return 0;
   }
   if (command === "graph") {
+    if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (first === undefined) throw usageError("The graph command requires a repository-relative file path.");
     const inspection = await inspectRepositoryGraph(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
     process.stdout.write(parsed.values.json === true ? formatGraphJson(inspection) : formatGraphText(inspection));
+    return 0;
+  }
+  if (command === "search") {
+    if (first === undefined) throw usageError("The search command requires a coding task.");
+    const parsedLimit = parsed.values.limit === undefined ? undefined : Number(parsed.values.limit);
+    if (parsedLimit !== undefined && (!Number.isSafeInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > STRUCTURAL_V1.cli.maximumLimit)) {
+      throw usageError(`The --limit value must be an integer from 1 to ${STRUCTURAL_V1.cli.maximumLimit}.`);
+    }
+    const execution = await searchRepository(
+      scanner,
+      new FileSystemRepositorySourceReader(),
+      repositoryFactory,
+      {
+        repositoryPath: second ?? workingDirectory,
+        task: first,
+        ...(parsedLimit === undefined ? {} : { limit: parsedLimit }),
+      },
+    );
+    process.stdout.write(parsed.values.json === true ? formatSearchJson(execution.result) : formatSearchText(execution.result));
     return 0;
   }
   throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);

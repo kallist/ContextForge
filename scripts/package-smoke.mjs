@@ -92,6 +92,20 @@ try {
   ) {
     throw new Error("Installed CLI could not inspect the packaged Repository Graph.");
   }
+  const searchOutput = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "search", "Smoke.run", fixtureRoot, "--limit", "1", "--json"],
+    installRoot,
+  );
+  const search = JSON.parse(searchOutput);
+  if (
+    search.rankingStrategy !== "contextforge-structural-v1" ||
+    search.indexStatus?.status !== "FRESH" ||
+    search.candidates?.[0]?.relativePath !== "src/main.ts" ||
+    search.candidates?.[0]?.relevantSymbols?.some((symbol) => symbol.qualifiedName === "Smoke.run") !== true
+  ) {
+    throw new Error("Installed CLI could not retrieve and explain packaged Search results.");
+  }
 
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
@@ -115,7 +129,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, inspect, and graph.\n");
+  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, inspect, graph, and search.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createTemporaryDirectory, removeTemporaryDirectory, writeFixture } from "../helpers/fixtures.js";
@@ -213,4 +213,59 @@ test("compiled CLI indexes and deterministically inspects repository graph JSON 
   const unsafe = runCli(["graph", "../outside.ts", root, "--json"]);
   assert.equal(unsafe.status, 2);
   assert.match(unsafe.stderr, /normalized repository-relative/u);
+});
+
+test("compiled installed-path CLI searches in text/JSON, applies limits, reports stale state, and requires an index", async (context) => {
+  const root = await createTemporaryDirectory("cli-search");
+  const missingRoot = await createTemporaryDirectory("cli-search-missing");
+  context.after(() => Promise.all([removeTemporaryDirectory(root), removeTemporaryDirectory(missingRoot)]));
+  await writeFixture(root, "src/memory.ts", "export class MemoryService { disableMemory() { return false; } }\n");
+  await writeFixture(root, "tests/memory.test.ts", 'import { MemoryService } from "../src/memory.js";\nnew MemoryService();\n');
+  await writeFixture(missingRoot, "src/main.ts", "export const main = true;\n");
+
+  const missing = runCli(["search", "main", missingRoot, "--json"]);
+  assert.equal(missing.status, 8);
+  assert.match(missing.stderr, /INDEX_REQUIRED/u);
+
+  const indexed = runCli(["index", root, "--json"]);
+  assert.equal(indexed.status, 0, indexed.stderr);
+  const text = runCli(["search", "fix MemoryService disable race", root, "--limit", "1"]);
+  assert.equal(text.status, 0, text.stderr);
+  assert.match(text.stdout, /ContextForge Search/u);
+  assert.match(text.stdout, /contextforge-structural-v1/u);
+  assert.match(text.stdout, /src\/memory\.ts/u);
+
+  const first = runCli(["search", "MemoryService", root, "--limit", "1", "--json"]);
+  const second = runCli(["search", "MemoryService", root, "--limit", "1", "--json"]);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(second.stdout, first.stdout);
+  const parsed = JSON.parse(first.stdout) as {
+    schemaVersion: string;
+    rankingStrategy: string;
+    indexStatus: { status: string };
+    candidates: { relativePath: string; scoreContributions: unknown[] }[];
+  };
+  assert.equal(parsed.schemaVersion, "1.0");
+  assert.equal(parsed.rankingStrategy, "contextforge-structural-v1");
+  assert.equal(parsed.indexStatus.status, "FRESH");
+  assert.equal(parsed.candidates.length, 1);
+  assert.equal(parsed.candidates[0]?.relativePath, "src/memory.ts");
+  assert.ok((parsed.candidates[0]?.scoreContributions.length ?? 0) > 0);
+  assert.equal(first.stdout.includes(root), false);
+
+  await writeFile(join(root, "src", "memory.ts"), 'export const state = "NEW_STALE_LITERAL";\n', "utf8");
+  const stale = runCli(["search", "NEW_STALE_LITERAL", root, "--json"]);
+  assert.equal(stale.status, 0, stale.stderr);
+  const staleJson = JSON.parse(stale.stdout) as { generation: number; indexStatus: { status: string }; diagnostics: string[] };
+  assert.equal(staleJson.generation, 1);
+  assert.equal(staleJson.indexStatus.status, "STALE");
+  assert.ok(staleJson.diagnostics.includes("LEXICAL_SOURCE_STALE"));
+
+  const empty = runCli(["search", "", root]);
+  assert.equal(empty.status, 2);
+  assert.match(empty.stderr, /INVALID_TASK/u);
+  const invalidLimit = runCli(["search", "memory", root, "--limit", "0"]);
+  assert.equal(invalidLimit.status, 2);
+  assert.match(invalidLimit.stderr, /USAGE/u);
 });

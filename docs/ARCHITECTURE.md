@@ -2,9 +2,9 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–3 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–4 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals. Phase 4 and later product modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, direct retrieval, generation-verified lexical matching, bounded graph expansion, and explainable ranking. Phase 5 and later product modules remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
@@ -17,7 +17,7 @@ Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phase 2).
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-30, Phase 0–3 are implemented and locally exercised on Windows. Benchmark fixtures/results, task retrieval/ranking/expansion, packing, MCP, remote providers, and release artifacts remain absent.
+- As of 2026-08-30, Phase 0–4 are implemented and locally exercised on Windows. Benchmark fixtures/results, token budgeting/packing, MCP, remote providers, and release artifacts remain absent.
 
 ### Existing Assets
 
@@ -113,7 +113,7 @@ The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tre
 
 ## Proposed Source Layout
 
-The Phase 0–3 subset now exists; token, retrieval, ranking, and MCP adapters remain planned:
+The Phase 0–4 subset now exists; token packing, benchmark, and MCP adapters remain planned:
 
 ```text
 src/
@@ -183,10 +183,12 @@ These are conceptual records and invariants, not a required one-class-per-row de
 
 - **Input:** `TaskQuery` and one active `RepositoryIndex` generation.
 - **Output:** a bounded superset of `ContextCandidate` records.
-- **Signals:** exact/fuzzy symbol, canonical path/segment, lexical content, instructions/docs, tests, and bounded Git relevance.
+- **Signals:** exact/normalized-component symbol, canonical path/segment, lexical content, instructions/docs, tests, and bounded Git relevance.
 - **Failure:** missing active index is explicit; a degraded file can still match text but exposes no invented structural facts.
-- **Complexity:** indexed lookups plus capped result lists per signal; never scan the entire graph per query.
+- **Complexity:** one generation-bound metadata read builds exact lookup maps, then uses capped result lists per signal; graph traversal starts only from bounded seeds and never performs per-term full-symbol scans.
 - **V1 limitation:** transparent lexical/structural retrieval only.
+
+Phase 4 implements source lexical retrieval as a bounded generation-verified working-tree scan. The application first loads one complete active generation, then reads only its currently safe text files. It hashes the actual bytes used for matching and accepts evidence only when the hash equals the indexed file hash. Changed bytes are excluded and reported as stale; search never auto-indexes. At most 10,000 files and 64 MiB are scanned, with direct metadata candidates first and remaining paths in stable order. Reaching the bound reports partial verification. No source or source-derived lexical terms are stored in SQLite, so schema version 2 remains unchanged. See ADR-005.
 
 ### 3. Primary Candidate Ranking
 
@@ -242,31 +244,35 @@ These are conceptual records and invariants, not a required one-class-per-row de
 - **Complexity:** linear in final payload size with bounded rerender iterations.
 - **V1 limitation:** two alternative serializations, not dynamic/streaming context delivery.
 
-## Initial Explainable Ranking
+## Implemented Explainable Ranking
 
-V1 uses additive, capped signal contributions followed by graph-distance adjustment. Initial default points are architecture defaults to calibrate through benchmarks, not benchmark results:
+Phase 4 versions the additive strategy as `contextforge-structural-v1`. These are implementation constants and regression-tested ordering semantics, not benchmark results:
 
-| Signal | Maximum contribution | Example reason |
-|---|---:|---|
-| Exact symbol match | 100 | `task identifier exactly matches MemoryService` |
-| Exact canonical path | 90 | `task names src/memory/service.ts` |
-| Path segment/name match | 55 | `path segment memory matches task term` |
-| Lexical content coverage | 45 | `3 of 4 distinctive task terms occur in range` |
-| Fuzzy symbol match | 40 | `memory-service resembles MemoryService` |
-| Related test relationship | 35 | `test imports selected source file` |
-| Direct import/definition edge | 30 | `primary candidate imports this definition` |
-| Reverse dependency edge | 22 | `this file imports the primary candidate` |
-| Task-aware instruction/doc relation | 25 | `nearest AGENTS.md governs selected path` |
-| Git relevance | 10 | `recent commit message matches task term` |
+| Direct signal | Proposed points |
+|---|---:|
+| Exact qualified symbol | 120 |
+| Exact canonical path | 110 |
+| Exact symbol | 100 |
+| Exact basename | 82 |
+| Exact technical source literal | 58 |
+| Symbol component | 42 |
+| Import/module metadata | 34 |
+| Path component | 30 |
+| Source lexical occurrence 1 / 2 / 3 | 28 / 8 / 4 |
+
+Identity, lexical, structural, and Git families are capped at 150, 120, 65, and 5 points. One lexical query signal contributes at most 50 points. Git contributes only to an already direct/expanded candidate: dirty state is 2 points and bounded recency is at most 3.
+
+Expansion uses at most 24 primary seeds, depth 2, 24 neighbors per node, 128 new files, and 256 final internal candidates. An inherited proposal is `seed score × 0.32 × distance decay × relation factor × edge confidence × hub damping`. Depth decay is 0.58 then 0.34; relation factors are import 0.72, reverse import 0.52, test 0.78, and documentation 0.38. Hub damping is `min(1, log2(3) / log2(2 + degree))`.
 
 Rules:
 
-- Exact evidence and structural relationships outrank weak fuzzy or Git signals.
-- Contributions within a signal family are capped so repeated keywords or high graph degree cannot dominate.
-- For an expanded candidate, inherited contribution is based on the strongest origin path: `origin_score × 0.60^distance`, combined with a capped relation bonus. Additional paths add reasons but not unlimited score.
-- Unsafe, sensitive, binary, generated/minified-over-limit, or outside-root candidates are excluded before scoring.
-- Stable ordering uses final score descending, then canonical path, then start range/symbol ID.
-- Every numeric contribution has a structured `SelectionReason`; weights and reason codes are versioned in the manifest.
+- Exact evidence outranks weak lexical, structural, or Git signals.
+- Per-term and family caps prevent repeated keywords, multiple graph paths, or high graph degree from dominating.
+- One file envelope merges all evidence and retains up to 32 relevant symbols, avoiding file/symbol double counting.
+- Unsafe, sensitive, binary, excluded generated/dependency state, or outside-root candidates are absent before scoring.
+- Stable ordering uses final score descending, origin priority, file-category priority, then raw canonical path.
+- Every accepted numeric contribution has a structured reason. `rawScore` is the additive sum within ordinary floating-point tolerance and is a relative relevance score, not a probability.
+- Fuzzy matching, embeddings, LLM reranking, and learned weights are not implemented.
 
 ## Token Estimation and Hard-Budget Contract
 
@@ -428,11 +434,13 @@ File nodes are existing `indexed_file` rows and symbol nodes are existing `symbo
 
 JavaScript/TypeScript resolution covers repository-relative literal imports/re-exports/require/dynamic imports, common source extensions, directory indexes, and unique NodeNext compiled-extension mappings. Python covers ordinary repository-root packages with `__init__.py` and explicit relative imports. Alias/compiler-complete resolution, advanced Python import machinery, and non-literal dynamic imports remain out of scope and become unresolved/external rather than guessed.
 
-Graph derivation intentionally performs a full metadata rebuild per generation while Phase 2 parsing remains incremental. Documentation input is bounded to 2,000 approved files or 16 MiB, individual reference/module heuristics are capped, and Git history is bounded to 100 commits by default. `contextforge graph` is inspection only; Phase 4 task retrieval, scoring, and expansion are not present. See ADR-004.
+Graph derivation intentionally performs a full metadata rebuild per generation while Phase 2 parsing remains incremental. Documentation input is bounded to 2,000 approved files or 16 MiB, individual reference/module heuristics are capped, and Git history is bounded to 100 commits by default. `contextforge graph` remains inspection only; Phase 4 consumes this graph through the separate Search use case. See ADR-004.
 
 ### Phase 4 — Task Retrieval and Explainable Ranking
 
-Implement query normalization, indexed lexical/path/symbol retrieval, initial scoring/reasons, bounded graph expansion, reranking/deduplication, `search`, and `explain` use cases.
+**IMPLEMENTED.** Normalize bounded untrusted tasks into exact and decomposed coding signals; retrieve file envelopes from path, basename, symbol, import/module, and generation-hash-verified source evidence; rank direct candidates; expand bounded imports, reverse imports, tests, and documentation with distance decay and hub damping; weakly rescore existing candidates with generation-bound Git data; and return deterministic text/JSON through `contextforge search`.
+
+The implementation preserves symbol-level evidence and ranges inside one file result, uses additive reconstructible score contributions and versioned `contextforge-structural-v1` constants, reports stale/partial lexical verification, and never mutates the index. `contextforge explain` remains deferred until Phase 5 has a persisted/serializable Context Manifest to explain. Fuzzy retrieval is deliberately not implemented. See ADR-005.
 
 ### Phase 5 — Token Budget and Context Packs
 
@@ -532,7 +540,7 @@ The design was challenged against the requested review questions.
 
 - **Over-engineering:** The first slice excludes parser, SQLite, graph, ranking, and packing. Ports exist only at real I/O boundaries; no service mesh, plugin framework, worker pool, or polyglot runtime was added.
 - **Not just code RAG:** The differentiator is safe repository structure, typed graph relations, tests/docs/Git signals, explainable scores, semantic ranges, and section-aware hard-budget packing—not split/search/top-k.
-- **Structural retrieval:** Phase 3 now supplies direct/reverse imports, containment, test/documentation relationships, and Git signals. Graph distance, bounded task expansion, and ranking remain Phase 4.
+- **Structural retrieval:** Phase 3 supplies direct/reverse imports, containment, test/documentation relationships, and Git signals. Phase 4 now consumes them through bounded distance-aware, hub-damped expansion and keeps direct versus expanded origin explicit.
 - **Explainability:** Every score contribution has a reason and evidence; caps and deterministic ties prevent opaque ranking.
 - **Token budget:** Both final serializations are measured after rendering with explicit failure when no useful pack fits.
 - **Benchmarkability:** Ranking versions, estimator versions, manifests, deterministic ordering, and production-path benchmark use make results reproducible.
@@ -556,7 +564,7 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Parser and language adapters | IMPLEMENTED / LOCALLY TESTED ON WINDOWS |
 | SQLite index and concurrency | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Repository Graph, import resolution, tests/docs/Git signals, and graph CLI | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| Task retrieval, ranking, and bounded graph expansion | NOT IMPLEMENTED / NOT TESTED |
+| Task retrieval, ranking, and bounded graph expansion | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Token estimator and Context Pack | NOT IMPLEMENTED / NOT TESTED |
 | Benchmark harness/results | NOT IMPLEMENTED / NOT RUN |
 | MCP adapter | NOT IMPLEMENTED / DEFERRED |

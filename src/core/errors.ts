@@ -7,7 +7,11 @@ export type ContextForgeErrorCode =
   | "PARSER_UNAVAILABLE"
   | "INDEX"
   | "INDEX_BUSY"
-  | "INDEX_NOT_FOUND";
+  | "INDEX_NOT_FOUND"
+  | "INDEX_REQUIRED"
+  | "INVALID_TASK"
+  | "TASK_TOO_LARGE"
+  | "SEARCH_FAILED";
 
 const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   USAGE: 2,
@@ -19,6 +23,10 @@ const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   INDEX: 6,
   INDEX_BUSY: 7,
   INDEX_NOT_FOUND: 8,
+  INDEX_REQUIRED: 8,
+  INVALID_TASK: 2,
+  TASK_TOO_LARGE: 2,
+  SEARCH_FAILED: 9,
 };
 
 export class ContextForgeError extends Error {

@@ -1,8 +1,21 @@
 import type { RepositoryMap } from "../core/repository-map.js";
 import type { IndexedFileInspection, IndexSummary } from "../core/repository-index.js";
 import type { RepositoryGraphInspection } from "../core/repository-graph.js";
+import type { SearchResult } from "../core/task-retrieval.js";
 
 const MAXIMUM_TEXT_ENTRIES = 200;
+
+function terminalText(value: string, maximumLength = 500): string {
+  const safe = [...value]
+    .map((character) => {
+      const code = character.codePointAt(0) ?? 0;
+      return code <= 31 || (code >= 127 && code <= 159) ? " " : character;
+    })
+    .join("")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return safe.length <= maximumLength ? safe : `${safe.slice(0, maximumLength)}… [display truncated]`;
+}
 
 export function formatJson(map: RepositoryMap): string {
   return `${JSON.stringify(map, null, 2)}\n`;
@@ -91,6 +104,53 @@ export function formatIndexText(summary: IndexSummary): string {
 
 export function formatGraphJson(inspection: RepositoryGraphInspection): string {
   return `${JSON.stringify(inspection, null, 2)}\n`;
+}
+
+export function formatSearchJson(result: SearchResult): string {
+  return `${JSON.stringify(result, null, 2)}\n`;
+}
+
+export function formatSearchText(result: SearchResult): string {
+  const indexSummary = result.indexStatus.status === "FRESH"
+    ? "FRESH"
+    : result.indexStatus.status === "PARTIAL"
+      ? "PARTIAL (working-tree verification reached its bounded scan limit)"
+      : `STALE (${result.indexStatus.changedFiles} changed: ${result.indexStatus.addedFiles} added, ${result.indexStatus.deletedFiles} deleted)`;
+  const lines = [
+    "ContextForge Search",
+    "",
+    "Task",
+    terminalText(result.task),
+    "",
+    `Repository: ${terminalText(result.repository.name)}`,
+    `Generation: ${result.generation}`,
+    `Strategy: ${result.rankingStrategy}`,
+    `Index: ${indexSummary}`,
+  ];
+  if (result.indexStatus.lexicalSkippedFiles > 0) {
+    lines.push(`Lexical evidence skipped: ${result.indexStatus.lexicalSkippedFiles} file(s)`);
+  }
+  if (result.diagnostics.length > 0) lines.push(`Diagnostics: ${result.diagnostics.join(", ")}`);
+  lines.push("", "Candidates");
+  if (result.candidates.length === 0) lines.push("  (no supported candidates; refine the task with a path, symbol, identifier, or error literal)");
+  result.candidates.forEach((candidate, index) => {
+    lines.push(
+      "",
+      `${index + 1}. ${terminalText(candidate.relativePath)}`,
+      `   ${candidate.rawScore.toFixed(2)} points · ${candidate.origin}`,
+    );
+    for (const contribution of candidate.scoreContributions.slice(0, 6)) {
+      lines.push(`   +${contribution.value.toFixed(2)} ${terminalText(contribution.reason)}`);
+    }
+    if (candidate.scoreContributions.length > 6) {
+      lines.push(`   … ${candidate.scoreContributions.length - 6} more contribution(s) in --json output`);
+    }
+    if (candidate.relevantSymbols.length > 0) {
+      lines.push("", "   Relevant symbols");
+      for (const symbol of candidate.relevantSymbols.slice(0, 10)) lines.push(`   - ${terminalText(symbol.qualifiedName)}`);
+    }
+  });
+  return `${lines.join("\n")}\n`;
 }
 
 export function formatGraphText(inspection: RepositoryGraphInspection): string {
