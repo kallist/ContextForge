@@ -1,0 +1,871 @@
+{
+  "benchmarkVersion": "contextforge-benchmark-v1",
+  "datasetVersion": "contextforge-dataset-v1",
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "fixedBudget": [
+    {
+      "budget": 2000,
+      "systemId": "lexical-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.736111125,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "symbolRecall": 0.7934782608695652,
+      "overallGoldRecall": 0.7361467083333334,
+      "precision": 0.140178,
+      "noiseRatio": 0.8598220000000002,
+      "meanPayloadTokens": 1893.4583333333333,
+      "meanSerializationOverheadTokens": 561
+    },
+    {
+      "budget": 2000,
+      "systemId": "structural-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.7291666666666666,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "symbolRecall": 0.7898550869565217,
+      "overallGoldRecall": 0.7320792500000001,
+      "precision": 0.15473991666666664,
+      "noiseRatio": 0.8452600833333332,
+      "meanPayloadTokens": 1924.25,
+      "meanSerializationOverheadTokens": 704.9166666666666
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.7569444583333333,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "symbolRecall": 0.7608696086956522,
+      "overallGoldRecall": 0.7409823750000001,
+      "precision": 0.16084365217391303,
+      "noiseRatio": 0.8391563478260871,
+      "meanPayloadTokens": 1818.0416666666667,
+      "meanSerializationOverheadTokens": 708.375
+    },
+    {
+      "budget": 4000,
+      "systemId": "lexical-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.7777777916666667,
+      "requiredSymbolRecall": 0.8030303181818182,
+      "symbolRecall": 0.8152173913043478,
+      "overallGoldRecall": 0.7857142916666667,
+      "precision": 0.15955604166666668,
+      "noiseRatio": 0.8404439583333333,
+      "meanPayloadTokens": 2506.4166666666665,
+      "meanSerializationOverheadTokens": 627.0833333333334
+    },
+    {
+      "budget": 4000,
+      "systemId": "structural-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.7708333333333334,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "symbolRecall": 0.782608695652174,
+      "overallGoldRecall": 0.7678571249999999,
+      "precision": 0.14514133333333334,
+      "noiseRatio": 0.8548586666666664,
+      "meanPayloadTokens": 2794.0416666666665,
+      "meanSerializationOverheadTokens": 915.1666666666666
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8181818181818182,
+      "symbolRecall": 0.8260869565217391,
+      "overallGoldRecall": 0.8161375416666666,
+      "precision": 0.16407678260869565,
+      "noiseRatio": 0.8359232173913046,
+      "meanPayloadTokens": 2339.7083333333335,
+      "meanSerializationOverheadTokens": 817.4583333333334
+    },
+    {
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.8194444583333333,
+      "requiredSymbolRecall": 0.8484848636363637,
+      "symbolRecall": 0.8586956521739131,
+      "overallGoldRecall": 0.8260582083333334,
+      "precision": 0.17351258333333333,
+      "noiseRatio": 0.8264874166666667,
+      "meanPayloadTokens": 3510.9166666666665,
+      "meanSerializationOverheadTokens": 652.1666666666666
+    },
+    {
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.75,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "symbolRecall": 0.782608695652174,
+      "overallGoldRecall": 0.755952375,
+      "precision": 0.13800679166666668,
+      "noiseRatio": 0.8619932083333331,
+      "meanPayloadTokens": 3794.6666666666665,
+      "meanSerializationOverheadTokens": 939.375
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "symbolRecall": 0.8478260869565217,
+      "overallGoldRecall": 0.8708664166666668,
+      "precision": 0.19285012499999998,
+      "noiseRatio": 0.8071498750000002,
+      "meanPayloadTokens": 3453.375,
+      "meanSerializationOverheadTokens": 922.5
+    },
+    {
+      "budget": 16000,
+      "systemId": "lexical-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.923611125,
+      "requiredSymbolRecall": 0.9166666818181818,
+      "symbolRecall": 0.9021739130434783,
+      "overallGoldRecall": 0.8931878333333333,
+      "precision": 0.17681270833333332,
+      "noiseRatio": 0.8231872916666666,
+      "meanPayloadTokens": 5508.458333333333,
+      "meanSerializationOverheadTokens": 661.4583333333334
+    },
+    {
+      "budget": 16000,
+      "systemId": "structural-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "symbolRecall": 0.8478260869565217,
+      "overallGoldRecall": 0.8419312083333333,
+      "precision": 0.16969383333333335,
+      "noiseRatio": 0.8303061666666665,
+      "meanPayloadTokens": 5801.416666666667,
+      "meanSerializationOverheadTokens": 1006.375
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "symbolRecall": 0.8695652173913043,
+      "overallGoldRecall": 0.8907076666666667,
+      "precision": 0.18521470833333334,
+      "noiseRatio": 0.8147852916666669,
+      "meanPayloadTokens": 4992.625,
+      "meanSerializationOverheadTokens": 977.9166666666666
+    },
+    {
+      "budget": 32000,
+      "systemId": "lexical-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.9444444583333333,
+      "requiredSymbolRecall": 0.9393939545454546,
+      "symbolRecall": 0.9456521739130435,
+      "overallGoldRecall": 0.93138225,
+      "precision": 0.17867883333333334,
+      "noiseRatio": 0.8213211666666665,
+      "meanPayloadTokens": 9507.125,
+      "meanSerializationOverheadTokens": 672.5
+    },
+    {
+      "budget": 32000,
+      "systemId": "structural-full-file-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.8958333333333334,
+      "requiredSymbolRecall": 0.9090909090909091,
+      "symbolRecall": 0.9130434782608695,
+      "overallGoldRecall": 0.8928571249999999,
+      "precision": 0.153961375,
+      "noiseRatio": 0.8460386249999998,
+      "meanPayloadTokens": 9797.791666666666,
+      "meanSerializationOverheadTokens": 1062.8333333333333
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v1",
+      "tasks": 24,
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "symbolRecall": 0.8913043478260869,
+      "overallGoldRecall": 0.9092262083333335,
+      "precision": 0.17303633333333335,
+      "noiseRatio": 0.8269636666666669,
+      "meanPayloadTokens": 7551,
+      "meanSerializationOverheadTokens": 1010.7916666666666
+    }
+  ],
+  "retrieval": [
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoff": 1,
+      "requiredFileRecall": 0.47916662499999996,
+      "requiredSymbolRecall": 0.43712118181818177
+    },
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoff": 3,
+      "requiredFileRecall": 0.7152777499999999,
+      "requiredSymbolRecall": 0.6522726818181818
+    },
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoff": 5,
+      "requiredFileRecall": 0.8958333333333334,
+      "requiredSymbolRecall": 0.7310606363636364
+    },
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoff": 10,
+      "requiredFileRecall": 0.9305555833333333,
+      "requiredSymbolRecall": 0.7310606363636364
+    },
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoff": 20,
+      "requiredFileRecall": 0.9444444583333333,
+      "requiredSymbolRecall": 0.7310606363636364
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoff": 1,
+      "requiredFileRecall": 0.2986110833333333,
+      "requiredSymbolRecall": 0.32575754545454544
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoff": 3,
+      "requiredFileRecall": 0.49999995833333327,
+      "requiredSymbolRecall": 0.4992424090909091
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoff": 5,
+      "requiredFileRecall": 0.708333375,
+      "requiredSymbolRecall": 0.6022727727272728
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoff": 10,
+      "requiredFileRecall": 0.8958333333333334,
+      "requiredSymbolRecall": 0.7310606363636364
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoff": 20,
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.7537879090909091
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoff": 1,
+      "requiredFileRecall": 0.2986110833333333,
+      "requiredSymbolRecall": 0.32575754545454544
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoff": 3,
+      "requiredFileRecall": 0.49999995833333327,
+      "requiredSymbolRecall": 0.4992424090909091
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoff": 5,
+      "requiredFileRecall": 0.708333375,
+      "requiredSymbolRecall": 0.6022727727272728
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoff": 10,
+      "requiredFileRecall": 0.8958333333333334,
+      "requiredSymbolRecall": 0.7310606363636364
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoff": 20,
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.7537879090909091
+    }
+  ],
+  "matchedRecall": [
+    {
+      "target": 0.8,
+      "systemId": "lexical-full-file-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 3062.5789473684213
+    },
+    {
+      "target": 0.8,
+      "systemId": "structural-full-file-v1",
+      "reached": 20,
+      "total": 22,
+      "meanTokens": 4832.25
+    },
+    {
+      "target": 0.8,
+      "systemId": "contextforge-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 2329.8947368421054
+    },
+    {
+      "target": 0.9,
+      "systemId": "lexical-full-file-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 3062.5789473684213
+    },
+    {
+      "target": 0.9,
+      "systemId": "structural-full-file-v1",
+      "reached": 20,
+      "total": 22,
+      "meanTokens": 4832.25
+    },
+    {
+      "target": 0.9,
+      "systemId": "contextforge-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 2329.8947368421054
+    },
+    {
+      "target": 1,
+      "systemId": "lexical-full-file-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 3062.5789473684213
+    },
+    {
+      "target": 1,
+      "systemId": "structural-full-file-v1",
+      "reached": 20,
+      "total": 22,
+      "meanTokens": 4832.25
+    },
+    {
+      "target": 1,
+      "systemId": "contextforge-v1",
+      "reached": 19,
+      "total": 22,
+      "meanTokens": 2329.8947368421054
+    }
+  ],
+  "tokenReduction": [
+    {
+      "target": 0.8,
+      "baseline": "lexical-full-file-v1",
+      "tasks": 18,
+      "baselineMeanTokens": 2790.3888888888887,
+      "contextforgeMeanTokens": 2359.277777777778,
+      "reduction": 0.014626265055878988
+    },
+    {
+      "target": 0.8,
+      "baseline": "structural-full-file-v1",
+      "tasks": 19,
+      "baselineMeanTokens": 3405.4736842105262,
+      "contextforgeMeanTokens": 2329.8947368421054,
+      "reduction": 0.077900983040649
+    },
+    {
+      "target": 0.9,
+      "baseline": "lexical-full-file-v1",
+      "tasks": 18,
+      "baselineMeanTokens": 2790.3888888888887,
+      "contextforgeMeanTokens": 2359.277777777778,
+      "reduction": 0.014626265055878988
+    },
+    {
+      "target": 0.9,
+      "baseline": "structural-full-file-v1",
+      "tasks": 19,
+      "baselineMeanTokens": 3405.4736842105262,
+      "contextforgeMeanTokens": 2329.8947368421054,
+      "reduction": 0.077900983040649
+    },
+    {
+      "target": 1,
+      "baseline": "lexical-full-file-v1",
+      "tasks": 18,
+      "baselineMeanTokens": 2790.3888888888887,
+      "contextforgeMeanTokens": 2359.277777777778,
+      "reduction": 0.014626265055878988
+    },
+    {
+      "target": 1,
+      "baseline": "structural-full-file-v1",
+      "tasks": 19,
+      "baselineMeanTokens": 3405.4736842105262,
+      "contextforgeMeanTokens": 2329.8947368421054,
+      "reduction": 0.077900983040649
+    }
+  ],
+  "attributionAt8K": {
+    "structuralRanking": {
+      "requiredSymbolDelta": -0.07575759090909095,
+      "precisionDelta": -0.03550579166666665
+    },
+    "contextPacking": {
+      "requiredSymbolDelta": 0.09090909090909094,
+      "precisionDelta": 0.0548433333333333
+    }
+  },
+  "winTieLossAt8K": {
+    "versusLexical": {
+      "wins": 17,
+      "ties": 2,
+      "losses": 5
+    },
+    "versusStructuralFullFile": {
+      "wins": 17,
+      "ties": 7,
+      "losses": 0
+    }
+  },
+  "breakdown": {
+    "language": [
+      {
+        "label": "javascript",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.110572
+      },
+      {
+        "label": "javascript",
+        "systemId": "structural-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 0,
+        "requiredSymbolRecall": 0,
+        "precision": 0.02541
+      },
+      {
+        "label": "javascript",
+        "systemId": "contextforge-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 0,
+        "precision": 0.078284
+      },
+      {
+        "label": "mixed",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 6,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.200143
+      },
+      {
+        "label": "mixed",
+        "systemId": "structural-full-file-v1",
+        "tasks": 6,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.200143
+      },
+      {
+        "label": "mixed",
+        "systemId": "contextforge-v1",
+        "tasks": 6,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.2202936666666667
+      },
+      {
+        "label": "python",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 10,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.21809269999999997
+      },
+      {
+        "label": "python",
+        "systemId": "structural-full-file-v1",
+        "tasks": 10,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.2139661
+      },
+      {
+        "label": "python",
+        "systemId": "contextforge-v1",
+        "tasks": 10,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.2285383
+      },
+      {
+        "label": "typescript",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 18,
+        "requiredFileRecall": 0.7592592777777778,
+        "requiredSymbolRecall": 0.7916666875,
+        "precision": 0.1643531666666667
+      },
+      {
+        "label": "typescript",
+        "systemId": "structural-full-file-v1",
+        "tasks": 18,
+        "requiredFileRecall": 0.6666666666666666,
+        "requiredSymbolRecall": 0.6875,
+        "precision": 0.11930466666666664
+      },
+      {
+        "label": "typescript",
+        "systemId": "contextforge-v1",
+        "tasks": 18,
+        "requiredFileRecall": 0.8888888888888888,
+        "requiredSymbolRecall": 0.8125,
+        "precision": 0.18950166666666665
+      },
+      {
+        "label": "yaml",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.199428
+      },
+      {
+        "label": "yaml",
+        "systemId": "structural-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.199428
+      },
+      {
+        "label": "yaml",
+        "systemId": "contextforge-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.228876
+      }
+    ],
+    "category": [
+      {
+        "label": "AMBIGUOUS_NATURAL_LANGUAGE",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.28171999999999997
+      },
+      {
+        "label": "AMBIGUOUS_NATURAL_LANGUAGE",
+        "systemId": "structural-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.29374849999999997
+      },
+      {
+        "label": "AMBIGUOUS_NATURAL_LANGUAGE",
+        "systemId": "contextforge-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.32367100000000004
+      },
+      {
+        "label": "API_INTEGRATION",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.1108175
+      },
+      {
+        "label": "API_INTEGRATION",
+        "systemId": "structural-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.122949
+      },
+      {
+        "label": "API_INTEGRATION",
+        "systemId": "contextforge-v1",
+        "tasks": 2,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.126701
+      },
+      {
+        "label": "BUG_FIX",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 0,
+        "requiredSymbolRecall": 0,
+        "precision": 0
+      },
+      {
+        "label": "BUG_FIX",
+        "systemId": "structural-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 0,
+        "requiredSymbolRecall": 0,
+        "precision": 0
+      },
+      {
+        "label": "BUG_FIX",
+        "systemId": "contextforge-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 0,
+        "precision": 0
+      },
+      {
+        "label": "CONCURRENCY",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": 0.5,
+        "precision": 0.451776
+      },
+      {
+        "label": "CONCURRENCY",
+        "systemId": "structural-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": 0.5,
+        "precision": 0.1608255
+      },
+      {
+        "label": "CONCURRENCY",
+        "systemId": "contextforge-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": 0.5,
+        "precision": 0.17873750000000002
+      },
+      {
+        "label": "CONFIGURATION",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.15040725
+      },
+      {
+        "label": "CONFIGURATION",
+        "systemId": "structural-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 0.75,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.12911675
+      },
+      {
+        "label": "CONFIGURATION",
+        "systemId": "contextforge-v1",
+        "tasks": 4,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.1511235
+      },
+      {
+        "label": "CROSS_FILE_BUG_FIX",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 3,
+        "requiredFileRecall": 0.8888889999999999,
+        "requiredSymbolRecall": 0.8888889999999999,
+        "precision": 0.2162413333333333
+      },
+      {
+        "label": "CROSS_FILE_BUG_FIX",
+        "systemId": "structural-full-file-v1",
+        "tasks": 3,
+        "requiredFileRecall": 0.6666666666666666,
+        "requiredSymbolRecall": 0.6666666666666666,
+        "precision": 0.13799833333333333
+      },
+      {
+        "label": "CROSS_FILE_BUG_FIX",
+        "systemId": "contextforge-v1",
+        "tasks": 3,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.18545466666666668
+      },
+      {
+        "label": "DOCUMENTATION_ARCHITECTURE",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": null,
+        "precision": 0.0918515
+      },
+      {
+        "label": "DOCUMENTATION_ARCHITECTURE",
+        "systemId": "structural-full-file-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": null,
+        "precision": 0.0918515
+      },
+      {
+        "label": "DOCUMENTATION_ARCHITECTURE",
+        "systemId": "contextforge-v1",
+        "tasks": 2,
+        "requiredFileRecall": 0.5,
+        "requiredSymbolRecall": null,
+        "precision": 0.1287385
+      },
+      {
+        "label": "EXACT_SYMBOL",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 0.75,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.08875025
+      },
+      {
+        "label": "EXACT_SYMBOL",
+        "systemId": "structural-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 0.75,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.08578150000000001
+      },
+      {
+        "label": "EXACT_SYMBOL",
+        "systemId": "contextforge-v1",
+        "tasks": 4,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.293576
+      },
+      {
+        "label": "REFACTOR",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.249641
+      },
+      {
+        "label": "REFACTOR",
+        "systemId": "structural-full-file-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.249641
+      },
+      {
+        "label": "REFACTOR",
+        "systemId": "contextforge-v1",
+        "tasks": 1,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.268105
+      },
+      {
+        "label": "TEST_FAILURE",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 3,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.14565899999999998
+      },
+      {
+        "label": "TEST_FAILURE",
+        "systemId": "structural-full-file-v1",
+        "tasks": 3,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.15006166666666665
+      },
+      {
+        "label": "TEST_FAILURE",
+        "systemId": "contextforge-v1",
+        "tasks": 3,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.1698133333333333
+      }
+    ],
+    "difficulty": [
+      {
+        "label": "EASY",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 0.75,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.08875025
+      },
+      {
+        "label": "EASY",
+        "systemId": "structural-full-file-v1",
+        "tasks": 4,
+        "requiredFileRecall": 0.75,
+        "requiredSymbolRecall": 0.75,
+        "precision": 0.08578150000000001
+      },
+      {
+        "label": "EASY",
+        "systemId": "contextforge-v1",
+        "tasks": 4,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 1,
+        "precision": 0.293576
+      },
+      {
+        "label": "HARD",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 9,
+        "requiredFileRecall": 0.7407407777777778,
+        "requiredSymbolRecall": 0.833333375,
+        "precision": 0.26024477777777777
+      },
+      {
+        "label": "HARD",
+        "systemId": "structural-full-file-v1",
+        "tasks": 9,
+        "requiredFileRecall": 0.7777777777777778,
+        "requiredSymbolRecall": 0.875,
+        "precision": 0.19691244444444445
+      },
+      {
+        "label": "HARD",
+        "systemId": "contextforge-v1",
+        "tasks": 9,
+        "requiredFileRecall": 0.7777777777777778,
+        "requiredSymbolRecall": 0.875,
+        "precision": 0.22123877777777778
+      },
+      {
+        "label": "MEDIUM",
+        "systemId": "lexical-full-file-v1",
+        "tasks": 11,
+        "requiredFileRecall": 0.9090909090909091,
+        "requiredSymbolRecall": 0.9,
+        "precision": 0.13337254545454544
+      },
+      {
+        "label": "MEDIUM",
+        "systemId": "structural-full-file-v1",
+        "tasks": 11,
+        "requiredFileRecall": 0.7272727272727273,
+        "requiredSymbolRecall": 0.7,
+        "precision": 0.10880227272727273
+      },
+      {
+        "label": "MEDIUM",
+        "systemId": "contextforge-v1",
+        "tasks": 11,
+        "requiredFileRecall": 1,
+        "requiredSymbolRecall": 0.8,
+        "precision": 0.13299545454545456
+      }
+    ]
+  }
+}

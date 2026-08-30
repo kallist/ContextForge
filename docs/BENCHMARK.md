@@ -5,10 +5,12 @@
 - Benchmark implementation: `contextforge-benchmark-v1`
 - Dataset: `contextforge-dataset-v1`
 - Frozen dataset hash: `75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002`
-- Formal reference results: generated only after full quality, performance, and review gates complete
+- Formal reference results: **LOCAL PASS on Windows/Node 24.20.0**; see `BENCHMARK_RESULTS_V1.md` and `benchmarks/reference/contextforge-benchmark-v1/`
 - Agent execution comparison: **NOT IMPLEMENTED / NOT TESTED**
 
 `contextforge-benchmark-v1` evaluates repository context quality. It does not solve coding tasks, execute corpus code, call a model, or use a judge. A valid negative product result does not invalidate the framework; invalid Gold, leakage, unfair budgets, silently dropped cases, or irreproducible metric semantics do.
+
+The first frozen full run produced all 360 expected task/system/budget records. Repeating the final quality run produced identical SHA-256 hashes for raw JSON, aggregate JSON, and Markdown. The 8K result and matched-recall evidence are intentionally mixed; no general token-savings claim follows from them. The reviewed interpretation is in `BENCHMARK_RESULTS_V1.md`.
 
 ## Corpus and tasks
 
@@ -142,6 +144,8 @@ Generated artifacts appear under ignored `.benchmark-output/`:
 - `aggregate-results.json`: machine-readable aggregates;
 - `benchmark-report.md`: deterministic human report;
 - `performance-results.json`: environment and raw timing samples.
+
+The versioned reference directory commits these four source-free artifacts for the first formal run. Generated working files remain ignored so later local runs do not dirty the repository.
 
 Normal `npm test` runs benchmark math, schema/parser, invalid-data, baseline, fairness, leakage, budget, determinism, and report tests without running the 24 × 3 × 5 full corpus.
 

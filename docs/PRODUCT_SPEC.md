@@ -4,7 +4,7 @@
 
 This document defines what ContextForge should do and why. It consolidates the product requirements from `CONTEXTFORGE_MASTER_SPEC.md` without claiming that they are implemented. Implementation status and design decisions belong in `ARCHITECTURE.md`; measurement procedures and results belong in `BENCHMARK.md`.
 
-**Product status: V1 SPECIFIED — NOT IMPLEMENTED**
+**Product status: V1 SPECIFIED — implementation status is tracked in `ARCHITECTURE.md`**
 
 ## Product Vision
 
@@ -345,7 +345,7 @@ The desired engineering targets are:
 - Gold Symbol Recall@Budget ≥ 85%;
 - Token Reduction ≥ 60%.
 
-These are targets, not guaranteed or measured results. Current results are `NOT RUN / NOT TESTED`. See `BENCHMARK.md` for definitions and reporting rules.
+These remain targets, not guarantees. The first `contextforge-benchmark-v1` formal run measured 91.7% required-file recall and 86.4% required-symbol recall at 8K for `contextforge-v1`, while matched-recall paired macro token reduction was 1.5% versus lexical whole-file and 7.8% versus structural whole-file. The 60% token-reduction target was therefore **NOT MET** on this dataset. See `BENCHMARK.md` for definitions and `BENCHMARK_RESULTS_V1.md` for the evidence and limitations.
 
 ## Deferred Roadmap
 

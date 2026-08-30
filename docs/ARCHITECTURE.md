@@ -2,28 +2,29 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–5 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–6 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing. Phase 6 and later product modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation. Later integration modules remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
 ## Repository Audit
 
-Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phases 2–5).
+Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phases 2–6).
 
 ### Current State
 
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-30, Phase 0–5 are implemented and locally exercised on Windows. Benchmark fixtures/results, MCP, remote providers, and release artifacts remain absent.
+- As of 2026-08-30, Phase 0–6 are implemented and locally exercised on Windows. The frozen benchmark corpus, raw/aggregate reference results, and reviewed report are present; MCP, remote providers, and release artifacts remain absent.
 
 ### Existing Assets
 
 - `AGENTS.md`: durable engineering rules.
 - `docs/PRODUCT_SPEC.md`: product behavior and V1 acceptance criteria.
-- `docs/BENCHMARK.md`: metrics, integrity rules, and `NOT RUN / NOT TESTED` status.
+- `docs/BENCHMARK.md`: frozen metrics, integrity rules, reproduction commands, and reference-result boundary.
+- `docs/BENCHMARK_RESULTS_V1.md`: reviewed quality/performance evidence and claims gate.
 - `CONTEXTFORGE_MASTER_SPEC.md`: preserved reference source.
 - `README.md`: truthful project entry point.
 
@@ -49,7 +50,7 @@ This environment demonstrates why consumer-side native compilation must not be r
 
 - hosted execution evidence for the committed Ubuntu/Windows/macOS CI workflow;
 - macOS package and filesystem validation;
-- benchmark fixtures and harness.
+- external-human Gold/methodology review and large external-repository benchmark coverage.
 
 ### Principal Risks
 
@@ -113,7 +114,7 @@ The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tre
 
 ## Proposed Source Layout
 
-The Phase 0–5 subset now exists; benchmark and MCP adapters remain planned:
+The Phase 0–6 subset now exists; MCP adapters remain planned:
 
 ```text
 src/
@@ -407,7 +408,7 @@ npm run smoke
 npm pack --dry-run
 ```
 
-The Phase 0 workflow runs the full lint, typecheck, test, build, CLI smoke, and package-install smoke gates on `ubuntu-latest` and `windows-latest` with Node 24.20.0. macOS and later parser/SQLite asset checks remain Phase 2/8 additions. All tests are offline by default. Paid-model or real-agent benchmarks are never merge gates.
+The workflow runs lint, typecheck, tests, build, CLI smoke, package-install smoke, and the bounded benchmark smoke on `ubuntu-latest`, `windows-latest`, and `macos-latest` with Node 24.20.0. All tests are offline by default. The full 360-case quality run, performance timings, paid-model tests, and real-agent benchmarks are not merge gates.
 
 ## Implementation Phases
 
@@ -451,7 +452,9 @@ Pack reads, hashes, and slices each candidate from the same source string. Hash 
 
 ### Phase 6 — Offline Benchmark
 
-Create licensed/versioned TypeScript, Python, and mixed-language cases with independently reviewed Gold Context. Run production paths and report recall, precision, token reduction, selected files, index/pack duration, and failures without fabricating targets.
+**IMPLEMENTED.** `contextforge-benchmark-v1` freezes 24 manually reviewed Gold tasks across four repository snapshots and compares lexical whole-file, production structural ranking with whole-file packing, and the production rank-and-pack path under one estimator and five hard budgets. Gold is evaluator-only, pinned/curated corpus identities are hashed, invalid entities fail before scoring, quality output is byte-deterministic, and environment-specific performance remains separate. The benchmark is developer tooling rather than a new production CLI command. See ADR-007 and `BENCHMARK_RESULTS_V1.md`.
+
+The first formal result is mixed and retained without production tuning: structural whole-file retrieval underperformed lexical retrieval on this finite dataset, while ContextForge packing improved 8K required-symbol recall and precision over structural whole-file. Matched-recall paired macro token reduction was 1.5% versus lexical and 7.8% versus structural whole-file, so no strong general token-savings claim is justified. External-human review, large external repositories, cross-platform full-run reproduction, and coding-agent task success remain untested.
 
 ### Phase 7 — MCP and Coding-Agent Integration
 
@@ -569,6 +572,6 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Repository Graph, import resolution, tests/docs/Git signals, and graph CLI | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Task retrieval, ranking, and bounded graph expansion | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Token estimator and Context Pack | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| Benchmark harness/results | NOT IMPLEMENTED / NOT RUN |
+| Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | MCP adapter | NOT IMPLEMENTED / DEFERRED |
 | Hosted CI workflow | IMPLEMENTED (Ubuntu/Windows/macOS matrix) / NOT RUN |

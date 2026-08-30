@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0–5 implemented — Safe Map through hard-budget Context Packing**
+**Status: Phase 0–6 implemented — Safe Map through reproducible offline evaluation**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -20,9 +20,9 @@ The product goal is to preserve the context needed to complete a task while redu
 
 ## Current State
 
-ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest.
+ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest. Phase 6 adds a frozen, offline benchmark that compares this production path with lexical and structural whole-file baselines.
 
-Benchmark scoring, MCP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
+MCP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
 
 ## Requirements
 
@@ -62,6 +62,19 @@ npm run package:smoke
 ```
 
 That smoke test runs `npm pack`, installs the tarball into a fresh temporary project, and invokes the installed `contextforge` binary. It does not publish the package.
+
+## Offline benchmark evidence
+
+`contextforge-benchmark-v1` contains 24 frozen Gold tasks across a pinned ContextForge revision and curated TypeScript, Python, and mixed-language repositories. It runs offline against `lexical-full-file-v1`, `structural-full-file-v1`, and the production `contextforge-v1` path at 2K, 4K, 8K, 16K, and 32K estimator-token budgets.
+
+The first formal run is published in [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md). It shows mixed evidence rather than a blanket win: at 8K, ContextForge reached 0.917 required-file recall, 0.864 required-symbol recall, and 0.193 Gold-range precision; structural ranking alone underperformed the lexical baseline on this dataset, while production packing recovered recall and precision relative to structural whole-file packing. At matched required-symbol recall, paired macro token reductions were 1.5% versus lexical whole-file and 7.8% versus structural whole-file—well below the 60% product target. These figures describe this finite benchmark only, not coding-agent success or a general token-savings claim.
+
+```text
+npm run benchmark:validate
+npm run benchmark:smoke
+npm run benchmark
+npm run benchmark:performance
+```
 
 ## Language analysis and index behavior
 
@@ -125,10 +138,11 @@ An ignored directory contributes one exclusion count; unvisited descendants are 
 ## Project Documents
 
 - [Product Specification](docs/PRODUCT_SPEC.md) — required product behavior, scope, and V1 acceptance criteria.
-- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through Context Packing.
-- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, and packing decisions.
-- [Benchmark](docs/BENCHMARK.md) — evaluation protocol, metric definitions, targets, and current not-run status.
+- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through offline evaluation.
+- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, and benchmark decisions.
+- [Benchmark](docs/BENCHMARK.md) — frozen evaluation protocol, metric definitions, reproduction commands, and evidence boundary.
+- [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md) — reviewed formal quality and environment-specific performance results.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
 
-The next planned engineering phase is **Phase 6 — Offline Benchmark**, defined in `docs/ARCHITECTURE.md`. It is not part of the current implementation.
+The next planned engineering phase is **Phase 7 — MCP and Coding-Agent Integration**, defined in `docs/ARCHITECTURE.md`. It has not been started.

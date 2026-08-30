@@ -7,7 +7,10 @@ This directory contains the frozen, offline `contextforge-benchmark-v1` protocol
 - `dataset-v1.json`: 24 manually authored tasks and Gold annotations.
 - `dataset-v1.lock.json`: frozen canonical dataset hash and review state.
 - `GOLD_REVIEW_V1.md`: pre-score Gold review and known review limitation.
+- `METHODOLOGY_REVIEW_V1.md`: pre-score baseline, metric, leakage, security, and reproducibility review.
+- `RESULTS_REVIEW_V1.md`: post-score failure, claims, and final integrity review.
 - `corpus/`: curated TypeScript, Python, and mixed-language repositories.
+- `reference/contextforge-benchmark-v1/`: versioned source-free raw, aggregate, report, and performance evidence from the first formal run.
 - `schema/`: versioned dataset and quality-result schema descriptions.
 - `src/`: materialization, baselines, production adapters, metrics, aggregation, and deterministic report generation.
 

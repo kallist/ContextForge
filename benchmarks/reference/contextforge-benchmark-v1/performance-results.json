@@ -1,0 +1,296 @@
+{
+  "benchmarkVersion": "contextforge-benchmark-v1",
+  "datasetVersion": "contextforge-dataset-v1",
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "contextforgeCommit": "8790fecebe4c9026afdf0e5a6d03cfe7f69cb35d",
+  "rankingStrategy": "contextforge-structural-v1",
+  "packingStrategy": "contextforge-pack-v1",
+  "tokenEstimator": "contextforge-generic-v1",
+  "tokenEstimatorVersion": "1.0",
+  "baselineVersions": [
+    "lexical-full-file-v1",
+    "structural-full-file-v1"
+  ],
+  "environment": {
+    "os": "win32",
+    "osRelease": "10.0.26200",
+    "architecture": "x64",
+    "node": "v24.20.0"
+  },
+  "repetitions": 3,
+  "note": "Environment-specific medians; not an SLA.",
+  "medians": [
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "lexical-full-file-v1",
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 180.22169999999824,
+      "packingMs": 197.37200000000303,
+      "totalMs": 377.66449999999895
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "structural-full-file-v1",
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 488.7327000000005,
+      "packingMs": 165.78610000000117,
+      "totalMs": 654.6353999999992
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "contextforge-v1",
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 462.9688000000024,
+      "packingMs": 147.32890000000043,
+      "totalMs": 602.553899999999
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "lexical-full-file-v1",
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 1163.5953000000009,
+      "packingMs": 1737.1293000000005,
+      "totalMs": 2815.7223999999987
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "structural-full-file-v1",
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 2384.3006000000023,
+      "packingMs": 90.64250000000175,
+      "totalMs": 2461.950199999992
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "contextforge-v1",
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 2265.1505999999936,
+      "packingMs": 61.594300000004296,
+      "totalMs": 2326.744899999998
+    }
+  ],
+  "samples": [
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 1,
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 219.92369999999937,
+      "packingMs": 212.63410000000022,
+      "totalMs": 432.8629000000001
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 1,
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 490.5542999999998,
+      "packingMs": 165.3667000000005,
+      "totalMs": 656.6614
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 1,
+      "indexMs": 774.3377999999993,
+      "retrievalMs": 464.9994000000006,
+      "packingMs": 147.32890000000043,
+      "totalMs": 612.328300000001
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 2,
+      "indexMs": 634.4064999999991,
+      "retrievalMs": 178.01699999999983,
+      "packingMs": 180.78940000000148,
+      "totalMs": 358.90279999999984
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 2,
+      "indexMs": 634.4064999999991,
+      "retrievalMs": 443.00160000000324,
+      "packingMs": 206.97629999999845,
+      "totalMs": 650.1140000000014
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 2,
+      "indexMs": 634.4064999999991,
+      "retrievalMs": 446.4913000000015,
+      "packingMs": 150.41969999999856,
+      "totalMs": 596.9110000000001
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 3,
+      "indexMs": 889.3436000000002,
+      "retrievalMs": 180.22169999999824,
+      "packingMs": 197.37200000000303,
+      "totalMs": 377.66449999999895
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 3,
+      "indexMs": 889.3436000000002,
+      "retrievalMs": 488.7327000000005,
+      "packingMs": 165.78610000000117,
+      "totalMs": 654.6353999999992
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskId": "self-pack-exact",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 3,
+      "indexMs": 889.3436000000002,
+      "retrievalMs": 462.9688000000024,
+      "packingMs": 139.5850999999966,
+      "totalMs": 602.553899999999
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 1,
+      "indexMs": 4413.379099999998,
+      "retrievalMs": 1283.1437000000005,
+      "packingMs": 1762.9965999999986,
+      "totalMs": 3046.632900000004
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 1,
+      "indexMs": 4413.379099999998,
+      "retrievalMs": 2528.758999999998,
+      "packingMs": 91.12589999999909,
+      "totalMs": 2619.9541000000027
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 1,
+      "indexMs": 4413.379099999998,
+      "retrievalMs": 2206.212599999999,
+      "packingMs": 57.6620000000039,
+      "totalMs": 2263.874600000003
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 2,
+      "indexMs": 3676.0618999999933,
+      "retrievalMs": 1078.3672000000006,
+      "packingMs": 1737.1293000000005,
+      "totalMs": 2815.7223999999987
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 2,
+      "indexMs": 3676.0618999999933,
+      "retrievalMs": 2337.5611999999965,
+      "packingMs": 90.64250000000175,
+      "totalMs": 2428.3336999999956
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 2,
+      "indexMs": 3676.0618999999933,
+      "retrievalMs": 2265.1505999999936,
+      "packingMs": 61.594300000004296,
+      "totalMs": 2326.744899999998
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "repetition": 3,
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 1163.5953000000009,
+      "packingMs": 1573.9775999999983,
+      "totalMs": 2737.9184999999998
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "repetition": 3,
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 2384.3006000000023,
+      "packingMs": 77.42900000000373,
+      "totalMs": 2461.950199999992
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "taskId": "medium-synthetic-service-420",
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "repetition": 3,
+      "indexMs": 4071.117400000003,
+      "retrievalMs": 2744.2530000000115,
+      "packingMs": 97.20779999998922,
+      "totalMs": 2841.4608000000007
+    }
+  ]
+}
