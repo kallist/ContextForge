@@ -173,6 +173,7 @@ export interface QualityRun {
 
 export interface PerformanceSample {
   readonly repositoryId: string;
+  readonly repositoryRevision: string;
   readonly taskId: string;
   readonly budget: number;
   readonly systemId: SystemId;

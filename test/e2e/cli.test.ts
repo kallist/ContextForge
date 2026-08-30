@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import test from "node:test";
 
+import { createRepositoryRuntime, runBenchmarkSystem } from "../../benchmarks/src/systems.js";
 import { createTemporaryDirectory, removeTemporaryDirectory, writeFixture } from "../helpers/fixtures.js";
 
 const cliPath = resolve("dist", "cli", "main.js");
@@ -299,11 +300,14 @@ test("compiled CLI packs Markdown/manifest within budget, keeps streams pure, an
   const manifest = JSON.parse(first.stdout) as {
     schemaVersion: string;
     generation: number;
+    packStatus: "COMPLETE" | "PARTIAL";
+    rankingStrategy: string;
     packingStrategy: string;
     tokenEstimator: string;
     requestedBudget: number;
     estimatedPayloadTokens: number;
-    selectedItems: { relativePath: string; selectedRanges: unknown[] }[];
+    selectedItems: { relativePath: string; selectedRanges: { startLine: number; endLine: number; reasons: string[] }[] }[];
+    diagnostics: string[];
   };
   assert.equal(manifest.schemaVersion, "1.0");
   assert.equal(manifest.generation, 1);
@@ -313,6 +317,23 @@ test("compiled CLI packs Markdown/manifest within budget, keeps streams pure, an
   assert.ok(manifest.estimatedPayloadTokens <= manifest.requestedBudget);
   assert.ok(manifest.selectedItems.some((item) => item.relativePath === "src/memory.ts" && item.selectedRanges.length > 0));
   assert.equal(first.stdout.includes(root), false);
+
+  const benchmarkSelection = await runBenchmarkSystem(
+    "contextforge-v1",
+    await createRepositoryRuntime(root),
+    "MemoryService.disableMemory",
+    2_000,
+  );
+  assert.equal(benchmarkSelection.rankingStrategy, manifest.rankingStrategy);
+  assert.equal(benchmarkSelection.packingStrategy, manifest.packingStrategy);
+  assert.equal(benchmarkSelection.tokenEstimator, manifest.tokenEstimator);
+  assert.equal(benchmarkSelection.payloadTokens, manifest.estimatedPayloadTokens);
+  assert.equal(benchmarkSelection.status, manifest.packStatus);
+  assert.deepEqual(benchmarkSelection.diagnostics, manifest.diagnostics);
+  assert.deepEqual(
+    benchmarkSelection.selectedRanges,
+    manifest.selectedItems.map((item) => ({ path: item.relativePath, ranges: item.selectedRanges })),
+  );
 
   const output = join(root, "context.md");
   const written = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--out", output]);

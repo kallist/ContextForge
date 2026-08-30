@@ -47,16 +47,30 @@ function tokensByTask(run: QualityRun, systemId: SystemId, target: number): Map<
   return result;
 }
 
-function pairedReduction(run: QualityRun, baseline: Exclude<SystemId, "contextforge-v1">, target: number): { tasks: number; reduction: number | null } {
+function pairedReduction(run: QualityRun, baseline: Exclude<SystemId, "contextforge-v1">, target: number): {
+  tasks: number;
+  baselineMeanTokens: number | null;
+  contextforgeMeanTokens: number | null;
+  reduction: number | null;
+} {
   const baselineTokens = tokensByTask(run, baseline, target);
   const contextTokens = tokensByTask(run, "contextforge-v1", target);
+  const pairedBaselineTokens: number[] = [];
+  const pairedContextTokens: number[] = [];
   const reductions: number[] = [];
   for (const [key, baselineValue] of baselineTokens) {
     const contextValue = contextTokens.get(key);
     if (contextValue === undefined || baselineValue === 0) continue;
+    pairedBaselineTokens.push(baselineValue);
+    pairedContextTokens.push(contextValue);
     reductions.push(1 - contextValue / baselineValue);
   }
-  return { tasks: reductions.length, reduction: mean(reductions) };
+  return {
+    tasks: reductions.length,
+    baselineMeanTokens: mean(pairedBaselineTokens),
+    contextforgeMeanTokens: mean(pairedContextTokens),
+    reduction: mean(reductions),
+  };
 }
 
 function comparison(run: QualityRun, left: SystemId, right: SystemId, budget: number): { requiredSymbolDelta: number | null; precisionDelta: number | null } {
@@ -121,9 +135,11 @@ export function aggregateQualityRun(run: QualityRun): unknown {
       requiredFileRecall: mean(values.map((item) => item.requiredFileRecall)),
       requiredSymbolRecall: mean(values.map((item) => item.requiredSymbolRecall)),
       symbolRecall: mean(values.map((item) => item.symbolRecall)),
+      overallGoldRecall: mean(values.map((item) => item.overallGoldRecall)),
       precision: mean(values.map((item) => item.goldRangePrecision)),
       noiseRatio: mean(values.map((item) => item.noiseRatio)),
       meanPayloadTokens: mean(values.map((item) => item.payloadTokens)),
+      meanSerializationOverheadTokens: mean(values.map((item) => item.serializationOverheadTokens)),
     };
   }));
   const retrieval = SYSTEM_IDS.flatMap((systemId) => RETRIEVAL_CUTOFFS.map((cutoff) => {
@@ -181,11 +197,11 @@ function retrievalTable(run: QualityRun): string[] {
 }
 
 function fixedBudgetTable(run: QualityRun): string[] {
-  const lines = ["| Budget | System | Required file | Required symbol | Overall symbol | Precision | Noise | Mean payload tokens |", "|---:|---|---:|---:|---:|---:|---:|---:|"];
+  const lines = ["| Budget | System | Required file | Required symbol | Overall symbol | Overall Gold | Precision | Noise | Mean payload tokens |", "|---:|---|---:|---:|---:|---:|---:|---:|---:|"];
   for (const budget of QUALITY_BUDGETS.filter((item) => run.manifest.budgets.includes(item))) {
     for (const systemId of SYSTEM_IDS) {
       const values = cases(run, systemId, budget);
-      lines.push(`| ${budget} | ${systemId} | ${format(mean(values.map((item) => item.requiredFileRecall)))} | ${format(mean(values.map((item) => item.requiredSymbolRecall)))} | ${format(mean(values.map((item) => item.symbolRecall)))} | ${format(mean(values.map((item) => item.goldRangePrecision)))} | ${format(mean(values.map((item) => item.noiseRatio)))} | ${format(mean(values.map((item) => item.payloadTokens)))} |`);
+      lines.push(`| ${budget} | ${systemId} | ${format(mean(values.map((item) => item.requiredFileRecall)))} | ${format(mean(values.map((item) => item.requiredSymbolRecall)))} | ${format(mean(values.map((item) => item.symbolRecall)))} | ${format(mean(values.map((item) => item.overallGoldRecall)))} | ${format(mean(values.map((item) => item.goldRangePrecision)))} | ${format(mean(values.map((item) => item.noiseRatio)))} | ${format(mean(values.map((item) => item.payloadTokens)))} |`);
     }
   }
   return lines;
@@ -213,11 +229,35 @@ function languageBreakdown(run: QualityRun): string[] {
 }
 
 export function renderBenchmarkReport(run: QualityRun): string {
-  const contextAtEight = cases(run, "contextforge-v1", 8_000).sort((left, right) =>
-    (left.requiredSymbolRecall ?? 1) - (right.requiredSymbolRecall ?? 1) ||
-    (left.requiredFileRecall ?? 1) - (right.requiredFileRecall ?? 1) ||
-    left.taskId.localeCompare(right.taskId, "en"),
-  );
+  const contextAtEight = cases(run, "contextforge-v1", 8_000);
+  const lexicalAtEight = new Map(cases(run, "lexical-full-file-v1", 8_000).map((item) => [taskKey(item), item]));
+  const worstAtEight = [...contextAtEight].sort((left, right) => {
+    const leftMisses = left.missedRequiredFiles.length + left.missedRequiredSymbols.length;
+    const rightMisses = right.missedRequiredFiles.length + right.missedRequiredSymbols.length;
+    const leftLexical = lexicalAtEight.get(taskKey(left));
+    const rightLexical = lexicalAtEight.get(taskKey(right));
+    const leftRequiredDelta = (left.requiredSymbolRecall ?? -1) - (leftLexical?.requiredSymbolRecall ?? -1);
+    const rightRequiredDelta = (right.requiredSymbolRecall ?? -1) - (rightLexical?.requiredSymbolRecall ?? -1);
+    const leftPrecisionDelta = (left.goldRangePrecision ?? -1) - (leftLexical?.goldRangePrecision ?? -1);
+    const rightPrecisionDelta = (right.goldRangePrecision ?? -1) - (rightLexical?.goldRangePrecision ?? -1);
+    return rightMisses - leftMisses || leftRequiredDelta - rightRequiredDelta || leftPrecisionDelta - rightPrecisionDelta || left.taskId.localeCompare(right.taskId, "en");
+  });
+  const bestAtEight = contextAtEight.filter((context) => {
+    const lexical = lexicalAtEight.get(taskKey(context));
+    if (lexical === undefined) return false;
+    const contextRequired = context.requiredSymbolRecall ?? -1;
+    const lexicalRequired = lexical.requiredSymbolRecall ?? -1;
+    return contextRequired > lexicalRequired ||
+      (contextRequired === lexicalRequired && (context.goldRangePrecision ?? -1) > (lexical.goldRangePrecision ?? -1));
+  }).sort((left, right) => {
+    const leftLexical = lexicalAtEight.get(taskKey(left));
+    const rightLexical = lexicalAtEight.get(taskKey(right));
+    const leftRequiredDelta = (left.requiredSymbolRecall ?? -1) - (leftLexical?.requiredSymbolRecall ?? -1);
+    const rightRequiredDelta = (right.requiredSymbolRecall ?? -1) - (rightLexical?.requiredSymbolRecall ?? -1);
+    const leftPrecisionDelta = (left.goldRangePrecision ?? -1) - (leftLexical?.goldRangePrecision ?? -1);
+    const rightPrecisionDelta = (right.goldRangePrecision ?? -1) - (rightLexical?.goldRangePrecision ?? -1);
+    return rightRequiredDelta - leftRequiredDelta || rightPrecisionDelta - leftPrecisionDelta || left.taskId.localeCompare(right.taskId, "en");
+  });
   const lines = [
     "# ContextForge Offline Benchmark V1 Results",
     "",
@@ -254,13 +294,13 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     "## Matched-recall token reduction",
     "",
-    "| Target | Baseline | Paired tasks | Macro mean reduction |",
-    "|---:|---|---:|---:|",
+    "| Target | Baseline | Paired tasks | Mean baseline tokens | Mean ContextForge tokens | Macro mean reduction |",
+    "|---:|---|---:|---:|---:|---:|",
   );
   for (const target of MATCHED_RECALL_TARGETS) {
     for (const baseline of ["lexical-full-file-v1", "structural-full-file-v1"] as const) {
       const reduction = pairedReduction(run, baseline, target);
-      lines.push(`| ${(target * 100).toFixed(0)}% | ${baseline} | ${reduction.tasks} | ${reduction.reduction === null ? "NOT AVAILABLE" : `${(reduction.reduction * 100).toFixed(1)}%`} |`);
+      lines.push(`| ${(target * 100).toFixed(0)}% | ${baseline} | ${reduction.tasks} | ${format(reduction.baselineMeanTokens)} | ${format(reduction.contextforgeMeanTokens)} | ${reduction.reduction === null ? "NOT AVAILABLE" : `${(reduction.reduction * 100).toFixed(1)}%`} |`);
     }
   }
   const structuralValue = comparison(run, "structural-full-file-v1", "lexical-full-file-v1", 8_000);
@@ -297,8 +337,21 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "| Task | Required file | Required symbol | Missed required context | Attribution |",
     "|---|---:|---:|---|---|",
   );
-  for (const item of contextAtEight.slice(0, 5)) {
+  for (const item of worstAtEight.slice(0, 5)) {
     lines.push(`| ${item.taskId} | ${format(item.requiredFileRecall)} | ${format(item.requiredSymbolRecall)} | ${[...item.missedRequiredFiles, ...item.missedRequiredSymbols].join(", ") || "none"} | ${item.failureAttribution.join(", ") || "none"} |`);
+  }
+  lines.push(
+    "",
+    "## Notable ContextForge wins versus lexical full-file at 8K",
+    "",
+    "| Task | ContextForge required symbol | Lexical required symbol | ContextForge precision | Lexical precision |",
+    "|---|---:|---:|---:|---:|",
+  );
+  for (const item of bestAtEight.slice(0, 5)) {
+    const lexical = lexicalAtEight.get(taskKey(item));
+    if (lexical !== undefined) {
+      lines.push(`| ${item.taskId} | ${format(item.requiredSymbolRecall)} | ${format(lexical.requiredSymbolRecall)} | ${format(item.goldRangePrecision)} | ${format(lexical.goldRangePrecision)} |`);
+    }
   }
   lines.push(
     "",
@@ -313,5 +366,5 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "- TypeScript aliases, advanced Python imports, pure synonym retrieval, large external repositories, and cross-platform benchmark execution remain limitations or untested paths.",
     "",
   );
-  return `${lines.join("\n")}\n`;
+  return lines.join("\n");
 }

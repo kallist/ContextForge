@@ -189,6 +189,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
         const selection = await runBenchmarkSystem(systemId, prepared.runtime, task.taskText, 8_000);
         samples.push({
           repositoryId: pinned.repositoryId,
+          repositoryRevision: pinned.repositoryRevision,
           taskId: task.taskId,
           budget: 8_000,
           systemId,
@@ -219,6 +220,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
         const selection = await runBenchmarkSystem(systemId, runtime, "repair Service420.runService420 dependency behavior", 8_000);
         samples.push({
           repositoryId: "medium-synthetic-1000",
+          repositoryRevision: `sha256:${materialized.sourceHash}`,
           taskId: "medium-synthetic-service-420",
           budget: 8_000,
           systemId,
@@ -238,6 +240,12 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
     benchmarkVersion: BENCHMARK_VERSION,
     datasetVersion: DATASET_VERSION,
     datasetHash: datasetHash(dataset),
+    contextforgeCommit: await gitHead(workspaceRoot),
+    rankingStrategy: RANKING_STRATEGY,
+    packingStrategy: PACKING_STRATEGY,
+    tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
+    tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
+    baselineVersions: ["lexical-full-file-v1", "structural-full-file-v1"],
     environment: { os: platform(), osRelease: release(), architecture: arch(), node: process.version },
     repetitions: 3,
     note: "Environment-specific medians; not an SLA.",
@@ -245,6 +253,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
       const selected = samples.filter((sample) => sample.repositoryId === repositoryId && sample.systemId === systemId);
       return {
         repositoryId,
+        repositoryRevision: selected[0]?.repositoryRevision ?? "unknown",
         systemId,
         indexMs: median(selected.flatMap((sample) => sample.indexMs === null ? [] : [sample.indexMs])),
         retrievalMs: median(selected.map((sample) => sample.retrievalMs)),
