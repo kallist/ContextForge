@@ -2,9 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": ".test-dist",
+    "outDir": ".benchmark-dist",
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "benchmarks/src/**/*.ts"]
+  "include": ["src/**/*.ts", "benchmarks/src/**/*.ts"]
 }

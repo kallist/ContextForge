@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextforge.local/schema/benchmark-dataset-v1.json",
+  "title": "ContextForge benchmark dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmarkVersion", "datasetVersion", "repositories", "tasks"],
+  "properties": {
+    "benchmarkVersion": { "const": "contextforge-benchmark-v1" },
+    "datasetVersion": { "const": "contextforge-dataset-v1" },
+    "repositories": { "type": "array", "minItems": 1 },
+    "tasks": { "type": "array", "minItems": 24 }
+  }
+}

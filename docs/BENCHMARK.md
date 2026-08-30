@@ -1,213 +1,150 @@
-# ContextForge Benchmark Specification
+# ContextForge Offline Benchmark Protocol
 
-## Status
+## Status and versions
 
-- **Benchmark implementation: NOT IMPLEMENTED**
-- **Offline benchmark results: NOT RUN / NOT TESTED**
-- **Real coding-agent comparison: NOT RUN / NOT TESTED**
+- Benchmark implementation: `contextforge-benchmark-v1`
+- Dataset: `contextforge-dataset-v1`
+- Frozen dataset hash: `75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002`
+- Formal reference results: generated only after full quality, performance, and review gates complete
+- Agent execution comparison: **NOT IMPLEMENTED / NOT TESTED**
 
-The values in the Target Metrics section are engineering goals, not observed results.
+`contextforge-benchmark-v1` evaluates repository context quality. It does not solve coding tasks, execute corpus code, call a model, or use a judge. A valid negative product result does not invalidate the framework; invalid Gold, leakage, unfair budgets, silently dropped cases, or irreproducible metric semantics do.
 
-## Benchmark Goals
+## Corpus and tasks
 
-The benchmark must supply evidence for three product questions:
+The frozen dataset contains 24 manually authored tasks across four repositories:
 
-1. Did ContextForge select the right context?
-2. Did it use fewer tokens?
-3. Can it explain why the context was selected?
+1. the read-only ContextForge Phase 05 Git revision `77944250fe022794cb4b86b96415c8fac625f632`;
+2. a curated TypeScript authentication repository;
+3. a curated Python queue repository;
+4. a curated mixed TypeScript/Python/JavaScript/YAML profile repository.
 
-The offline suite is a V1 requirement. It must exercise the production indexing, retrieval, ranking, budgeting, and packing path rather than a benchmark-only approximation.
+Each repository contributes six tasks. Categories cover exact symbol, bug fix, cross-file bug fix, test failure, concurrency-like behavior, configuration, API integration, refactor, architecture documentation, and ambiguous natural language. The four EASY exact-symbol cases are explicit controls; difficulty is assigned from task wording and required structural hops, never from observed score.
 
-## Benchmark Case Format
+Curated repositories contain similarly named distractors, helpers/hubs, tests, documentation, and configuration. They are deliberately small enough for Gold review, not claims about large production repositories.
 
-Each versioned case must define:
+## Gold model and freeze
 
-- repository or fixture identity and version;
-- coding task;
-- gold files;
-- gold symbols;
-- optional gold documentation;
-- token budget.
+Each task records repository/revision, text, category, language tags, difficulty, notes, and explicit arrays of Gold files, symbols, and ranges. Every Gold item is `REQUIRED` or `SUPPORTING` and has a rationale.
 
-Cases should also record why each gold item is required, expected safety exclusions, relevant configuration, and any legitimate alternative selections. The implemented format must distinguish a missing annotation from an intentionally empty gold set.
+- A Gold file is a canonical repository-relative path.
+- A Gold symbol is a path plus current qualified symbol name; source snippets are not copied into the dataset.
+- A Gold range is one-based inclusive and is used only when a semantic symbol is unavailable.
+- Required symbol/range importance must agree with its Gold file importance.
+- Missing files/symbols, invalid ranges, duplicates, absolute/traversing paths, revision mismatch, and fixture hash mismatch fail the run before scoring.
 
-## Gold Context
+Gold was authored from source behavior and ownership, not from system output. A separate pre-score review pass checked necessity, excessive context, task leakage, exact-identity bias, structural-signal bias, missing tests/docs/config, and category/difficulty balance. The dataset and curated corpus revisions were then canonicalized and frozen. See `benchmarks/GOLD_REVIEW_V1.md`; the reviewer was the same engineering session rather than an external human, which remains a stated limitation.
 
-Gold context is the minimum defensible set of repository items a competent agent needs for the task, not every file that might be interesting. Gold files and symbols should be reviewed independently of ContextForge output to avoid circular labels.
+The dataset hash is SHA-256 over canonical JSON with recursively sorted object keys and array order preserved. Curated repository revisions are independent SHA-256 identities over sorted relative paths and file-content hashes. Changing corpus bytes or definitions breaks validation; semantic changes require a new version when appropriate.
 
-Gold annotations must use stable file identities and unambiguous symbol/range references. When a repository version changes, cases must either remain pinned or be re-reviewed. Disagreements and acceptable alternatives should be recorded rather than silently resolved in favor of the product.
+## Systems
 
-## Language Coverage
+### `lexical-full-file-v1`
 
-The initial offline suite must cover:
+Uses the production task normalizer plus fixed benchmark-only path, basename, symbol-name/component, and generation-verified source lexical evidence. It uses no graph expansion, related-test/document relationship, Git score, embedding, or model. Weights and per-signal caps are frozen in `benchmarks/src/systems.ts`.
 
-- TypeScript/JavaScript;
-- Python;
-- at least one mixed-language repository.
+Candidates are ordered deterministically by score, file-category priority, and raw repository-relative path. Packing considers mandatory root instructions and ranked whole files. An oversized file is skipped and the next candidate is considered. No source slicing is allowed.
 
-Coverage should include source, tests, repository instructions, and architecture documentation where relevant. Fixtures must be representative enough to exercise ambiguity, dependency expansion, exclusions, and tight budgets; trivial cases alone are insufficient.
+### `structural-full-file-v1`
 
-## Offline Metrics
+Calls the production `searchRepository` path with `contextforge-structural-v1`, then applies the same benchmark whole-file serializer and skip-oversized policy as the lexical baseline. It isolates the value of production structural ranking from Phase 05 packing.
 
-### File Recall@Budget
+### `contextforge-v1`
 
-The fraction of required gold files represented in the selected Context Pack while respecting the case budget.
+Calls production `searchRepository` for retrieval metrics and production `buildContextPack` for the actual payload:
 
-```text
-matched gold files / total gold files
-```
+- ranking: `contextforge-structural-v1`;
+- packing: `contextforge-pack-v1`;
+- estimator: `contextforge-generic-v1` version `1.0`.
 
-A file counts as represented when the selected full file or selected excerpt covers the annotated required content. The benchmark must document its exact matching rule.
+No production weights, caps, graph depth, section shares, range rules, or estimator behavior are changed by benchmark configuration.
 
-### Symbol Recall@Budget
+## Fair comparison envelope
 
-The fraction of required gold symbols represented in the selected Context Pack while respecting the case budget.
+All systems receive the same materialized repository revision, active generation, task text, safe-file eligibility, secret/binary exclusions, source hash verification, token estimator, and requested budget. Baselines serialize the task, repository/generation metadata, file headers, reasons, fences, estimator, and budget; these bytes count toward the same final payload limit. The production payload format remains part of the ContextForge system under evaluation, so serialization overhead is measured separately rather than erased.
 
-```text
-matched gold symbols / total gold symbols
-```
+The whole-file systems consider root `AGENTS.md` first and otherwise only change retrieval/ranking as declared. ContextForge may select instruction sections because section-aware packing is intentionally part of B-to-C attribution. All payloads must be at or below the requested estimator budget. A system unable to produce useful context records `NO_CONTEXT`; it is not silently dropped.
 
-Symbol identity and overlap rules must be versioned with the benchmark.
+## Retrieval metrics
 
-### Precision
+Retrieval is evaluated before packing at K = 1, 3, 5, 10, and 20.
 
-The fraction of selected evaluable items that are relevant under the case annotations.
+- Required File Recall@K = required Gold file paths present in top K / required Gold files.
+- Overall File Recall@K = all Gold file paths present in top K / all Gold files.
+- Required Symbol Recall@K = required Gold path/qualified-name identities present in candidate `relevantSymbols` in top K / required Gold symbols.
+- Overall Symbol Recall@K uses all Gold symbols.
 
-```text
-relevant selected items / selected evaluable items
-```
+A ranked file does not imply all its symbols were retrieved. Metrics with a zero denominator are `null`/`N/A`, not perfect scores.
 
-Reports must say whether the unit is files, symbols, ranges, or a separately reported set. File and symbol precision must not be blended without a defined weighting.
+## Packing metrics
 
-### Token Count
+Budgets are 2,000, 4,000, 8,000, 16,000, and 32,000 estimator tokens.
 
-The total tokens in the generated Context Pack under the declared estimator/tokenizer, including structural and explanation overhead. Reports must include the requested budget and whether final serialization complied with it.
+- File Recall@Budget: a Gold file counts when at least one meaningful source range from that file is in the payload; manifest-only mention does not count.
+- Symbol Recall@Budget: a Gold symbol counts only when one selected range fully contains its one-based inclusive core symbol range.
+- Overall Gold Recall: required items have weight 2 and supporting items weight 1 across file, symbol, and explicit-range entities. Required file and symbol recall remain the primary metrics and are never hidden by this aggregate.
+- Gold Range Precision: estimated tokens in the intersection of selected source ranges and Gold symbol/range regions divided by estimated selected repository-content tokens. When a Gold file has no semantic symbol/range annotation, selected content from that Gold file is treated as relevant.
+- Repository Content Noise Ratio = `1 - Gold Range Precision`.
+- Repository Content Tokens: estimator tokens from selected source slices only.
+- Serialization Overhead Tokens: complete payload tokens minus repository-content tokens; task, headers, paths, reasons, and fences are overhead, not noise.
+- Payload Tokens: the estimator count of the actual serialized agent payload; a `NO_CONTEXT` result records zero because no payload was emitted.
 
-### Token Reduction
+All ratios use explicit denominators and are rounded to six decimal places in raw results. Macro averages give every applicable task equal weight; `null` cases are excluded with counts retained in raw data.
 
-The reduction relative to a declared baseline context for the same repository and task.
+## Matched-recall tokens and token reduction
 
-```text
-1 - (ContextForge token count / baseline token count)
-```
+For each task/system and 80%, 90%, and 100% Required Symbol Recall, `Tokens@MatchedRecall` is the minimum **actual payload token count** among the fixed budget runs that reaches the target. It is not the budget upper bound. If no run reaches the target, the value is `NOT REACHED`.
 
-The baseline—such as all eligible repository content—must be reproducible and use the same tokenizer and safety exclusions. A change in baseline definition invalidates direct historical comparison unless results are recomputed.
-
-### Selected File Count
-
-The number of distinct repository files represented by full content or excerpts. Reports should additionally separate full files from excerpts when implemented.
-
-### Index Duration
-
-Elapsed time for a cold or incremental index operation, reported separately. Results must identify which mode ran and the repository state.
-
-### Pack Duration
-
-Elapsed time to derive task signals, retrieve, expand, rank, budget, and serialize a Context Pack against an already defined index state. Any excluded setup must be stated.
-
-## Explanation Quality
-
-Explainability is a product goal even though the source specification does not set a numeric explanation target. Each selected item must have non-empty, inspectable reasons tied to actual retrieval or structural evidence. The suite should validate reason presence, supported reason categories, and consistency between `context.md` and `context.json`.
-
-Human evaluation of reason usefulness may be added later, but it must be reported separately from deterministic offline metrics.
-
-## Target Metrics
-
-Desired V1 engineering targets:
-
-| Metric | Target | Current result |
-|---|---:|---|
-| Gold File Recall@Budget | ≥ 90% | NOT RUN / NOT TESTED |
-| Gold Symbol Recall@Budget | ≥ 85% | NOT RUN / NOT TESTED |
-| Token Reduction | ≥ 60% | NOT RUN / NOT TESTED |
-
-Targets apply only to a disclosed, versioned benchmark suite. They are not acceptance evidence until actual runs, case-level results, aggregate method, environment, and failures are recorded.
-
-The source specification defines no numeric precision, duration, or explanation-quality threshold. Those values must not be invented; any later threshold requires an explicit product decision.
-
-## Required Correctness and Safety Checks
-
-Benchmark and adjacent test evidence must cover:
-
-- relevant selection and irrelevant exclusion;
-- hard budget enforcement, including unusably small budgets;
-- accurate symbols and line ranges;
-- related-test and task-aware documentation discovery;
-- bounded graph expansion;
-- secret and sensitive-file exclusion;
-- repository boundary, path traversal, and symlink protection;
-- graceful per-file parser failure;
-- safe incremental indexing and reader-visible atomicity;
-- stable output for identical inputs where practical.
-
-Security failures are not acceptable tradeoffs for higher recall. Unsafe candidates must not count as desirable gold context.
-
-## Performance Measurement
-
-Cold index, incremental index, and pack latency must be measured. Every published run should record at least:
-
-- ContextForge version or commit;
-- benchmark suite version;
-- operating system and relevant hardware/runtime details;
-- repository identity, size, language distribution, and eligible file count;
-- warm/cold cache conditions;
-- concurrency and configured work limits;
-- tokenizer/estimator and budget;
-- per-case values plus the aggregation method.
-
-No performance claim should be made from unrecorded or incomparable environments.
-
-## Agent Benchmark
-
-A future optional evaluation may compare:
+Matched-Recall Token Reduction is computed only for task pairs where ContextForge and the named baseline both reach the same target:
 
 ```text
-Coding agent without ContextForge
-vs
-the same coding agent with ContextForge
+1 - (ContextForge actual payload tokens / baseline actual payload tokens)
 ```
 
-Possible measures include task success, tests passed, input/output tokens, tool calls, files read, latency, and cost. A defensible comparison should pin agent/model versions and settings, task/repository versions, tool permissions, timeout, run count, and success rubric, then report variance and failures.
+The report gives the number of comparable task pairs and the macro mean of per-task reductions. A negative value means ContextForge used more tokens. No fixed-budget utilization difference is described as token reduction.
 
-Current agent-benchmark status: **NOT RUN / NOT TESTED**.
+## Aggregation, diagnostics, and determinism
 
-Real or paid model evaluation must not be a mandatory CI dependency. It should be explicit, bounded, and reported separately from offline deterministic gates.
+Source-free raw results retain every task/system/budget case and selected range. Machine-readable aggregates cover system/budget, retrieval cutoff, matched recall, paired token reduction, language tag, task category, difficulty, 8K attribution, and win/tie/loss. Primary reporting uses macro averages.
 
-## Benchmark Integrity
+At 8K, win/tie/loss first compares Required Symbol Recall, then Gold Range Precision as the tie-breaker. It supplements rather than replaces raw metrics.
 
-- Never fabricate, interpolate, or imply missing results.
-- Never present target values as measurements.
-- Do not weaken gold annotations, budgets, assertions, or fixtures merely to improve scores.
-- Do not rely only on artificially easy fixtures; include ambiguous and failure cases.
-- Preserve and report failure cases, zero-result cases, invalid packs, and budget violations.
-- Version repositories/fixtures, gold labels, metric code, tokenizer, configuration, and aggregation rules.
-- Keep raw case-level results available for audit; aggregate values must be reproducible from them.
-- Separate cold and incremental performance, local and hosted runs, and offline and paid-agent evidence.
-- Do not claim hosted CI success from a local run.
-- Prevent secrets, private repository source, and local absolute paths from entering public benchmark artifacts.
+Misses are attributed where possible:
 
-## Reporting Template
+- `RETRIEVAL_MISS`: required identity absent from top 20;
+- `PACKING_DROP`: retrieved identity absent from payload;
+- `BUDGET_LIMIT`: no useful context or whole file did not fit;
+- `UNSUPPORTED`: task language is outside the implemented parser boundary.
 
-When the benchmark exists, each run should report:
+Quality JSON and Markdown omit timing and timestamps and must be byte-stable for the same commit, dataset, systems, and budgets. Performance samples are separate, use three repetitions and medians, record OS/architecture/Node, and are environment-specific—not an SLA.
+
+## Isolation and security
+
+Pinned Git materialization uses `execFile` arguments with shell disabled semantics, bounded time/buffers, canonical paths, and read-only Git commands. Curated files are copied without following links. Every repository is indexed once per quality run in an isolated temporary copy. Source-tree hashes before and after execution must match, excluding temporary `.contextforge` state.
+
+The formal benchmark has no network dependency and never executes corpus application code. Generated results contain repository IDs and relative paths only—no source content, secret values, temporary paths, or local absolute paths. Gold is not in any system adapter input type; changing Gold cannot change a system selection.
+
+## Reproduction
+
+Use Node `>=24.15 <25` (the project pins 24.20.0):
 
 ```text
-Status: PASS / FAIL / ERROR / NOT RUN
-ContextForge version:
-Suite version:
-Environment:
-Configuration and tokenizer:
-Cases attempted/completed/failed:
-File Recall@Budget:
-Symbol Recall@Budget:
-Precision (unit):
-Token Count and compliance:
-Token Reduction and baseline:
-Selected File Count:
-Cold Index Duration:
-Incremental Index Duration:
-Pack Duration:
-Failure cases:
-Artifact locations:
+npm ci
+npm run benchmark:validate
+npm run benchmark:smoke
+npm run benchmark
+npm run benchmark:performance
 ```
 
-Until a benchmark implementation and actual run exist, all result fields remain `NOT RUN / NOT TESTED`.
+Generated artifacts appear under ignored `.benchmark-output/`:
+
+- `quality-results.json`: all raw cases;
+- `aggregate-results.json`: machine-readable aggregates;
+- `benchmark-report.md`: deterministic human report;
+- `performance-results.json`: environment and raw timing samples.
+
+Normal `npm test` runs benchmark math, schema/parser, invalid-data, baseline, fairness, leakage, budget, determinism, and report tests without running the 24 × 3 × 5 full corpus.
+
+## Limitations and deferred evaluation
+
+The dataset is small, self-repository and curated-fixture bias remain, and no external human Gold review has occurred. The estimator is generic rather than model-specific. Pure synonyms and cross-language semantic relationships are difficult for lexical/structural v1 retrieval. TypeScript path aliases and advanced Python import behavior remain product limitations. Large external production repositories, Linux/macOS benchmark reproduction, agent task success, paid models, LLM judges, embeddings, vector search, LLM reranking/compression, MCP, Web UI, and context learning are not established by this protocol.

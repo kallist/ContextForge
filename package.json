@@ -19,12 +19,18 @@
     "clean": "node scripts/clean.mjs",
     "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json && node scripts/copy-parser-assets.mjs dist/adapters/parser/assets",
     "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/copy-parser-assets.mjs .test-dist/src/adapters/parser/assets",
+    "build:benchmark": "node scripts/clean.mjs .benchmark-dist && tsc -p tsconfig.benchmark.json && node scripts/copy-parser-assets.mjs .benchmark-dist/src/adapters/parser/assets",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build && npm run build:test",
     "test": "node --test \".test-dist/test/**/*.test.js\"",
     "smoke": "node dist/cli/main.js --help",
     "package:smoke": "node scripts/package-smoke.mjs",
+    "benchmark:validate": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js validate",
+    "benchmark:smoke": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js smoke",
+    "benchmark:quality": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js quality",
+    "benchmark:performance": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js performance",
+    "benchmark": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js full",
     "prepack": "npm run build"
   },
   "dependencies": {

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextforge.local/schema/benchmark-quality-result-v1.json",
+  "title": "ContextForge benchmark quality run v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest", "cases"],
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "required": ["benchmarkVersion", "datasetVersion", "datasetHash", "contextforgeCommit", "budgets", "systems", "taskCount", "repositoryCount", "runMode"]
+    },
+    "cases": { "type": "array", "minItems": 1 }
+  }
+}

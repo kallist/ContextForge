@@ -1,0 +1,528 @@
+{
+  "benchmarkVersion": "contextforge-benchmark-v1",
+  "datasetVersion": "contextforge-dataset-v1",
+  "repositories": [
+    {
+      "repositoryId": "contextforge-phase5",
+      "kind": "PINNED_GIT",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632"
+    },
+    {
+      "repositoryId": "curated-typescript-v1",
+      "kind": "CURATED_FIXTURE",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "relativePath": "benchmarks/corpus/typescript"
+    },
+    {
+      "repositoryId": "curated-python-v1",
+      "kind": "CURATED_FIXTURE",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad"
+      ,"relativePath": "benchmarks/corpus/python"
+    },
+    {
+      "repositoryId": "curated-mixed-v1",
+      "kind": "CURATED_FIXTURE",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "relativePath": "benchmarks/corpus/mixed"
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "self-pack-exact",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Review buildContextPack before changing its final hard-budget verification.",
+      "taskCategory": "EXACT_SYMBOL",
+      "languageTags": ["typescript"],
+      "difficulty": "EASY",
+      "goldFiles": [
+        { "path": "src/application/build-context-pack.ts", "importance": "REQUIRED", "rationale": "Owns production packing and final budget verification." },
+        { "path": "src/core/context-pack.ts", "importance": "SUPPORTING", "rationale": "Defines the manifest and selected-range contract returned by the use case." }
+      ],
+      "goldSymbols": [
+        { "path": "src/application/build-context-pack.ts", "qualifiedName": "buildContextPack", "importance": "REQUIRED", "rationale": "The requested implementation entry point." },
+        { "path": "src/core/context-pack.ts", "qualifiedName": "ContextPackManifest", "importance": "SUPPORTING", "rationale": "The stable output contract affected by packing changes." }
+      ],
+      "goldRanges": [],
+      "notes": "Explicit identity case retained as an EASY control, not representative of natural-language retrieval."
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Fix the race that could expose a half-written active generation when two index writers overlap.",
+      "taskCategory": "CONCURRENCY",
+      "languageTags": ["typescript"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "src/adapters/sqlite/sqlite-index-repository.ts", "importance": "REQUIRED", "rationale": "Owns BEGIN IMMEDIATE, validation, activation, commit, and writer failure behavior." },
+        { "path": "src/application/build-index.ts", "importance": "REQUIRED", "rationale": "Runs scan, parse, graph build, and generation construction inside the repository transaction callback." },
+        { "path": "test/integration/sqlite-index.test.ts", "importance": "SUPPORTING", "rationale": "Contains active-generation and writer-lock regression coverage." }
+      ],
+      "goldSymbols": [
+        { "path": "src/adapters/sqlite/sqlite-index-repository.ts", "qualifiedName": "SqliteIndexRepository.buildAndActivate", "importance": "REQUIRED", "rationale": "The atomic publication boundary." },
+        { "path": "src/application/build-index.ts", "qualifiedName": "buildIndex", "importance": "REQUIRED", "rationale": "The producer operating inside that boundary." }
+      ],
+      "goldRanges": [],
+      "notes": "Natural-language concurrency case; REQUIRED scope is intentionally limited to the writer boundary and producer."
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Search must not rank changed working-tree bytes as evidence from the active generation.",
+      "taskCategory": "BUG_FIX",
+      "languageTags": ["typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "src/application/search-repository.ts", "importance": "REQUIRED", "rationale": "Verifies lexical bytes against the active generation and reports stale status." },
+        { "path": "src/adapters/filesystem/repository-source-reader.ts", "importance": "REQUIRED", "rationale": "Performs the bounded read and produces the content hash used by Search." },
+        { "path": "test/integration/search-repository.test.ts", "importance": "SUPPORTING", "rationale": "Exercises changed and added source without mutating the active index." }
+      ],
+      "goldSymbols": [
+        { "path": "src/application/search-repository.ts", "qualifiedName": "searchRepository", "importance": "REQUIRED", "rationale": "Public application use case for generation-verified retrieval." },
+        { "path": "src/adapters/filesystem/repository-source-reader.ts", "qualifiedName": "FileSystemRepositorySourceReader.readTextFile", "importance": "REQUIRED", "rationale": "Returns the hash of the exact bytes used as lexical evidence." }
+      ],
+      "goldRanges": [],
+      "notes": "Does not name exact paths and requires understanding the Search/source-reader boundary."
+    },
+    {
+      "taskId": "self-output-publish-race",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Prevent a concurrent pack output writer from overwriting an artifact that appeared after the preflight check.",
+      "taskCategory": "CROSS_FILE_BUG_FIX",
+      "languageTags": ["typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "src/adapters/filesystem/output-artifact-writer.ts", "importance": "REQUIRED", "rationale": "Implements exclusive temporary publication and maps EEXIST safely." },
+        { "path": "src/application/output-artifact.ts", "importance": "SUPPORTING", "rationale": "Defines the application port kept independent of filesystem mechanics." },
+        { "path": "test/integration/output-artifact.test.ts", "importance": "SUPPORTING", "rationale": "Covers overwrite and publication failure behavior." }
+      ],
+      "goldSymbols": [
+        { "path": "src/adapters/filesystem/output-artifact-writer.ts", "qualifiedName": "FileSystemOutputArtifactWriter.writeExclusive", "importance": "REQUIRED", "rationale": "The TOCTOU-sensitive publication method." },
+        { "path": "src/application/output-artifact.ts", "qualifiedName": "OutputArtifactWriter", "importance": "SUPPORTING", "rationale": "The architecture boundary implemented by the adapter." }
+      ],
+      "goldRanges": [],
+      "notes": "Tests adapter behavior without treating unrelated pack ranking code as Gold."
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Repair the installed-package smoke check when parser WASM assets are omitted from the tarball.",
+      "taskCategory": "CONFIGURATION",
+      "languageTags": ["javascript", "typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "scripts/package-smoke.mjs", "importance": "REQUIRED", "rationale": "Packs, installs, invokes, and verifies packaged parser assets." },
+        { "path": "package.json", "importance": "REQUIRED", "rationale": "Defines package files, prepack build, bin, and package-smoke script." },
+        { "path": "scripts/copy-parser-assets.mjs", "importance": "SUPPORTING", "rationale": "Copies parser assets into compiled output before packing." }
+      ],
+      "goldSymbols": [
+        { "path": "scripts/package-smoke.mjs", "qualifiedName": "run", "importance": "REQUIRED", "rationale": "Executes each installed-package verification command." }
+      ],
+      "goldRanges": [],
+      "notes": "Configuration/build case with one JavaScript helper symbol and two file-level contracts."
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "taskText": "Document why packing keeps one active generation and refuses to persist source content.",
+      "taskCategory": "DOCUMENTATION_ARCHITECTURE",
+      "languageTags": ["typescript"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "docs/adr/ADR-006-hard-budget-context-packing.md", "importance": "REQUIRED", "rationale": "Records the accepted one-generation and source-privacy packing decision." },
+        { "path": "src/application/build-context-pack.ts", "importance": "SUPPORTING", "rationale": "Implementation evidence for the documented boundary." },
+        { "path": "docs/ARCHITECTURE.md", "importance": "SUPPORTING", "rationale": "Places the decision in the system-wide dependency and consistency model." }
+      ],
+      "goldSymbols": [],
+      "goldRanges": [],
+      "notes": "Architecture case intentionally has file-level Gold rather than brittle Markdown line numbers."
+    },
+
+    {
+      "taskId": "ts-session-revoke-exact",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "Change SessionStore.revokeSession so repeated revocation stays idempotent.",
+      "taskCategory": "EXACT_SYMBOL",
+      "languageTags": ["typescript"],
+      "difficulty": "EASY",
+      "goldFiles": [
+        { "path": "src/auth/session-store.ts", "importance": "REQUIRED", "rationale": "Owns the session record and revocation state transition." },
+        { "path": "tests/auth-service.test.ts", "importance": "SUPPORTING", "rationale": "Existing revocation behavior check." }
+      ],
+      "goldSymbols": [
+        { "path": "src/auth/session-store.ts", "qualifiedName": "SessionStore.revokeSession", "importance": "REQUIRED", "rationale": "Exact requested state transition." },
+        { "path": "tests/auth-service.test.ts", "qualifiedName": "testRevokedSession", "importance": "SUPPORTING", "rationale": "Behavioral regression target." }
+      ],
+      "goldRanges": [],
+      "notes": "Easy direct-symbol control with a related test."
+    },
+    {
+      "taskId": "ts-logout-token-bug",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "A token still authenticates after logout; fix the revocation flow without changing login.",
+      "taskCategory": "CROSS_FILE_BUG_FIX",
+      "languageTags": ["typescript"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "src/auth/auth-service.ts", "importance": "REQUIRED", "rationale": "Orchestrates logout and authentication checks." },
+        { "path": "src/auth/session-store.ts", "importance": "REQUIRED", "rationale": "Persists the revoked state." },
+        { "path": "src/auth/token-service.ts", "importance": "REQUIRED", "rationale": "Rejects tokens based on current session state." },
+        { "path": "tests/auth-service.test.ts", "importance": "SUPPORTING", "rationale": "Demonstrates the user-visible regression." }
+      ],
+      "goldSymbols": [
+        { "path": "src/auth/auth-service.ts", "qualifiedName": "AuthService.logout", "importance": "REQUIRED", "rationale": "Logout orchestration entry point." },
+        { "path": "src/auth/session-store.ts", "qualifiedName": "SessionStore.revokeSession", "importance": "REQUIRED", "rationale": "Revocation mutation." },
+        { "path": "src/auth/token-service.ts", "qualifiedName": "TokenService.verify", "importance": "REQUIRED", "rationale": "Authentication decision after logout." },
+        { "path": "tests/auth-service.test.ts", "qualifiedName": "testRevokedSession", "importance": "SUPPORTING", "rationale": "Expected end-to-end behavior." }
+      ],
+      "goldRanges": [],
+      "notes": "Natural-language cross-file task with billing-session and cache distractors."
+    },
+    {
+      "taskId": "ts-revocation-test-failure",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "The revoked-session regression test returns false after logout.",
+      "taskCategory": "TEST_FAILURE",
+      "languageTags": ["typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "tests/auth-service.test.ts", "importance": "REQUIRED", "rationale": "Contains the failing behavior and setup." },
+        { "path": "src/auth/auth-service.ts", "importance": "REQUIRED", "rationale": "Owns the calls exercised by the test." },
+        { "path": "src/auth/session-store.ts", "importance": "SUPPORTING", "rationale": "Stores revocation state used by the tested flow." }
+      ],
+      "goldSymbols": [
+        { "path": "tests/auth-service.test.ts", "qualifiedName": "testRevokedSession", "importance": "REQUIRED", "rationale": "Failing test behavior." },
+        { "path": "src/auth/auth-service.ts", "qualifiedName": "AuthService.isAuthenticated", "importance": "REQUIRED", "rationale": "Final assertion path." },
+        { "path": "src/auth/session-store.ts", "qualifiedName": "SessionStore.getSession", "importance": "SUPPORTING", "rationale": "Provides session state to verification." }
+      ],
+      "goldRanges": [],
+      "notes": "Test-led task where test relationship should help structural ranking."
+    },
+    {
+      "taskId": "ts-auth-ttl-config",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "Reject a non-positive authentication session TTL from environment configuration.",
+      "taskCategory": "CONFIGURATION",
+      "languageTags": ["typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "src/config/auth-config.ts", "importance": "REQUIRED", "rationale": "Parses and validates the environment value." },
+        { "path": "src/auth/token-service.ts", "importance": "SUPPORTING", "rationale": "Consumes the validated TTL when issuing tokens." }
+      ],
+      "goldSymbols": [
+        { "path": "src/config/auth-config.ts", "qualifiedName": "loadAuthConfig", "importance": "REQUIRED", "rationale": "Configuration validation entry point." },
+        { "path": "src/auth/token-service.ts", "qualifiedName": "TokenService.issue", "importance": "SUPPORTING", "rationale": "Downstream TTL consumer." }
+      ],
+      "goldRanges": [],
+      "notes": "Configuration task uses behavior language rather than an exact path."
+    },
+    {
+      "taskId": "ts-session-revoke-api",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "Make the session revoke endpoint delegate to application logout and return no content.",
+      "taskCategory": "API_INTEGRATION",
+      "languageTags": ["typescript"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "src/api/session-controller.ts", "importance": "REQUIRED", "rationale": "HTTP-facing endpoint adapter." },
+        { "path": "src/auth/auth-service.ts", "importance": "REQUIRED", "rationale": "Application logout operation." },
+        { "path": "docs/AUTH_ARCHITECTURE.md", "importance": "SUPPORTING", "rationale": "Documents adapter/application ownership." }
+      ],
+      "goldSymbols": [
+        { "path": "src/api/session-controller.ts", "qualifiedName": "SessionController.revoke", "importance": "REQUIRED", "rationale": "Endpoint implementation." },
+        { "path": "src/auth/auth-service.ts", "qualifiedName": "AuthService.logout", "importance": "REQUIRED", "rationale": "Delegated application behavior." }
+      ],
+      "goldRanges": [],
+      "notes": "API boundary task with a relevant architecture document."
+    },
+    {
+      "taskId": "ts-users-stay-signed-in",
+      "repositoryId": "curated-typescript-v1",
+      "repositoryRevision": "sha256:4b2163c07e4a55d230f55a38c7da4e7f148046c8185a72c1b7718fcd6d6d14cc",
+      "taskText": "Users remain signed in after they log out; trace the state and verification path.",
+      "taskCategory": "AMBIGUOUS_NATURAL_LANGUAGE",
+      "languageTags": ["typescript"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "src/auth/auth-service.ts", "importance": "REQUIRED", "rationale": "Connects logout to later authentication checks." },
+        { "path": "src/auth/session-store.ts", "importance": "REQUIRED", "rationale": "Holds the authoritative revoked state." },
+        { "path": "src/auth/token-service.ts", "importance": "REQUIRED", "rationale": "Makes the final signed-in decision." },
+        { "path": "docs/AUTH_ARCHITECTURE.md", "importance": "SUPPORTING", "rationale": "Explains ownership when natural-language terms do not match paths." }
+      ],
+      "goldSymbols": [
+        { "path": "src/auth/auth-service.ts", "qualifiedName": "AuthService.isAuthenticated", "importance": "REQUIRED", "rationale": "Final application authentication check." },
+        { "path": "src/auth/session-store.ts", "qualifiedName": "SessionStore.getSession", "importance": "REQUIRED", "rationale": "Reads current revocation state." },
+        { "path": "src/auth/token-service.ts", "qualifiedName": "TokenService.verify", "importance": "REQUIRED", "rationale": "Determines whether the token remains accepted." }
+      ],
+      "goldRanges": [],
+      "notes": "Hard semantic phrasing omits exact file and symbol identities."
+    },
+
+    {
+      "taskId": "py-release-stale-exact",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "Review JobStore.release_stale before making stale release idempotent.",
+      "taskCategory": "EXACT_SYMBOL",
+      "languageTags": ["python"],
+      "difficulty": "EASY",
+      "goldFiles": [
+        { "path": "app/queue/store.py", "importance": "REQUIRED", "rationale": "Owns the exact state transition." },
+        { "path": "tests/test_worker.py", "importance": "SUPPORTING", "rationale": "Exercises stale release through Worker." }
+      ],
+      "goldSymbols": [
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.release_stale", "importance": "REQUIRED", "rationale": "Exact requested method." },
+        { "path": "tests/test_worker.py", "qualifiedName": "test_expired_lease_requeued", "importance": "SUPPORTING", "rationale": "Behavioral check." }
+      ],
+      "goldRanges": [],
+      "notes": "Python direct-symbol control."
+    },
+    {
+      "taskId": "py-expired-lease-race",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "Avoid duplicate claims when an expired running lease is released and immediately reclaimed.",
+      "taskCategory": "CONCURRENCY",
+      "languageTags": ["python"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "app/queue/worker.py", "importance": "REQUIRED", "rationale": "Orders expiry, release, and claim." },
+        { "path": "app/queue/lease.py", "importance": "REQUIRED", "rationale": "Defines expiry semantics." },
+        { "path": "app/queue/store.py", "importance": "REQUIRED", "rationale": "Owns release and claim transitions." },
+        { "path": "tests/test_worker.py", "importance": "SUPPORTING", "rationale": "Reproduces expired lease handling." }
+      ],
+      "goldSymbols": [
+        { "path": "app/queue/worker.py", "qualifiedName": "Worker.run_once", "importance": "REQUIRED", "rationale": "Sequences the race-sensitive operations." },
+        { "path": "app/queue/lease.py", "qualifiedName": "LeasePolicy.is_expired", "importance": "REQUIRED", "rationale": "Expiry decision." },
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.claim", "importance": "REQUIRED", "rationale": "Claim state transition." },
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.release_stale", "importance": "REQUIRED", "rationale": "Release state transition." }
+      ],
+      "goldRanges": [],
+      "notes": "Concurrency-like task requires one structural hop and multiple state owners."
+    },
+    {
+      "taskId": "py-worker-test-failure",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "The expired lease requeue test cannot claim the job after releasing it.",
+      "taskCategory": "TEST_FAILURE",
+      "languageTags": ["python"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "tests/test_worker.py", "importance": "REQUIRED", "rationale": "Failing test and setup." },
+        { "path": "app/queue/worker.py", "importance": "REQUIRED", "rationale": "Behavior exercised by the test." },
+        { "path": "app/queue/store.py", "importance": "SUPPORTING", "rationale": "State mutation used by Worker." }
+      ],
+      "goldSymbols": [
+        { "path": "tests/test_worker.py", "qualifiedName": "test_expired_lease_requeued", "importance": "REQUIRED", "rationale": "Failing test case." },
+        { "path": "app/queue/worker.py", "qualifiedName": "Worker.run_once", "importance": "REQUIRED", "rationale": "Operation under test." },
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.release_stale", "importance": "SUPPORTING", "rationale": "Supporting state transition." }
+      ],
+      "goldRanges": [],
+      "notes": "Test relationship should help without exact production paths."
+    },
+    {
+      "taskId": "py-queue-settings",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "Validate positive lease duration and retry attempts from queue environment settings.",
+      "taskCategory": "CONFIGURATION",
+      "languageTags": ["python"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "app/config.py", "importance": "REQUIRED", "rationale": "Parses both queue settings and rejects invalid values." },
+        { "path": "app/queue/lease.py", "importance": "SUPPORTING", "rationale": "Consumes the lease duration contract." }
+      ],
+      "goldSymbols": [
+        { "path": "app/config.py", "qualifiedName": "load_queue_settings", "importance": "REQUIRED", "rationale": "Configuration parser and validator." },
+        { "path": "app/queue/lease.py", "qualifiedName": "LeasePolicy", "importance": "SUPPORTING", "rationale": "Downstream lease configuration owner." }
+      ],
+      "goldRanges": [],
+      "notes": "Natural configuration language with no exact file name."
+    },
+    {
+      "taskId": "py-submit-api-idempotency",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "Keep duplicate job submissions idempotent at the API boundary.",
+      "taskCategory": "API_INTEGRATION",
+      "languageTags": ["python"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "app/api/jobs.py", "importance": "REQUIRED", "rationale": "API submission adapter." },
+        { "path": "app/queue/store.py", "importance": "REQUIRED", "rationale": "Provides idempotent storage by job identifier." },
+        { "path": "docs/QUEUE_DESIGN.md", "importance": "SUPPORTING", "rationale": "Documents the idempotency contract." }
+      ],
+      "goldSymbols": [
+        { "path": "app/api/jobs.py", "qualifiedName": "JobsApi.submit_job", "importance": "REQUIRED", "rationale": "API operation." },
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.submit", "importance": "REQUIRED", "rationale": "Idempotent persistence operation." }
+      ],
+      "goldRanges": [],
+      "notes": "API and storage boundary task."
+    },
+    {
+      "taskId": "py-state-transition-refactor",
+      "repositoryId": "curated-python-v1",
+      "repositoryRevision": "sha256:1894ba29665a65eb3692e13d9fc8115a806c4641d9b6fb5b2abe0b749544e2ad",
+      "taskText": "Refactor pending, running, and completed state transitions without moving queue ownership into Worker.",
+      "taskCategory": "REFACTOR",
+      "languageTags": ["python"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "app/queue/store.py", "importance": "REQUIRED", "rationale": "Owns all durable state transitions." },
+        { "path": "app/queue/worker.py", "importance": "REQUIRED", "rationale": "Orchestrates store operations but must not own state." },
+        { "path": "docs/QUEUE_DESIGN.md", "importance": "SUPPORTING", "rationale": "Architecture constraint for the refactor." }
+      ],
+      "goldSymbols": [
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.claim", "importance": "REQUIRED", "rationale": "Pending-to-running transition." },
+        { "path": "app/queue/store.py", "qualifiedName": "JobStore.complete", "importance": "REQUIRED", "rationale": "Running-to-completed transition." },
+        { "path": "app/queue/worker.py", "qualifiedName": "Worker", "importance": "REQUIRED", "rationale": "Orchestration boundary preserved by the refactor." }
+      ],
+      "goldRanges": [],
+      "notes": "Architecture-sensitive refactor with helper and analytics distractors."
+    },
+
+    {
+      "taskId": "mixed-client-update-exact",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "Review ApiClient.updateProfile before changing its profile response contract.",
+      "taskCategory": "EXACT_SYMBOL",
+      "languageTags": ["typescript", "mixed"],
+      "difficulty": "EASY",
+      "goldFiles": [
+        { "path": "frontend/src/api/client.ts", "importance": "REQUIRED", "rationale": "Contains the exact client operation and DTO." },
+        { "path": "shared/openapi/profile.yaml", "importance": "SUPPORTING", "rationale": "Canonical cross-language response contract." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/src/api/client.ts", "qualifiedName": "ApiClient.updateProfile", "importance": "REQUIRED", "rationale": "Exact requested method." }
+      ],
+      "goldRanges": [],
+      "notes": "Mixed-corpus direct identity control."
+    },
+    {
+      "taskId": "mixed-stale-profile-cache",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "A saved display name is stale after the next profile fetch; trace update and cache invalidation across the stack.",
+      "taskCategory": "CROSS_FILE_BUG_FIX",
+      "languageTags": ["typescript", "python", "mixed"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "frontend/src/state/profile-store.ts", "importance": "REQUIRED", "rationale": "Frontend save and subsequent local state." },
+        { "path": "backend/app/profile_service.py", "importance": "REQUIRED", "rationale": "Backend update and fetch orchestration." },
+        { "path": "backend/app/cache.py", "importance": "REQUIRED", "rationale": "Cache invalidation and replacement behavior." },
+        { "path": "docs/PROFILE_FLOW.md", "importance": "SUPPORTING", "rationale": "Explains the cross-language ownership chain." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/src/state/profile-store.ts", "qualifiedName": "ProfileStore.save", "importance": "REQUIRED", "rationale": "Frontend update entry point." },
+        { "path": "backend/app/profile_service.py", "qualifiedName": "ProfileService.update_profile", "importance": "REQUIRED", "rationale": "Backend update entry point." },
+        { "path": "backend/app/cache.py", "qualifiedName": "ProfileCache.invalidate", "importance": "REQUIRED", "rationale": "Required stale-cache transition." }
+      ],
+      "goldRanges": [],
+      "notes": "Cross-language edges are not assumed; the case exposes limitations honestly."
+    },
+    {
+      "taskId": "mixed-profile-test-failure",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "The stale-profile frontend test fails when saving a new display name.",
+      "taskCategory": "TEST_FAILURE",
+      "languageTags": ["typescript", "mixed"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "frontend/tests/profile-store.test.ts", "importance": "REQUIRED", "rationale": "Failing test setup and assertion." },
+        { "path": "frontend/src/state/profile-store.ts", "importance": "REQUIRED", "rationale": "State behavior under test." },
+        { "path": "frontend/src/api/client.ts", "importance": "SUPPORTING", "rationale": "Client dependency used by the store." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/tests/profile-store.test.ts", "qualifiedName": "testStaleProfile", "importance": "REQUIRED", "rationale": "Failing test function." },
+        { "path": "frontend/src/state/profile-store.ts", "qualifiedName": "ProfileStore.save", "importance": "REQUIRED", "rationale": "Operation under test." },
+        { "path": "frontend/src/api/client.ts", "qualifiedName": "ApiClient.updateProfile", "importance": "SUPPORTING", "rationale": "Supporting API call." }
+      ],
+      "goldRanges": [],
+      "notes": "Test case includes a same-name billing profile distractor."
+    },
+    {
+      "taskId": "mixed-openapi-display-name",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "Keep displayName required and consistent in the checked-in profile API contract and both implementations.",
+      "taskCategory": "CONFIGURATION",
+      "languageTags": ["yaml", "typescript", "python", "mixed"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "shared/openapi/profile.yaml", "importance": "REQUIRED", "rationale": "Canonical checked-in contract." },
+        { "path": "frontend/src/api/client.ts", "importance": "REQUIRED", "rationale": "Frontend DTO representation." },
+        { "path": "backend/app/profile_service.py", "importance": "SUPPORTING", "rationale": "Backend payload representation." },
+        { "path": "scripts/check_contract.js", "importance": "SUPPORTING", "rationale": "Contract consistency check." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/src/api/client.ts", "qualifiedName": "ProfileDto", "importance": "REQUIRED", "rationale": "Frontend profile contract." },
+        { "path": "backend/app/profile_service.py", "qualifiedName": "ProfileService.update_profile", "importance": "SUPPORTING", "rationale": "Backend contract consumer." },
+        { "path": "scripts/check_contract.js", "qualifiedName": "validateProfileContract", "importance": "SUPPORTING", "rationale": "Contract validation helper." }
+      ],
+      "goldRanges": [
+        { "path": "shared/openapi/profile.yaml", "startLine": 1, "endLine": 15, "importance": "REQUIRED", "rationale": "OpenAPI path and required Profile fields." }
+      ],
+      "notes": "Config/range case uses strict one-based inclusive YAML Gold."
+    },
+    {
+      "taskId": "mixed-profile-flow-doc",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "Update the architecture explanation for profile saves, backend routing, and cache replacement.",
+      "taskCategory": "DOCUMENTATION_ARCHITECTURE",
+      "languageTags": ["typescript", "python", "mixed"],
+      "difficulty": "MEDIUM",
+      "goldFiles": [
+        { "path": "docs/PROFILE_FLOW.md", "importance": "REQUIRED", "rationale": "Architecture explanation being changed." },
+        { "path": "frontend/src/state/profile-store.ts", "importance": "SUPPORTING", "rationale": "Frontend implementation evidence." },
+        { "path": "backend/app/routes.py", "importance": "SUPPORTING", "rationale": "Backend routing evidence." },
+        { "path": "backend/app/cache.py", "importance": "SUPPORTING", "rationale": "Cache replacement evidence." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/src/state/profile-store.ts", "qualifiedName": "ProfileStore.save", "importance": "SUPPORTING", "rationale": "Frontend save behavior described by the document." },
+        { "path": "backend/app/routes.py", "qualifiedName": "ProfileRoutes.update_profile", "importance": "SUPPORTING", "rationale": "Backend routing behavior described by the document." },
+        { "path": "backend/app/cache.py", "qualifiedName": "ProfileCache.set", "importance": "SUPPORTING", "rationale": "Replacement behavior described by the document." }
+      ],
+      "goldRanges": [],
+      "notes": "Required Gold is the document; implementation files remain supporting."
+    },
+    {
+      "taskId": "mixed-rename-reverts",
+      "repositoryId": "curated-mixed-v1",
+      "repositoryRevision": "sha256:987ae64795f93a9b37be0f838052979e89287d2268822c18d235397b263c93f3",
+      "taskText": "A profile rename appears immediately but reverts after refresh.",
+      "taskCategory": "AMBIGUOUS_NATURAL_LANGUAGE",
+      "languageTags": ["typescript", "python", "mixed"],
+      "difficulty": "HARD",
+      "goldFiles": [
+        { "path": "frontend/src/state/profile-store.ts", "importance": "REQUIRED", "rationale": "Owns immediate save and refresh load." },
+        { "path": "backend/app/profile_service.py", "importance": "REQUIRED", "rationale": "Owns backend update and later fetch." },
+        { "path": "backend/app/cache.py", "importance": "REQUIRED", "rationale": "Can return stale data after refresh." },
+        { "path": "frontend/src/api/client.ts", "importance": "SUPPORTING", "rationale": "Connects frontend state to the backend contract." },
+        { "path": "docs/PROFILE_FLOW.md", "importance": "SUPPORTING", "rationale": "Cross-stack ownership explanation." }
+      ],
+      "goldSymbols": [
+        { "path": "frontend/src/state/profile-store.ts", "qualifiedName": "ProfileStore.load", "importance": "REQUIRED", "rationale": "Refresh path." },
+        { "path": "frontend/src/state/profile-store.ts", "qualifiedName": "ProfileStore.save", "importance": "REQUIRED", "rationale": "Immediate rename path." },
+        { "path": "backend/app/profile_service.py", "qualifiedName": "ProfileService.get_profile", "importance": "REQUIRED", "rationale": "Backend refresh read." },
+        { "path": "backend/app/profile_service.py", "qualifiedName": "ProfileService.update_profile", "importance": "REQUIRED", "rationale": "Backend rename write." },
+        { "path": "backend/app/cache.py", "qualifiedName": "ProfileCache.get", "importance": "REQUIRED", "rationale": "Potential stale read." }
+      ],
+      "goldRanges": [],
+      "notes": "Hard natural-language case avoids exact code identities and exposes cross-language retrieval weakness."
+    }
+  ]
+}

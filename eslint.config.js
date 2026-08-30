@@ -4,15 +4,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", ".test-dist/**", "node_modules/**", ".npm-cache-temp/**", ".portable-node/**"],
+    ignores: ["dist/**", ".test-dist/**", ".benchmark-dist/**", ".benchmark-output/**", "node_modules/**", ".npm-cache-temp/**", ".portable-node/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map((configuration) => ({
     ...configuration,
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["src/**/*.ts", "test/**/*.ts", "benchmarks/src/**/*.ts"],
   })),
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["src/**/*.ts", "test/**/*.ts", "benchmarks/src/**/*.ts"],
     languageOptions: {
       globals: globals.node,
       parserOptions: {

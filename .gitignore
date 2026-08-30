@@ -3,6 +3,8 @@ node_modules/
 dist/
 coverage/
 .test-dist/
+.benchmark-dist/
+.benchmark-output/
 .npm-cache-temp/
 .portable-node/
 *.tsbuildinfo

@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const allowedTargets = new Set(["dist", ".test-dist"]);
+const allowedTargets = new Set(["dist", ".test-dist", ".benchmark-dist"]);
 const requestedTargets = process.argv.slice(2);
 const targets = requestedTargets.length === 0 ? [...allowedTargets] : requestedTargets;
 
