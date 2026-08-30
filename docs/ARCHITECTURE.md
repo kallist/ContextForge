@@ -2,22 +2,22 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–4 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–5 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, direct retrieval, generation-verified lexical matching, bounded graph expansion, and explainable ranking. Phase 5 and later product modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing. Phase 6 and later product modules remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
 ## Repository Audit
 
-Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phase 2).
+Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phases 2–5).
 
 ### Current State
 
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-30, Phase 0–4 are implemented and locally exercised on Windows. Benchmark fixtures/results, token budgeting/packing, MCP, remote providers, and release artifacts remain absent.
+- As of 2026-08-30, Phase 0–5 are implemented and locally exercised on Windows. Benchmark fixtures/results, MCP, remote providers, and release artifacts remain absent.
 
 ### Existing Assets
 
@@ -73,7 +73,7 @@ This environment demonstrates why consumer-side native compilation must not be r
 | Parser | `web-tree-sitter` with packaged, pinned WASM grammars | Real ASTs without consumer native compilation |
 | Languages | JavaScript/JSX, TypeScript/TSX, and Python grammar adapters; structured text fallback | Matches V1 product scope |
 | Storage | Built-in `node:sqlite`, WAL, index generations | Transactions, local indexed lookup, atomic activation, no addon |
-| Token estimation | `TokenEstimator` port; built-in `generic-v1`; model-specific plugins deferred | Transparent and model-agnostic with no heavy tokenizer dependency |
+| Token estimation | `TokenEstimator` port; built-in `contextforge-generic-v1`; model-specific plugins deferred | Transparent and model-agnostic with no heavy tokenizer dependency |
 | Testing | `node:test` on compiled JS; subprocess CLI E2E | Stable built-in runner, minimal toolchain |
 | Build/typecheck | `tsc`; package compiled JS, declarations, WASM assets | Ordinary auditable npm package |
 | Lint | ESLint with TypeScript rules | Explicit static quality gate |
@@ -113,7 +113,7 @@ The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tre
 
 ## Proposed Source Layout
 
-The Phase 0–4 subset now exists; token packing, benchmark, and MCP adapters remain planned:
+The Phase 0–5 subset now exists; benchmark and MCP adapters remain planned:
 
 ```text
 src/
@@ -238,11 +238,11 @@ Phase 4 implements source lexical retrieval as a bounded generation-verified wor
 ### 8. Context Packing and Manifest
 
 - **Input:** section plan and selected current source units.
-- **Output:** `context.md`, `context.json`, and matching manifest evidence.
+- **Output:** budgeted Markdown plus an alternative source-free JSON manifest.
 - **Signals:** stable section order, source attribution, scores/reasons, exclusions, and estimator output.
 - **Failure:** final over-budget serialization triggers deterministic eviction and rerender; serialization or safety failure emits no completed pack.
 - **Complexity:** linear in final payload size with bounded rerender iterations.
-- **V1 limitation:** two alternative serializations, not dynamic/streaming context delivery.
+- **V1 limitation:** static Markdown context delivery; JSON describes the decision but does not duplicate selected source.
 
 ## Implemented Explainable Ranking
 
@@ -278,26 +278,26 @@ Rules:
 
 `TokenEstimator` is a core port with `id`, `version`, and `estimate(serializedText)`.
 
-V1's built-in `generic-v1` estimator has no third-party tokenizer. It uses a documented conservative formula over UTF-8 content:
+V1's built-in `contextforge-generic-v1` estimator has no third-party tokenizer. After normalizing CRLF/CR to LF, it uses a documented conservative formula over UTF-8 content:
 
 ```text
-ceil(ASCII bytes / 3)
+ceil(non-newline ASCII bytes / 3)
 + ceil(non-ASCII UTF-8 bytes / 2)
-+ line break count
-+ fixed serialization markers
++ logical line break count
++ one non-empty-input boundary marker
 ```
 
 This is deterministic and intentionally conservative for code and multilingual text. It is not claimed to equal every model tokenizer. The hard-budget guarantee is exact **relative to the estimator named in the manifest**. Model-specific estimators are deferred plugins and must use the same port.
 
-Both `context.md` and the content-bearing `context.json` alternative are independently rendered and checked against the requested budget. They are alternatives; concatenating them is outside the contract. The JSON exclusion list is bounded with aggregate counts so audit metadata cannot grow without limit.
+The complete rendered Markdown is the agent payload and is independently checked against the requested budget. The alternative JSON output is a deterministic, source-free manifest whose metadata size is outside that payload budget. Its exclusion list is bounded with aggregate counts so audit output cannot grow without limit. Neither artifact contains a timestamp.
 
 Hard-budget enforcement:
 
 1. reserve format/manifest overhead using an empty final render;
 2. allocate semantic units using estimator costs;
-3. render both complete outputs;
-4. estimate both serialized outputs;
-5. if either exceeds the budget, evict the lowest marginal-value non-required unit, merge/shorten only at valid semantic line boundaries, and rerender;
+3. render the complete Markdown payload;
+4. estimate that serialized output;
+5. if it exceeds the budget, evict the lowest marginal-value non-required unit, merge/shorten only at valid semantic line boundaries, and rerender;
 6. stop after a bounded number of units; never byte-truncate JSON or source mid-line;
 7. if required skeleton plus one useful primary unit cannot fit, return `BUDGET_TOO_SMALL` and no completed pack.
 
@@ -314,7 +314,8 @@ Safety filters and required repository instructions precede all allocation. Init
 | Dependencies | 15% | Direct definitions/imports before reverse dependencies |
 | Related tests | 15% | First-class evidence, not leftover filler |
 | Architecture/documentation | 10% | Task-aware excerpts only |
-| Git context | up to 5% | Omit first when unavailable or weak |
+| Configuration | 10% | Task-relevant configuration as code-adjacent context |
+| Git context/headroom | remaining, up to 5% | Omit first when unavailable or weak |
 
 Unused shares flow in priority order to primary code, tests, dependencies, then documentation. Shares are configurable and versioned but cannot bypass safety or the hard budget.
 
@@ -440,11 +441,13 @@ Graph derivation intentionally performs a full metadata rebuild per generation w
 
 **IMPLEMENTED.** Normalize bounded untrusted tasks into exact and decomposed coding signals; retrieve file envelopes from path, basename, symbol, import/module, and generation-hash-verified source evidence; rank direct candidates; expand bounded imports, reverse imports, tests, and documentation with distance decay and hub damping; weakly rescore existing candidates with generation-bound Git data; and return deterministic text/JSON through `contextforge search`.
 
-The implementation preserves symbol-level evidence and ranges inside one file result, uses additive reconstructible score contributions and versioned `contextforge-structural-v1` constants, reports stale/partial lexical verification, and never mutates the index. `contextforge explain` remains deferred until Phase 5 has a persisted/serializable Context Manifest to explain. Fuzzy retrieval is deliberately not implemented. See ADR-005.
+The implementation preserves symbol-level evidence and ranges inside one file result, uses additive reconstructible score contributions and versioned `contextforge-structural-v1` constants, reports stale/partial lexical verification, and never mutates the index. The source-free Phase 5 manifest now carries pack decisions, but a separate `contextforge explain` command remains deferred. Fuzzy retrieval is deliberately not implemented. See ADR-005.
 
 ### Phase 5 — Token Budget and Context Packs
 
-Implement `TokenEstimator`, generic-v1, semantic range selection, section-aware allocation, hard final-render verification, `context.md`, `context.json`, manifests, stale-file checks, and `pack` CLI E2E.
+**IMPLEMENTED.** `BuildContextPack` invokes Phase 4 Search and consumes its exact active snapshot; assigns instruction, primary, dependency, test, documentation, and configuration roles; builds progressively richer whole-file or semantic-range representations; allocates by versioned section policy; and verifies the complete Markdown render with `contextforge-generic-v1`. Exact over-budget output triggers bounded deterministic reduction, while an unusably small budget returns `BUDGET_TOO_SMALL` with no artifact.
+
+Pack reads, hashes, and slices each candidate from the same source string. Hash mismatch, unsafe current-map state, or verification limits exclude content and make the manifest honestly partial. Root `AGENTS.md` is whole-file when small and fence-aware heading-selected when large. Output uses LF, terminal-safe control escaping, and a backtick fence longer than the longest run in source. `contextforge pack` supports Markdown stdout, source-free manifest JSON, and atomic exclusive `--out`; it never mutates the index or overwrites output. See ADR-006.
 
 ### Phase 6 — Offline Benchmark
 
@@ -542,7 +545,7 @@ The design was challenged against the requested review questions.
 - **Not just code RAG:** The differentiator is safe repository structure, typed graph relations, tests/docs/Git signals, explainable scores, semantic ranges, and section-aware hard-budget packing—not split/search/top-k.
 - **Structural retrieval:** Phase 3 supplies direct/reverse imports, containment, test/documentation relationships, and Git signals. Phase 4 now consumes them through bounded distance-aware, hub-damped expansion and keeps direct versus expanded origin explicit.
 - **Explainability:** Every score contribution has a reason and evidence; caps and deterministic ties prevent opaque ranking.
-- **Token budget:** Both final serializations are measured after rendering with explicit failure when no useful pack fits.
+- **Token budget:** The final Markdown agent payload is measured after rendering, with explicit failure when no useful pack fits; the source-free manifest is audit metadata outside that budget.
 - **Benchmarkability:** Ranking versions, estimator versions, manifests, deterministic ordering, and production-path benchmark use make results reproducible.
 - **Native installation pain:** Consumer-side native addons were removed by choosing packaged WASM grammars and Node's bundled SQLite. The remaining WASM ABI/asset risk is addressed with pinned versions and package smoke tests.
 - **Windows:** Paths, npm shims, WASM asset resolution, junctions, Unicode/spaces, no shell scripts, and hosted matrix coverage are explicit.
@@ -565,7 +568,7 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | SQLite index and concurrency | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Repository Graph, import resolution, tests/docs/Git signals, and graph CLI | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Task retrieval, ranking, and bounded graph expansion | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| Token estimator and Context Pack | NOT IMPLEMENTED / NOT TESTED |
+| Token estimator and Context Pack | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Benchmark harness/results | NOT IMPLEMENTED / NOT RUN |
 | MCP adapter | NOT IMPLEMENTED / DEFERRED |
 | Hosted CI workflow | IMPLEMENTED (Ubuntu/Windows/macOS matrix) / NOT RUN |

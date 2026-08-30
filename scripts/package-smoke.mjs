@@ -106,6 +106,29 @@ try {
   ) {
     throw new Error("Installed CLI could not retrieve and explain packaged Search results.");
   }
+  const contextMarkdown = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "pack", "Smoke.run", fixtureRoot, "--budget", "2000"],
+    installRoot,
+  );
+  if (!contextMarkdown.startsWith("# ContextForge Context Pack\n") || !contextMarkdown.includes("src/main.ts")) {
+    throw new Error("Installed CLI could not compile the packaged Context Markdown payload.");
+  }
+  const contextManifestOutput = run(
+    process.execPath,
+    [npmCliPath, "exec", "--", "contextforge", "pack", "Smoke.run", fixtureRoot, "--budget", "2000", "--json"],
+    installRoot,
+  );
+  const contextManifest = JSON.parse(contextManifestOutput);
+  if (
+    contextManifest.packingStrategy !== "contextforge-pack-v1" ||
+    contextManifest.tokenEstimator !== "contextforge-generic-v1" ||
+    contextManifest.tokenEstimatorVersion !== "1.0" ||
+    contextManifest.estimatedPayloadTokens > contextManifest.requestedBudget ||
+    contextManifest.selectedItems?.some((item) => item.relativePath === "src/main.ts") !== true
+  ) {
+    throw new Error("Installed CLI could not produce a valid hard-budget Context Manifest.");
+  }
 
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
@@ -129,7 +152,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write("Package smoke passed: pack, fresh install, packaged WASM parsers, index, inspect, graph, and search.\n");
+  process.stdout.write("Package smoke passed: npm pack, fresh install, packaged WASM parsers, index, inspect, graph, search, and context pack.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }

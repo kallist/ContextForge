@@ -269,3 +269,78 @@ test("compiled installed-path CLI searches in text/JSON, applies limits, reports
   assert.equal(invalidLimit.status, 2);
   assert.match(invalidLimit.stderr, /USAGE/u);
 });
+
+test("compiled CLI packs Markdown/manifest within budget, keeps streams pure, and writes exclusively", async (context) => {
+  const root = await createTemporaryDirectory("cli-pack");
+  const missingRoot = await createTemporaryDirectory("cli-pack-missing");
+  context.after(() => Promise.all([removeTemporaryDirectory(root), removeTemporaryDirectory(missingRoot)]));
+  await writeFixture(root, "src/memory.ts", "export class MemoryService { disableMemory() { return false; } }\n");
+  await writeFixture(root, "tests/memory.test.ts", 'import { MemoryService } from "../src/memory.js";\nnew MemoryService();\n');
+  await writeFixture(missingRoot, "src/main.ts", "export const main = true;\n");
+
+  const missing = runCli(["pack", "main", missingRoot, "--budget", "2000", "--json"]);
+  assert.equal(missing.status, 8);
+  assert.equal(missing.stdout, "");
+  assert.match(missing.stderr, /INDEX_REQUIRED/u);
+
+  const indexed = runCli(["index", root, "--json"]);
+  assert.equal(indexed.status, 0, indexed.stderr);
+  const text = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000"]);
+  assert.equal(text.status, 0, text.stderr);
+  assert.equal(text.stderr, "");
+  assert.match(text.stdout, /^# ContextForge Context Pack\n/u);
+  assert.match(text.stdout, /src\/memory\.ts/u);
+
+  const first = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--json"]);
+  const second = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--json"]);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(second.stdout, first.stdout);
+  assert.equal(first.stderr, "");
+  const manifest = JSON.parse(first.stdout) as {
+    schemaVersion: string;
+    generation: number;
+    packingStrategy: string;
+    tokenEstimator: string;
+    requestedBudget: number;
+    estimatedPayloadTokens: number;
+    selectedItems: { relativePath: string; selectedRanges: unknown[] }[];
+  };
+  assert.equal(manifest.schemaVersion, "1.0");
+  assert.equal(manifest.generation, 1);
+  assert.equal(manifest.packingStrategy, "contextforge-pack-v1");
+  assert.equal(manifest.tokenEstimator, "contextforge-generic-v1");
+  assert.equal(manifest.requestedBudget, 2000);
+  assert.ok(manifest.estimatedPayloadTokens <= manifest.requestedBudget);
+  assert.ok(manifest.selectedItems.some((item) => item.relativePath === "src/memory.ts" && item.selectedRanges.length > 0));
+  assert.equal(first.stdout.includes(root), false);
+
+  const output = join(root, "context.md");
+  const written = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--out", output]);
+  assert.equal(written.status, 0, written.stderr);
+  assert.equal(written.stdout, "");
+  assert.match(await readFile(output, "utf8"), /^# ContextForge Context Pack\n/u);
+  const existing = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--out", output]);
+  assert.equal(existing.status, 12);
+  assert.equal(existing.stdout, "");
+  assert.match(existing.stderr, /OUTPUT_EXISTS/u);
+
+  for (const invalid of ["0", "-1", "1.5", "NaN", "Infinity", "999999999999999999"]) {
+    const result = runCli(["pack", "memory", root, "--budget", invalid]);
+    assert.equal(result.status, 2);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /INVALID_BUDGET/u);
+  }
+  const tiny = runCli(["pack", "MemoryService", root, "--budget", "50"]);
+  assert.equal(tiny.status, 10);
+  assert.equal(tiny.stdout, "");
+  assert.match(tiny.stderr, /BUDGET_TOO_SMALL/u);
+
+  const staleSentinel = "NEW_PACK_STALE_SOURCE";
+  await writeFile(join(root, "src", "memory.ts"), `export class MemoryService { disableMemory() { return "${staleSentinel}"; } }\n`, "utf8");
+  const stale = runCli(["pack", "MemoryService.disableMemory", root, "--budget", "2000", "--json"]);
+  assert.equal(stale.status, 0, stale.stderr);
+  const staleManifest = JSON.parse(stale.stdout) as { packStatus: string; diagnostics: string[] };
+  assert.equal(staleManifest.packStatus, "PARTIAL");
+  assert.ok(staleManifest.diagnostics.includes("STALE_SELECTED_SOURCE"));
+  assert.equal(`${stale.stdout}${stale.stderr}`.includes(staleSentinel), false);
+});

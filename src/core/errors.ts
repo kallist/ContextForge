@@ -11,7 +11,12 @@ export type ContextForgeErrorCode =
   | "INDEX_REQUIRED"
   | "INVALID_TASK"
   | "TASK_TOO_LARGE"
-  | "SEARCH_FAILED";
+  | "SEARCH_FAILED"
+  | "INVALID_BUDGET"
+  | "BUDGET_TOO_SMALL"
+  | "PACK_FAILED"
+  | "OUTPUT_EXISTS"
+  | "OUTPUT_WRITE_FAILED";
 
 const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   USAGE: 2,
@@ -27,6 +32,11 @@ const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
   INVALID_TASK: 2,
   TASK_TOO_LARGE: 2,
   SEARCH_FAILED: 9,
+  INVALID_BUDGET: 2,
+  BUDGET_TOO_SMALL: 10,
+  PACK_FAILED: 11,
+  OUTPUT_EXISTS: 12,
+  OUTPUT_WRITE_FAILED: 13,
 };
 
 export class ContextForgeError extends Error {

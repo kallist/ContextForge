@@ -1,11 +1,11 @@
 import { basename, posix } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import type { RepositoryScanner } from "./map-repository.js";
+import type { RepositoryScanner, ScanResult } from "./map-repository.js";
 import type { RepositorySourceReader } from "./repository-source.js";
 import { ContextForgeError } from "../core/errors.js";
 import type { AnalyzedSymbol } from "../core/language-analysis.js";
-import type { IndexedFile, IndexRepositoryFactory } from "../core/repository-index.js";
+import type { IndexedFile, IndexRepositoryFactory, RepositoryIndexSnapshot } from "../core/repository-index.js";
 import type { GraphEdge, GitFileSignal } from "../core/repository-graph.js";
 import {
   STRUCTURAL_V1,
@@ -37,6 +37,14 @@ export interface SearchRepositoryRequest {
   readonly repositoryPath: string;
   readonly task: string;
   readonly limit?: number;
+}
+
+export interface SearchRepositoryExecution extends SearchExecution {
+  /** Internal application context; never serialized by the Search CLI contract. */
+  readonly context: {
+    readonly scan: ScanResult;
+    readonly snapshot: RepositoryIndexSnapshot;
+  };
 }
 
 interface SymbolReference {
@@ -481,7 +489,7 @@ async function executeSearchRepository(
   sourceReader: RepositorySourceReader,
   repositoryFactory: IndexRepositoryFactory,
   request: SearchRepositoryRequest,
-): Promise<SearchExecution> {
+): Promise<SearchRepositoryExecution> {
   const totalStarted = performance.now();
   const normalizationStarted = performance.now();
   const query = normalizeTaskQuery(request.task);
@@ -622,6 +630,7 @@ async function executeSearchRepository(
   };
   return {
     result,
+    context: { scan, snapshot: active },
     performance: {
       normalizationMs,
       retrievalMs,
@@ -638,7 +647,7 @@ export async function searchRepository(
   sourceReader: RepositorySourceReader,
   repositoryFactory: IndexRepositoryFactory,
   request: SearchRepositoryRequest,
-): Promise<SearchExecution> {
+): Promise<SearchRepositoryExecution> {
   try {
     return await executeSearchRepository(scanner, sourceReader, repositoryFactory, request);
   } catch (error) {

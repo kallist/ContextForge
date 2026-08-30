@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0–4 implemented — Safe Map, Durable Index, Repository Graph, and Explainable Task Retrieval**
+**Status: Phase 0–5 implemented — Safe Map through hard-budget Context Packing**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -20,9 +20,9 @@ The product goal is to preserve the context needed to complete a task while redu
 
 ## Current State
 
-ContextForge now safely discovers a repository, parses approved JavaScript/JSX, TypeScript/TSX, and Python files with packaged Tree-sitter WASM grammars, extracts symbols and imports, resolves bounded repository-local imports, derives explainable test/documentation relationships, collects optional bounded Git signals, and atomically activates one durable SQLite generation. It can normalize a coding task, retrieve direct path/symbol/import/source matches, expand bounded structural neighbors, suppress high-degree hubs, and return deterministic ranked file candidates with relevant symbols and additive score reasons.
+ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest.
 
-Token budgeting, Context Packs, benchmark scoring, MCP, remote providers, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval is transparent lexical/structural matching; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
+Benchmark scoring, MCP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
 
 ## Requirements
 
@@ -50,6 +50,9 @@ node dist/cli/main.js inspect src/services/memory.ts . --json
 node dist/cli/main.js graph src/services/memory.ts . --json
 node dist/cli/main.js search "fix memory disable race condition" .
 node dist/cli/main.js search "MemoryService.finalizeRun" . --limit 20 --json
+node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000
+node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000 --json
+node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000 --out context.md
 ```
 
 To verify the installable artifact without publishing it:
@@ -94,6 +97,14 @@ Run `contextforge index .` first, then use `contextforge search "<coding task>" 
 
 Source lexical matching does not store source or source-derived term rows in SQLite. Search reads bounded current bytes and accepts lexical evidence only when their SHA-256 equals the selected active generation. A mismatch reports `STALE`, excludes those bytes, and preserves generation semantics. The scan is capped at 10,000 files/64 MiB; reaching the cap reports `PARTIAL` rather than claiming complete freshness. Pure synonyms, semantic paraphrases, fuzzy spelling, and Chinese-to-English code mapping remain limitations.
 
+## Token budget and Context Packing
+
+`contextforge pack "<coding task>" [repository] --budget <tokens>` invokes the same `contextforge-structural-v1` Search use case, then applies `contextforge-pack-v1`. The default stdout artifact is Markdown and the budget covers that complete serialized payload, including task text, headings, paths, reasons, and dynamically sized code fences. `--json` emits the deterministic source-free manifest; manifest bytes are audit metadata and are not included in the Markdown budget. `--out <path>` publishes either artifact atomically and refuses to overwrite an existing file.
+
+The built-in `contextforge-generic-v1` estimator (version `1.0`) is deterministic, local, and deliberately conservative for code and multilingual text. It is not a model tokenizer, so the hard guarantee is relative to the estimator and version named in the manifest. If the format envelope plus one useful primary unit cannot fit, Pack returns `BUDGET_TOO_SMALL` instead of emitting malformed or misleading context.
+
+Pack reads, hashes, and slices each selected file from one in-memory source string. Bytes that no longer match the active generation are excluded and reported; a concurrent index activation cannot mix generations. Root `AGENTS.md` is included whole when small and heading-selected when large. Nested scoped instruction discovery, semantic program slicing, model tokenizers, persisted packs, and automatic output overwrite are **NOT IMPLEMENTED**.
+
 ## Repository Map Behavior
 
 `contextforge map [repository]` defaults to the current directory. If the input is inside a Git worktree, the nearest ancestor containing `.git` becomes the map root; otherwise, the input directory itself is mapped. Public output uses normalized repository-relative paths and never includes file contents or the absolute repository root.
@@ -114,10 +125,10 @@ An ignored directory contributes one exclusion count; unvisited descendants are 
 ## Project Documents
 
 - [Product Specification](docs/PRODUCT_SPEC.md) — required product behavior, scope, and V1 acceptance criteria.
-- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through the Repository Graph vertical slice.
-- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, Repository Graph, and explainable-ranking decisions with alternatives and consequences.
+- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through Context Packing.
+- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, and packing decisions.
 - [Benchmark](docs/BENCHMARK.md) — evaluation protocol, metric definitions, targets, and current not-run status.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
 
-The next planned engineering phase is **Phase 5 — Token Budget and Context Packing**, defined in `docs/ARCHITECTURE.md`. It is not part of the current implementation.
+The next planned engineering phase is **Phase 6 — Offline Benchmark**, defined in `docs/ARCHITECTURE.md`. It is not part of the current implementation.

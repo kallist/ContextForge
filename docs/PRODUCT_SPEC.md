@@ -190,7 +190,7 @@ Packing must choose the highest-value safe combination of full files, symbols, a
 
 ## Context Pack Format
 
-The primary human-readable output is `context.md`; the machine-readable output is `context.json`.
+The primary human-readable output is budgeted Markdown (commonly `context.md`); the machine-readable output is a source-free JSON manifest (commonly `context.json`).
 
 A Context Pack should represent:
 
@@ -210,14 +210,14 @@ The two formats must describe the same selection truth. Presentation differences
 The machine-readable output should contain enough metadata to inspect and reproduce a context build. The contract should cover:
 
 - task and repository identity;
-- HEAD SHA when available and creation time;
+- active index generation and applicable Git context when available;
 - requested budget and estimated tokens;
 - selected files, symbols, and line ranges;
 - scores and selection reasons;
 - excluded candidates or material exclusions;
-- language statistics and index version.
+- active generation plus ranking, packing, and estimator identities.
 
-Exact schema and compatibility policy must be documented when implemented.
+The implemented Phase 5 manifest is deterministic and intentionally has no creation timestamp. It contains selection and exclusion metadata but no source content; its serialized size is therefore outside the Markdown agent-payload budget.
 
 ## CLI
 
@@ -234,7 +234,7 @@ contextforge benchmark
 contextforge doctor
 ```
 
-These commands are product expectations, not currently runnable commands. CLI contracts may evolve during implementation, but implemented changes must be documented and tested.
+`map`, `index`, `inspect`, `graph`, `search`, and `pack` are implemented. The remaining commands are product expectations whose contracts may evolve during later phases.
 
 ## Incremental Indexing
 
@@ -313,7 +313,7 @@ No fixed latency target is specified for V1 in the source specification.
 
 ## V1 Acceptance Criteria
 
-V1 is complete only when a user can install a production CLI, enter a real repository, index it, provide a task and token budget, generate `context.md` and `context.json`, understand why content was selected, and run benchmark metrics.
+V1 is complete only when a user can install a production CLI, enter a real repository, index it, provide a task and token budget, generate budgeted Markdown plus a source-free JSON manifest, understand why content was selected, and run benchmark metrics.
 
 The release must demonstrate:
 
@@ -326,7 +326,7 @@ The release must demonstrate:
 - bounded graph expansion;
 - symbol-level context extraction;
 - token-budget enforcement;
-- Markdown and JSON Context Packs;
+- budgeted Markdown Context Packs and source-free JSON manifests;
 - incremental indexing;
 - secret and repository-boundary protection;
 - graceful parser degradation;

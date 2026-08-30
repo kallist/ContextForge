@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { FileSystemOutputArtifactWriter } from "../adapters/filesystem/output-artifact-writer.js";
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
 import { FileSystemRepositorySourceReader } from "../adapters/filesystem/repository-source-reader.js";
 import { TreeSitterLanguageAnalyzer } from "../adapters/parser/tree-sitter-language-analyzer.js";
 import { ReadOnlyGitSignalsReader } from "../adapters/git/git-signals-reader.js";
 import { SqliteIndexRepository } from "../adapters/sqlite/sqlite-index-repository.js";
 import { buildIndex } from "../application/build-index.js";
+import { buildContextPack, validateTokenBudget } from "../application/build-context-pack.js";
 import { inspectIndex } from "../application/inspect-index.js";
 import { inspectRepositoryGraph } from "../application/inspect-repository-graph.js";
 import { mapRepository } from "../application/map-repository.js";
@@ -36,6 +39,7 @@ Usage:
   contextforge inspect <relative-path> [repository] [--json]
   contextforge graph <relative-path> [repository] [--json]
   contextforge search <task> [repository] [--limit <n>] [--json]
+  contextforge pack <task> [repository] --budget <tokens> [--json] [--out <path>]
   contextforge --help
   contextforge --version
 
@@ -45,10 +49,13 @@ Commands:
   inspect   Read one file's symbols and imports from the active index (no ranking).
   graph     Inspect one file's structural relationships and Git signals (no ranking).
   search    Retrieve and explain task-relevant ranked candidates from the active index.
+  pack      Compile ranked repository context into a deterministic hard-budget payload.
 
 Options:
   --json    Emit the selected command's stable JSON contract.
   --limit   Limit search output (default ${STRUCTURAL_V1.cli.defaultLimit}, maximum ${STRUCTURAL_V1.cli.maximumLimit}).
+  --budget  Required positive token-estimate limit for the final Pack Markdown payload.
+  --out     Write the selected Markdown or JSON artifact without overwriting an existing path.
   --help    Show this help.
   --version Show the package version.
 `;
@@ -66,6 +73,11 @@ function usageError(message: string): ContextForgeError {
 }
 
 export async function run(argv: readonly string[], workingDirectory = process.cwd()): Promise<number> {
+  const separatedBudgetIndex = argv.indexOf("--budget");
+  const separatedBudget = separatedBudgetIndex < 0 ? undefined : argv[separatedBudgetIndex + 1];
+  if (separatedBudget !== undefined && /^-\d/u.test(separatedBudget)) {
+    validateTokenBudget(Number(separatedBudget));
+  }
   let parsed;
   try {
     parsed = parseArgs({
@@ -76,6 +88,8 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
         help: { type: "boolean" },
         json: { type: "boolean" },
         limit: { type: "string" },
+        budget: { type: "string" },
+        out: { type: "string" },
         version: { type: "boolean" },
       },
     });
@@ -97,8 +111,14 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
   if (extra.length > 0) throw usageError("Too many positional arguments.");
   const scanner = new FileSystemRepositoryScanner();
   const repositoryFactory = (rootRealPath: string): SqliteIndexRepository => new SqliteIndexRepository(rootRealPath);
+  const rejectPackOptions = (): void => {
+    if (parsed.values.budget !== undefined || parsed.values.out !== undefined) {
+      throw usageError("The --budget and --out options are only valid for pack.");
+    }
+  };
 
   if (command === "map") {
+    rejectPackOptions();
     if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (second !== undefined) throw usageError("Too many positional arguments.");
     const map = await mapRepository(scanner, { repositoryPath: first ?? workingDirectory }, version);
@@ -106,6 +126,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     return 0;
   }
   if (command === "index") {
+    rejectPackOptions();
     if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (second !== undefined) throw usageError("Too many positional arguments.");
     const summary = await buildIndex(
@@ -120,6 +141,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     return 0;
   }
   if (command === "inspect") {
+    rejectPackOptions();
     if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (first === undefined) throw usageError("The inspect command requires a repository-relative file path.");
     const inspection = await inspectIndex(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
@@ -127,6 +149,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     return 0;
   }
   if (command === "graph") {
+    rejectPackOptions();
     if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (first === undefined) throw usageError("The graph command requires a repository-relative file path.");
     const inspection = await inspectRepositoryGraph(scanner, repositoryFactory, second ?? workingDirectory, first.replaceAll("\\", "/"));
@@ -134,6 +157,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     return 0;
   }
   if (command === "search") {
+    rejectPackOptions();
     if (first === undefined) throw usageError("The search command requires a coding task.");
     const parsedLimit = parsed.values.limit === undefined ? undefined : Number(parsed.values.limit);
     if (parsedLimit !== undefined && (!Number.isSafeInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > STRUCTURAL_V1.cli.maximumLimit)) {
@@ -150,6 +174,28 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
       },
     );
     process.stdout.write(parsed.values.json === true ? formatSearchJson(execution.result) : formatSearchText(execution.result));
+    return 0;
+  }
+  if (command === "pack") {
+    if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
+    if (first === undefined) throw usageError("The pack command requires a coding task.");
+    if (parsed.values.budget === undefined) throw usageError("The pack command requires --budget <tokens>.");
+    const budget = Number(parsed.values.budget);
+    validateTokenBudget(budget);
+    const execution = await buildContextPack(
+      scanner,
+      new FileSystemRepositorySourceReader(),
+      repositoryFactory,
+      { repositoryPath: second ?? workingDirectory, task: first, budget },
+    );
+    const output = parsed.values.json === true
+      ? `${JSON.stringify(execution.manifest, null, 2)}\n`
+      : execution.markdown;
+    if (parsed.values.out === undefined) process.stdout.write(output);
+    else await new FileSystemOutputArtifactWriter().writeExclusive(resolve(workingDirectory, parsed.values.out), output);
+    for (const diagnostic of execution.manifest.diagnostics) {
+      process.stderr.write(`ContextForge PACK_DIAGNOSTIC: ${diagnostic}\n`);
+    }
     return 0;
   }
   throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);
