@@ -109,6 +109,7 @@ try {
     packed[0]?.files?.some(({ path }) =>
       !(
         path === "package.json" ||
+        path === "LICENSE" ||
         path === "README.md" ||
         path.startsWith("dist/")
       )

@@ -1,6 +1,6 @@
-# ContextForge V0.1 Draft Release Notes
+# ContextForge v0.1.0 Release Notes
 
-These are prerelease notes for the intended V0.1 line. They do not declare that version `0.1.0` has been finalized or released. The current package remains `0.1.0-dev.0`, private, and unlicensed pending explicit owner decisions.
+ContextForge v0.1.0 is the first public release of the local-first, task-aware context compiler for coding agents. It is distributed as the MIT-licensed `contextforge` package on npm.
 
 ## What ContextForge does
 
@@ -10,9 +10,16 @@ The production strategies are `contextforge-structural-v1`, `contextforge-pack-v
 
 ## Supported environment and distribution
 
-The declared runtime is Node `>=24.15 <25`. Release-candidate CI is designed to validate Node 24.15 on Ubuntu and Node 24.20 on Ubuntu, Windows, and macOS. The package uses Node's built-in SQLite and packaged WebAssembly assets; it has no native compilation or install/postinstall script.
+The declared runtime is Node `>=24.15 <25`. Release CI validates Node 24.15 on Ubuntu and Node 24.20 on Ubuntu, Windows, and macOS. The package uses Node's built-in SQLite and packaged WebAssembly assets; it has no native compilation or install/postinstall script.
 
-No registry package has been published. Until an explicit release, use a source checkout or a locally generated tarball as documented in the README. SQLite WAL state must remain on a local filesystem; UNC/network filesystems are unsupported.
+Install the exact release from the public npm registry:
+
+```text
+npm install -g contextforge@0.1.0
+contextforge --version
+```
+
+SQLite WAL state must remain on a local filesystem; UNC/network filesystems are unsupported.
 
 ## Benchmark evidence
 
