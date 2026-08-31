@@ -18,9 +18,11 @@ if (typeof npmCliPath !== "string" || npmCliPath.length === 0) {
 const temporaryRoot = await mkdtemp(join(tmpdir(), "contextforge-release-hardening-"));
 const installRoot = join(temporaryRoot, "install");
 const scaleRoot = join(temporaryRoot, "规模 repo with spaces");
+const contentionRoot = join(temporaryRoot, "mcp contention repo");
 const soakRoot = join(temporaryRoot, "mcp soak repo");
 const scaleFileCount = Number(process.env.CONTEXTFORGE_RELEASE_SCALE_FILES ?? "1200");
 const soakRequests = Number(process.env.CONTEXTFORGE_RELEASE_SOAK_REQUESTS ?? "1000");
+const contentionIterations = 10;
 const task = "ReleaseTarget.run";
 const budget = 8_000;
 
@@ -87,10 +89,12 @@ async function writeScaleSources(root, revision) {
   }
 }
 
-async function waitForFile(path, child, timeoutMs = 30_000) {
+async function waitForFile(path, child, timeoutMs = 30_000, boundary = "activation") {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error("Barrier process exited before reaching the activation boundary.");
+    if (child !== undefined && child.exitCode !== null) {
+      throw new Error(`Barrier process exited before reaching the ${boundary} boundary.`);
+    }
     try {
       await access(path);
       return;
@@ -99,7 +103,29 @@ async function waitForFile(path, child, timeoutMs = 30_000) {
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 20));
   }
-  throw new Error("Timed out waiting for the independent process activation barrier.");
+  throw new Error(`Timed out waiting for the independent process ${boundary} barrier.`);
+}
+
+async function createSignalFile(path, value) {
+  try {
+    await writeFile(path, value, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error;
+  }
+}
+
+async function withTimeout(promise, label, timeoutMs = 30_000) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function sqliteHealth(databasePath) {
@@ -161,10 +187,10 @@ function processObservation(pid) {
   return { rssBytes, handles: null };
 }
 
-function createMcpClient(cliPath, repositoryPath, name) {
+function createMcpClient(command, args, name) {
   const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: [cliPath, "mcp", "--repository", repositoryPath],
+    command,
+    args,
     cwd: installRoot,
     stderr: "pipe",
   });
@@ -192,6 +218,7 @@ try {
   const tarballPath = join(temporaryRoot, pack.filename);
   mustRun(process.execPath, [npmCliPath, "install", "--no-audit", "--no-fund", tarballPath], installRoot);
   const cliPath = join(installRoot, "node_modules", "contextforge", "dist", "cli", "main.js");
+  const installedPackageRoot = join(installRoot, "node_modules", "contextforge");
   await access(cliPath);
   const sqliteModulePath = join(
     installRoot,
@@ -231,6 +258,8 @@ try {
       ...(active.graph === null ? {} : { graph: active.graph }),
     }));
   `, "utf8");
+  const mcpBarrierHelperPath = join(repositoryRoot, "scripts", "release-hardening-mcp-writer.mjs");
+  await access(mcpBarrierHelperPath);
 
   await mkdir(scaleRoot, { recursive: true });
   await writeFile(join(scaleRoot, "AGENTS.md"), "# Synthetic release fixture\nDo not execute repository source.\n", "utf8");
@@ -384,33 +413,95 @@ try {
   const noGitGraph = JSON.parse(mustRun(process.execPath, [cliPath, "graph", "source.ts", noGitRoot, "--json"], installRoot));
   assert.equal(noGitGraph.git.status, "unavailable");
 
-  await writeScaleSources(scaleRoot, 5);
-  const mcpA = createMcpClient(cliPath, scaleRoot, "contextforge-release-mcp-a");
-  const mcpB = createMcpClient(cliPath, scaleRoot, "contextforge-release-mcp-b");
-  await Promise.all([mcpA.client.connect(mcpA.transport), mcpB.client.connect(mcpB.transport)]);
-  const mcpPids = [mcpA.transport.pid, mcpB.transport.pid];
-  assert.ok(mcpPids.every((pid) => typeof pid === "number"));
-  const [mcpIndexA, mcpIndexB] = await Promise.all([
-    mcpA.client.callTool({ name: "index", arguments: {} }),
-    mcpB.client.callTool({ name: "index", arguments: {} }),
-  ]);
-  const indexTexts = [mcpIndexA, mcpIndexB].map((result) => result.content.map((item) => item.type === "text" ? item.text : "").join(""));
-  assert.equal(indexTexts.filter((value) => value.includes("INDEX_BUSY")).length, 1);
-  const [mcpSearchA, mcpSearchB] = await Promise.all([
-    mcpA.client.callTool({ name: "search", arguments: { task, limit: 1 } }),
-    mcpB.client.callTool({ name: "search", arguments: { task, limit: 1 } }),
-  ]);
-  assert.equal(mcpSearchA.structuredContent?.candidates?.[0]?.relativePath, "src/release-target.ts");
-  assert.equal(mcpSearchB.structuredContent?.candidates?.[0]?.relativePath, "src/release-target.ts");
-  await Promise.all([mcpA.client.close(), mcpB.client.close()]);
-  assert.equal(mcpA.stderr.join(""), "");
-  assert.equal(mcpB.stderr.join(""), "");
-  await Promise.all(mcpPids.map((pid) => waitForExit(pid)));
+  await mkdir(contentionRoot, { recursive: true });
+  await writeFile(join(contentionRoot, "AGENTS.md"), "# Deterministic writer-contention fixture\n", "utf8");
+  await writeFile(join(contentionRoot, "release-target.ts"), "export class ReleaseTarget { run() { return true; } }\n", "utf8");
+  mustRun(process.execPath, [cliPath, "index", contentionRoot, "--json"], installRoot);
+  let latestContentionGeneration = 1;
+  for (let iteration = 0; iteration < contentionIterations; iteration += 1) {
+    const readyPath = join(temporaryRoot, `mcp-writer-${iteration}.ready`);
+    const releasePath = join(temporaryRoot, `mcp-writer-${iteration}.release`);
+    const mcpA = createMcpClient(
+      process.execPath,
+      [mcpBarrierHelperPath, installedPackageRoot, contentionRoot, readyPath, releasePath],
+      `contextforge-release-mcp-a-${iteration}`,
+    );
+    const mcpB = createMcpClient(
+      process.execPath,
+      [cliPath, "mcp", "--repository", contentionRoot],
+      `contextforge-release-mcp-b-${iteration}`,
+    );
+    try {
+      await Promise.all([mcpA.client.connect(mcpA.transport), mcpB.client.connect(mcpB.transport)]);
+    } catch (error) {
+      await Promise.allSettled([mcpA.client.close(), mcpB.client.close()]);
+      const startupPids = [mcpA.transport.pid, mcpB.transport.pid]
+        .filter((pid) => typeof pid === "number");
+      await Promise.allSettled(startupPids.map((pid) => waitForExit(pid)));
+      throw new Error(
+        `MCP contention helpers failed to start. A: ${mcpA.stderr.join("")} B: ${mcpB.stderr.join("")}`,
+        { cause: error },
+      );
+    }
+    const mcpPids = [mcpA.transport.pid, mcpB.transport.pid];
+    assert.ok(mcpPids.every((pid) => typeof pid === "number"));
+    const firstIndex = mcpA.client.callTool({ name: "index", arguments: {} });
+    let firstResult;
+    let secondResult;
+    try {
+      const barrierOutcome = await Promise.race([
+        waitForFile(readyPath, undefined, 30_000, "writer-lock-acquired").then(() => ({ status: "ready" })),
+        firstIndex.then(
+          () => ({ status: "completed" }),
+          (error) => ({ status: "failed", error }),
+        ),
+      ]);
+      if (barrierOutcome.status === "completed") {
+        throw new Error("First MCP index completed before its writer-lock barrier was observed.");
+      }
+      if (barrierOutcome.status === "failed") throw barrierOutcome.error;
+      try {
+        secondResult = await withTimeout(
+          mcpB.client.callTool({ name: "index", arguments: {} }),
+          "Competing MCP index",
+        );
+      } finally {
+        await createSignalFile(releasePath, "release\n");
+      }
+      firstResult = await withTimeout(firstIndex, "Barrier-held MCP index after release");
+      assert.notEqual(firstResult.isError, true);
+      assert.equal(secondResult.isError, true);
+      assert.match(
+        secondResult.content.map((item) => item.type === "text" ? item.text : "").join(""),
+        /INDEX_BUSY/u,
+      );
+      latestContentionGeneration = firstResult.structuredContent?.generation;
+      assert.equal(latestContentionGeneration, iteration + 2);
+    } finally {
+      await createSignalFile(releasePath, "release\n");
+      await withTimeout(firstIndex, "MCP index cleanup after barrier failure").catch(() => undefined);
+      await Promise.allSettled([mcpA.client.close(), mcpB.client.close()]);
+      await Promise.all(mcpPids.map((pid) => waitForExit(pid)));
+    }
+    assert.equal(mcpA.stderr.join(""), "");
+    assert.equal(mcpB.stderr.join(""), "");
+  }
+  const contentionHealth = sqliteHealth(join(contentionRoot, ".contextforge", "index.sqlite"));
+  assert.deepEqual(contentionHealth.integrity, ["ok"]);
+  assert.deepEqual(contentionHealth.foreignKeys, []);
+  assert.equal(contentionHealth.building, 0);
+  assert.equal(contentionHealth.state.generation, latestContentionGeneration);
+  mustRun(process.execPath, [cliPath, "search", task, contentionRoot, "--json"], installRoot);
+  mustRun(process.execPath, [cliPath, "pack", task, contentionRoot, "--budget", String(budget), "--json"], installRoot);
 
   await mkdir(soakRoot, { recursive: true });
   await writeFile(join(soakRoot, "main.ts"), "export class SoakTarget { run() { return true; } }\n", "utf8");
   mustRun(process.execPath, [cliPath, "index", soakRoot, "--json"], installRoot);
-  const soak = createMcpClient(cliPath, soakRoot, "contextforge-release-soak");
+  const soak = createMcpClient(
+    process.execPath,
+    [cliPath, "mcp", "--repository", soakRoot],
+    "contextforge-release-soak",
+  );
   await soak.client.connect(soak.transport);
   const soakPid = soak.transport.pid;
   assert.equal(typeof soakPid, "number");
@@ -467,6 +558,8 @@ try {
     },
     concurrency: {
       indexIndex: "one success, one INDEX_BUSY",
+      indexIndexIterations: contentionIterations,
+      indexIndexFailures: 0,
       indexSearchGeneration: concurrentSearch.generation,
       indexPackGeneration: concurrentPack.generation,
       multipleMcpServers: "PASS",
