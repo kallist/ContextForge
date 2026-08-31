@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0–6 implemented — Safe Map through reproducible offline evaluation**
+**Status: Phase 0–7 implemented — Safe Map through local MCP stdio integration**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -20,9 +20,9 @@ The product goal is to preserve the context needed to complete a task while redu
 
 ## Current State
 
-ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest. Phase 6 adds a frozen, offline benchmark that compares this production path with lexical and structural whole-file baselines.
+ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest. Phase 6 adds a frozen, offline benchmark; Phase 7 exposes the same Index, Search, and Pack application behavior through a local MCP stdio adapter.
 
-MCP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
+Remote MCP/HTTP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
 
 ## Requirements
 
@@ -53,6 +53,7 @@ node dist/cli/main.js search "MemoryService.finalizeRun" . --limit 20 --json
 node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000
 node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000 --json
 node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000 --out context.md
+node dist/cli/main.js mcp --repository .
 ```
 
 To verify the installable artifact without publishing it:
@@ -61,7 +62,28 @@ To verify the installable artifact without publishing it:
 npm run package:smoke
 ```
 
-That smoke test runs `npm pack`, installs the tarball into a fresh temporary project, and invokes the installed `contextforge` binary. It does not publish the package.
+That smoke test runs `npm pack`, installs the tarball into a fresh temporary project, exercises the installed CLI and packaged parsers/SQLite, then connects an official MCP client to the installed stdio server for `status`, `index`, `search`, and `pack`. It does not publish the package.
+
+## MCP integration
+
+After building, start one local stdio server bound to one repository:
+
+```text
+node /absolute/path/to/ContextForge/dist/cli/main.js mcp --repository /absolute/path/to/repository
+```
+
+The same command from a fresh tarball installation is `contextforge mcp --repository <path>`. This package is not published to a public registry, so documentation does not assume `npx` or a registry install. An MCP-compatible host should configure the executable and arguments above, use stdio as the transport, and leave stdout to protocol traffic.
+
+The server uses the official split TypeScript SDK (`@modelcontextprotocol/server` 2.0.0), supports its modern `2026-07-28` negotiation and legacy initialization compatibility, and exposes four tools:
+
+- `status` reports `MISSING`, `CURRENT`, `STALE`, or `PARTIAL` without source or absolute paths.
+- `index` explicitly mutates only `.contextforge` runtime index state; it does not change repository source or Git.
+- `search` is a bounded read-only view of production `contextforge-structural-v1` results.
+- `pack` returns the production hard-budget Markdown once in MCP text content, with source-free compact metadata in structured content.
+
+Repository binding is resolved once at startup. Tool calls cannot redirect the server to another root, and Search/Pack never auto-index. A stale Pack remains explicitly `PARTIAL` and excludes source that no longer matches the active generation. The declared budget covers the ContextForge Markdown payload under `contextforge-generic-v1`, not MCP wire framing or a model-specific tokenizer.
+
+Stdio inherits the permissions of the local host process; it is not remote authentication or an OS filesystem sandbox. ContextForge adds no network listener, telemetry, command-execution tool, arbitrary-file tool, Resources, or Prompts. Official-client stdio interoperability is tested, but actual Codex, Claude Code, Cursor, paid-agent task success, and remote MCP hosts are **NOT TESTED**.
 
 ## Offline benchmark evidence
 
@@ -138,11 +160,11 @@ An ignored directory contributes one exclusion count; unvisited descendants are 
 ## Project Documents
 
 - [Product Specification](docs/PRODUCT_SPEC.md) — required product behavior, scope, and V1 acceptance criteria.
-- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through offline evaluation.
-- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, and benchmark decisions.
+- [Architecture and Implementation Plan](docs/ARCHITECTURE.md) — approved V1 boundaries and implementation status through local MCP integration.
+- [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, benchmark, and local MCP decisions.
 - [Benchmark](docs/BENCHMARK.md) — frozen evaluation protocol, metric definitions, reproduction commands, and evidence boundary.
 - [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md) — reviewed formal quality and environment-specific performance results.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
 
-The next planned engineering phase is **Phase 7 — MCP and Coding-Agent Integration**, defined in `docs/ARCHITECTURE.md`. It has not been started.
+The next planned engineering phase is **Phase 8 — Hardening and Release Readiness**, defined in `docs/ARCHITECTURE.md`. No release has been created.

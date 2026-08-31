@@ -6,16 +6,13 @@ import { parseArgs } from "node:util";
 
 import { FileSystemOutputArtifactWriter } from "../adapters/filesystem/output-artifact-writer.js";
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
-import { FileSystemRepositorySourceReader } from "../adapters/filesystem/repository-source-reader.js";
-import { TreeSitterLanguageAnalyzer } from "../adapters/parser/tree-sitter-language-analyzer.js";
-import { ReadOnlyGitSignalsReader } from "../adapters/git/git-signals-reader.js";
+import { startContextForgeMcpStdio } from "../adapters/mcp/contextforge-mcp-server.js";
 import { SqliteIndexRepository } from "../adapters/sqlite/sqlite-index-repository.js";
-import { buildIndex } from "../application/build-index.js";
-import { buildContextPack, validateTokenBudget } from "../application/build-context-pack.js";
+import { validateTokenBudget } from "../application/build-context-pack.js";
 import { inspectIndex } from "../application/inspect-index.js";
 import { inspectRepositoryGraph } from "../application/inspect-repository-graph.js";
 import { mapRepository } from "../application/map-repository.js";
-import { searchRepository } from "../application/search-repository.js";
+import { createContextForgeApplication } from "../composition/contextforge-application.js";
 import { ContextForgeError } from "../core/errors.js";
 import { STRUCTURAL_V1 } from "../core/ranking/structural-v1.js";
 import {
@@ -40,6 +37,7 @@ Usage:
   contextforge graph <relative-path> [repository] [--json]
   contextforge search <task> [repository] [--limit <n>] [--json]
   contextforge pack <task> [repository] --budget <tokens> [--json] [--out <path>]
+  contextforge mcp [--repository <path>]
   contextforge --help
   contextforge --version
 
@@ -50,12 +48,14 @@ Commands:
   graph     Inspect one file's structural relationships and Git signals (no ranking).
   search    Retrieve and explain task-relevant ranked candidates from the active index.
   pack      Compile ranked repository context into a deterministic hard-budget payload.
+  mcp       Serve status, index, search, and pack tools over local MCP stdio.
 
 Options:
   --json    Emit the selected command's stable JSON contract.
   --limit   Limit search output (default ${STRUCTURAL_V1.cli.defaultLimit}, maximum ${STRUCTURAL_V1.cli.maximumLimit}).
   --budget  Required positive token-estimate limit for the final Pack Markdown payload.
   --out     Write the selected Markdown or JSON artifact without overwriting an existing path.
+  --repository Bind the MCP server to one repository (default: current directory).
   --help    Show this help.
   --version Show the package version.
 `;
@@ -90,6 +90,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
         limit: { type: "string" },
         budget: { type: "string" },
         out: { type: "string" },
+        repository: { type: "string" },
         version: { type: "boolean" },
       },
     });
@@ -111,6 +112,9 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
   if (extra.length > 0) throw usageError("Too many positional arguments.");
   const scanner = new FileSystemRepositoryScanner();
   const repositoryFactory = (rootRealPath: string): SqliteIndexRepository => new SqliteIndexRepository(rootRealPath);
+  if (command !== "mcp" && parsed.values.repository !== undefined) {
+    throw usageError("The --repository option is only valid for mcp.");
+  }
   const rejectPackOptions = (): void => {
     if (parsed.values.budget !== undefined || parsed.values.out !== undefined) {
       throw usageError("The --budget and --out options are only valid for pack.");
@@ -129,14 +133,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     rejectPackOptions();
     if (parsed.values.limit !== undefined) throw usageError("The --limit option is only valid for search.");
     if (second !== undefined) throw usageError("Too many positional arguments.");
-    const summary = await buildIndex(
-      scanner,
-      new FileSystemRepositorySourceReader(),
-      new TreeSitterLanguageAnalyzer(),
-      repositoryFactory,
-      { repositoryPath: first ?? workingDirectory },
-      new ReadOnlyGitSignalsReader(),
-    );
+    const summary = await (await createContextForgeApplication(first ?? workingDirectory)).index();
     process.stdout.write(parsed.values.json === true ? formatIndexJson(summary) : formatIndexText(summary));
     return 0;
   }
@@ -163,16 +160,10 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     if (parsedLimit !== undefined && (!Number.isSafeInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > STRUCTURAL_V1.cli.maximumLimit)) {
       throw usageError(`The --limit value must be an integer from 1 to ${STRUCTURAL_V1.cli.maximumLimit}.`);
     }
-    const execution = await searchRepository(
-      scanner,
-      new FileSystemRepositorySourceReader(),
-      repositoryFactory,
-      {
-        repositoryPath: second ?? workingDirectory,
-        task: first,
-        ...(parsedLimit === undefined ? {} : { limit: parsedLimit }),
-      },
-    );
+    const execution = await (await createContextForgeApplication(second ?? workingDirectory)).search({
+      task: first,
+      ...(parsedLimit === undefined ? {} : { limit: parsedLimit }),
+    });
     process.stdout.write(parsed.values.json === true ? formatSearchJson(execution.result) : formatSearchText(execution.result));
     return 0;
   }
@@ -182,12 +173,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     if (parsed.values.budget === undefined) throw usageError("The pack command requires --budget <tokens>.");
     const budget = Number(parsed.values.budget);
     validateTokenBudget(budget);
-    const execution = await buildContextPack(
-      scanner,
-      new FileSystemRepositorySourceReader(),
-      repositoryFactory,
-      { repositoryPath: second ?? workingDirectory, task: first, budget },
-    );
+    const execution = await (await createContextForgeApplication(second ?? workingDirectory)).pack({ task: first, budget });
     const output = parsed.values.json === true
       ? `${JSON.stringify(execution.manifest, null, 2)}\n`
       : execution.markdown;
@@ -196,6 +182,20 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     for (const diagnostic of execution.manifest.diagnostics) {
       process.stderr.write(`ContextForge PACK_DIAGNOSTIC: ${diagnostic}\n`);
     }
+    return 0;
+  }
+  if (command === "mcp") {
+    if (first !== undefined || second !== undefined) throw usageError("The mcp command accepts repository binding only through --repository.");
+    if (
+      parsed.values.json !== undefined ||
+      parsed.values.limit !== undefined ||
+      parsed.values.budget !== undefined ||
+      parsed.values.out !== undefined
+    ) {
+      throw usageError("The --json, --limit, --budget, and --out options are not valid for mcp.");
+    }
+    const application = await createContextForgeApplication(parsed.values.repository ?? workingDirectory);
+    startContextForgeMcpStdio(application, version);
     return 0;
   }
   throw usageError(command === undefined ? "A command is required." : `Unknown command: ${command}`);
