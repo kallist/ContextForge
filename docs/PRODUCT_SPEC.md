@@ -234,7 +234,7 @@ contextforge benchmark
 contextforge doctor
 ```
 
-`map`, `index`, `inspect`, `graph`, `search`, and `pack` are implemented. The remaining commands are product expectations whose contracts may evolve during later phases.
+`map`, `index`, `inspect`, `graph`, `search`, `pack`, and the local `mcp` server command are implemented. The remaining commands are product expectations whose contracts may evolve during later phases.
 
 ## Incremental Indexing
 
@@ -277,9 +277,9 @@ Security rules must be fail-safe and apply independently of relevance scores. V1
 
 ## MCP Integration
 
-MCP is an integration layer, not part of the ContextForge core. After stable CLI/core behavior exists, an MCP adapter should expose capabilities equivalent to repository mapping, repository search, Context Pack building, and selection explanation.
+MCP is an integration layer, not part of the ContextForge core. The implemented local stdio adapter binds one repository at startup and exposes only `status`, explicit `index`, read-only `search`, and read-only `pack`. Tools cannot redirect repository scope, and Search/Pack do not auto-index.
 
-Implementation must use the stable MCP specification and SDK current at implementation time. MCP-specific code must not own discovery, retrieval, ranking, budgeting, or packing logic.
+The implementation uses the stable official split TypeScript SDK current at implementation time. MCP-specific code owns only runtime schemas, result/error translation, annotations, and transport lifecycle; it does not own discovery, retrieval, ranking, budgeting, packing, or SQLite behavior. Remote MCP/HTTP, multi-root operation, Resources, Prompts, and application-level cancellation propagation remain deferred.
 
 ## Coding Agent Integration
 

@@ -2,22 +2,22 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–6 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–7 IMPLEMENTED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation. Later integration modules remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation; Phase 7 provides local MCP stdio integration. Remote transports and release work remain planned, not implemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
 ## Repository Audit
 
-Audit dates: 2026-08-29 (initial) and 2026-08-30 (Phases 2–6).
+Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), and 2026-08-31 (Phase 7).
 
 ### Current State
 
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-30, Phase 0–6 are implemented and locally exercised on Windows. The frozen benchmark corpus, raw/aggregate reference results, and reviewed report are present; MCP, remote providers, and release artifacts remain absent.
+- As of 2026-08-31, Phase 0–7 are implemented and locally exercised on Windows. The frozen benchmark evidence remains unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, actual coding-agent host QA, and release artifacts remain absent.
 
 ### Existing Assets
 
@@ -44,7 +44,7 @@ This environment demonstrates why consumer-side native compilation must not be r
 - Token budget is a first-class hard constraint under the declared estimator.
 - Atomic active-index publication and safe `index + index` / `index + pack` behavior.
 - Production-path tests and honest, reproducible offline benchmarks.
-- MCP is a deferred adapter and cannot own core behavior.
+- MCP is a thin local adapter and cannot own core behavior.
 
 ### Remaining Foundations
 
@@ -60,7 +60,7 @@ This environment demonstrates why consumer-side native compilation must not be r
 - Windows path case, drive letters, junctions/symlinks, file locking, reserved names, and executable shims.
 - npm packages accidentally omitting WASM assets or relying on Unix postinstall commands.
 - Generic token estimates diverging from a specific model tokenizer.
-- MCP protocol/SDK evolution before the deferred integration phase.
+- MCP protocol/SDK evolution across future protocol revisions.
 - Benchmark fixtures that are too easy, circularly labeled, or not redistributable.
 
 ## Technology Baseline
@@ -78,14 +78,14 @@ This environment demonstrates why consumer-side native compilation must not be r
 | Testing | `node:test` on compiled JS; subprocess CLI E2E | Stable built-in runner, minimal toolchain |
 | Build/typecheck | `tsc`; package compiled JS, declarations, WASM assets | Ordinary auditable npm package |
 | Lint | ESLint with TypeScript rules | Explicit static quality gate |
-| MCP | Deferred stdio adapter using the stable official TypeScript SDK at implementation time | Keeps protocol churn and transport out of core |
+| MCP | Local stdio via official `@modelcontextprotocol/server` 2.0.0; `2026-07-28` negotiation plus SDK legacy compatibility | Keeps protocol churn and transport out of core; no HTTP listener |
 
 See ADR-001 through ADR-004 for alternatives and consequences.
 
 ## Dependency Direction
 
 ```text
-CLI Adapter (MAP/INDEX/INSPECT/GRAPH)          MCP Adapter (DEFERRED)
+CLI Adapter (MAP/INDEX/INSPECT/GRAPH/SEARCH/PACK)    MCP Adapter (STDIO)
           \                                        /
            └──────── Application Use Cases ───────┘
                               │
@@ -110,11 +110,11 @@ Core Domain + Policies
   Filesystem/Git    Tree-sitter WASM  node:sqlite
 ```
 
-The Core and Application layers must not import CLI, MCP, UI, `node:sqlite`, Tree-sitter, or concrete filesystem/Git implementations. Adapters implement inward-facing ports. CLI and future MCP code may translate input/output and errors but may not duplicate retrieval, ranking, budgeting, or security policy.
+The Core and Application layers do not import CLI, MCP, UI, `node:sqlite`, Tree-sitter, or concrete filesystem/Git implementations. Adapters implement inward-facing ports. CLI and MCP translate input/output and errors but do not duplicate retrieval, ranking, budgeting, or security policy.
 
 ## Proposed Source Layout
 
-The Phase 0–6 subset now exists; MCP adapters remain planned:
+The Phase 0–7 implementation now includes a shared composition root and MCP adapter:
 
 ```text
 src/
@@ -127,6 +127,8 @@ src/
     parser/
     sqlite/
     token/
+    mcp/
+  composition/
 test/
   unit/
   integration/
@@ -145,10 +147,11 @@ Use folders to enforce meaningful dependency boundaries, not to create one-file 
 - `InspectRepositoryGraph`: query one active generation's forward/reverse imports, containment, tests, documentation, import statuses, and Git signals without ranking.
 - `SearchRepository`: retrieve explainable candidates without packing.
 - `BuildContextPack`: run the full task-aware selection and hard-budget pipeline.
+- `GetRepositoryStatus`: truthfully verify active-generation availability and current source freshness without exposing raw storage.
 - `ExplainContext`: expose scores, reasons, exclusions, and budget decisions from a manifest.
 - `RunOfflineBenchmark`: invoke production use cases for versioned benchmark cases.
 
-CLI commands are adapters over these use cases. MCP later maps tools onto the same use cases.
+CLI commands are adapters over these use cases. MCP maps `status`, `index`, `search`, and `pack` onto the same application behavior through one repository-bound composition root.
 
 ## Core Domain Contracts
 
@@ -386,11 +389,13 @@ The first implementation may hold the generation transaction for the whole bound
 - Symlink tests detect platform capability and separately test path-policy logic so a platform permission limitation cannot silently remove boundary coverage.
 - Use no Unix-only commands in npm scripts or CI steps.
 
-## MCP Boundary and Timing
+## MCP Boundary and Transport
 
-MCP remains `DEFERRED` until the CLI use cases, Context Pack schema, and explanation contract are stable and production-path E2E tests pass. Phase 7 adds a separate adapter, initially local stdio, mapping `repo_map`, `search_repository`, `build_context_pack`, and `explain_context` to application use cases.
+Phase 7 implements a separate local stdio adapter with the official split TypeScript SDK. `contextforge mcp --repository <path>` resolves and binds one canonical repository root at process startup. No normal tool accepts a repository argument. The adapter registers only `status`, `index`, `search`, and `pack`; it adds no Resources, Prompts, HTTP server, file watcher, network calls, command execution, arbitrary file access, or hidden indexing.
 
-At that phase, re-check the stable MCP specification and [official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk). As of this architecture review, the official TypeScript SDK is Tier 1 and its V2 line uses split server/client packages; no SDK dependency is added now. MCP transport and schema types must remain outside Core.
+The composition root constructs the existing filesystem, parser, Git, SQLite, Search, and Pack dependencies once for CLI/MCP parity. MCP schemas, annotations, negotiation, and stdio lifecycle stay in `src/adapters/mcp`; the Core contains no MCP types. Pack Markdown appears once as text content, while structured content is bounded source-free metadata. Stdout is reserved for protocol frames and normal successful operation emits no stderr.
+
+The implementation uses `@modelcontextprotocol/server` 2.0.0 and Zod runtime schemas. The SDK's `serveStdio` handles the stable `2026-07-28` discovery/negotiation lifecycle and compatible legacy initialization; ContextForge does not implement JSON-RPC or version shims. See [official package guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/packages.md), [stdio guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/serving/stdio.md), and ADR-008.
 
 ## Minimal Hosted CI Design
 
@@ -458,11 +463,11 @@ The first formal result is mixed and retained without production tuning: structu
 
 ### Phase 7 — MCP and Coding-Agent Integration
 
-After core contracts stabilize, add the official stable TypeScript MCP SDK and a thin local-stdio adapter. Add transport/schema tests and coding-agent integration documentation; keep paid agent comparisons optional.
+**IMPLEMENTED.** Add the official stable split TypeScript MCP SDK and a thin local-stdio adapter over shared application composition. One startup-bound repository exposes `status`, explicit local-runtime `index`, read-only `search`, and read-only hard-budget `pack`. Runtime schemas, compact bounded results, safe error mapping, stdout purity, modern and legacy SDK compatibility, generation snapshot concurrency, CLI/MCP parity, process shutdown, Unicode/space paths, and fresh-tarball official-client flows are tested. Cancellation propagation into application use cases and actual Codex/Claude Code/Cursor host configuration remain unimplemented/untested. See ADR-008.
 
 ### Phase 8 — Hardening and Release Readiness
 
-Run security/failure/concurrency E2E, package-install tests, performance measurement, Windows/macOS/Linux hosted matrix, documentation verification, independent review, and production CLI acceptance. Release work still requires explicit authorization.
+Run broader hardening, actual-host QA, release packaging/policy review, and production CLI acceptance. Phase 7 already includes security/failure/concurrency E2E, fresh-install MCP smoke, performance measurement, and the existing Windows/macOS/Linux hosted matrix; release work still requires explicit authorization.
 
 ## First Vertical Slice #1: Safe Repository Map
 

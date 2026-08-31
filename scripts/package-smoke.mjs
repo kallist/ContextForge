@@ -3,6 +3,9 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const temporaryRoot = await mkdtemp(join(tmpdir(), "contextforge-package-smoke-"));
 const installRoot = join(temporaryRoot, "install");
@@ -25,6 +28,55 @@ function run(command, args, cwd) {
   return result.stdout;
 }
 
+async function runMcpFlow(installedCliPath, repositoryPath) {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [installedCliPath, "mcp", "--repository", repositoryPath],
+    cwd: installRoot,
+    stderr: "pipe",
+  });
+  const stderr = [];
+  transport.stderr?.on("data", (chunk) => stderr.push(chunk.toString()));
+  const client = new Client(
+    { name: "contextforge-package-smoke", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  try {
+    await client.connect(transport);
+    if (client.getNegotiatedProtocolVersion() !== "2026-07-28") {
+      throw new Error("Installed MCP server did not negotiate the expected modern protocol revision.");
+    }
+    const tools = await client.listTools();
+    if (tools.tools.map(({ name }) => name).join(",") !== "status,index,search,pack") {
+      throw new Error("Installed MCP server did not expose the expected bounded tool surface.");
+    }
+    const status = await client.callTool({ name: "status", arguments: {} });
+    if (status.structuredContent?.indexStatus !== "CURRENT") {
+      throw new Error("Installed MCP status tool did not observe the CLI-created index.");
+    }
+    const index = await client.callTool({ name: "index", arguments: {} });
+    if (index.structuredContent?.generation !== 2) {
+      throw new Error("Installed MCP index tool did not refresh the fixture generation.");
+    }
+    const search = await client.callTool({ name: "search", arguments: { task: "Smoke.run", limit: 1 } });
+    if (search.structuredContent?.candidates?.[0]?.relativePath !== "src/main.ts") {
+      throw new Error("Installed MCP search tool did not retrieve the expected fixture file.");
+    }
+    const pack = await client.callTool({ name: "pack", arguments: { task: "Smoke.run", budget: 2_000 } });
+    const markdown = pack.content.find(({ type }) => type === "text")?.text;
+    if (typeof markdown !== "string" || !markdown.startsWith("# ContextForge Context Pack\n") || !markdown.includes("src/main.ts")) {
+      throw new Error("Installed MCP pack tool did not return the expected Context Markdown payload.");
+    }
+    const publicOutput = JSON.stringify({ tools, status, index, search, pack });
+    if (publicOutput.includes("CONTEXTFORGE_PACKAGE_MCP_SECRET") || publicOutput.includes(repositoryPath)) {
+      throw new Error("Installed MCP flow exposed secret content or an absolute repository path.");
+    }
+  } finally {
+    await client.close();
+  }
+  if (stderr.join("") !== "") throw new Error(`Installed MCP server emitted stderr: ${stderr.join("")}`);
+}
+
 try {
   await mkdir(installRoot, { recursive: true });
   await mkdir(join(fixtureRoot, "src"), { recursive: true });
@@ -35,6 +87,7 @@ try {
     "utf8",
   );
   await writeFile(join(fixtureRoot, "src", "ready.ts"), "export const ready = true;\n", "utf8");
+  await writeFile(join(fixtureRoot, ".env.local"), "CONTEXTFORGE_PACKAGE_MCP_SECRET", "utf8");
 
   const packedOutput = run(
     process.execPath,
@@ -130,6 +183,9 @@ try {
     throw new Error("Installed CLI could not produce a valid hard-budget Context Manifest.");
   }
 
+  const installedCliPath = join(installRoot, "node_modules", "contextforge", "dist", "cli", "main.js");
+  await runMcpFlow(installedCliPath, fixtureRoot);
+
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
   const parserAssetRoot = join(
@@ -152,7 +208,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write("Package smoke passed: npm pack, fresh install, packaged WASM parsers, index, inspect, graph, search, and context pack.\n");
+  process.stdout.write("Package smoke passed: npm pack, fresh install, packaged WASM parsers, CLI flows, and the official-client MCP stdio flow.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });
 }
