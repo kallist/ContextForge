@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0–7 implemented — Safe Map through local MCP stdio integration**
+**Status: Phase 0–8 implemented — local hardening passed; latest-HEAD Hosted CI and public-release decisions remain pending**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -29,6 +29,12 @@ Remote MCP/HTTP, remote providers, model-specific tokenizers, nested-directory `
 - Node.js `>=24.15 <25` (the repository pins Node 24.20.0 for development and CI)
 - npm
 
+## Release status
+
+ContextForge has not been released or published to npm. The current package is `contextforge@0.1.0-dev.0`, `private`, and `UNLICENSED`. Technical release-candidate validation is available, but public release remains **BLOCKED** until the owner explicitly chooses a license, finalizes the version, and authorizes release execution. No README instruction assumes a registry package exists.
+
+The intended distribution is a CLI package; no stable JavaScript library API or package `exports` surface is promised. Internal parser, SQLite, ranking, and packing modules may change between prereleases.
+
 ## Development
 
 ```text
@@ -56,6 +62,18 @@ node dist/cli/main.js pack "fix memory disable race condition" . --budget 8000 -
 node dist/cli/main.js mcp --repository .
 ```
 
+A minimal source-checkout quickstart is:
+
+```text
+npm ci
+npm run build
+node dist/cli/main.js index .
+node dist/cli/main.js search "fix stale index activation" . --json
+node dist/cli/main.js pack "fix stale index activation" . --budget 8000 --out context.md
+```
+
+To simulate consumer installation without a public registry, create a tarball with `npm pack`, install that tarball into a clean temporary project, and run its `contextforge` bin. `npm run package:smoke` performs this complete flow automatically and deletes its temporary files.
+
 To verify the installable artifact without publishing it:
 
 ```text
@@ -63,6 +81,8 @@ npm run package:smoke
 ```
 
 That smoke test runs `npm pack`, installs the tarball into a fresh temporary project, exercises the installed CLI and packaged parsers/SQLite, then connects an official MCP client to the installed stdio server for `status`, `index`, `search`, and `pack`. It does not publish the package.
+
+For release-candidate validation, `npm run release:hardening` exercises installed-package OS processes, crash recovery, SQLite integrity, multiple MCP servers, determinism, a 1,200-file synthetic repository, and a 1,000-request MCP soak. `npm run release:check` composes the technical gates but never pushes, tags, publishes, or creates a release. The frozen full benchmark remains a separate `npm run benchmark` gate.
 
 ## MCP integration
 
@@ -157,6 +177,14 @@ Safety rules are fail-closed and additive:
 
 An ignored directory contributes one exclusion count; unvisited descendants are deliberately not guessed. Filesystem races cannot be eliminated without an OS sandbox. ContextForge resolves and revalidates paths, performs bounded handle reads, compares metadata around reads, and fails closed when a path changes, but this is not an OS-level filesystem sandbox guarantee.
 
+## Trust model and release limitations
+
+ContextForge reads local repository content with the permissions of the invoking user and returns selected content to that local CLI user or MCP host. Repository source, documentation, tasks, Git output, parser data, and tool input may be untrusted. ContextForge does not execute repository source, expose shell or arbitrary-file MCP tools, upload repository data, start a network listener, or collect telemetry. It stores derived metadata and hashes in `.contextforge/index.sqlite`, not full source or task history.
+
+Sensitive filenames and ignored paths are excluded before retrieval, but ContextForge cannot guarantee detection of every inline secret inside otherwise eligible source. Generated Context Packs can contain untrusted instructions from repository files and must be reviewed before forwarding outside the local trust boundary. SQLite WAL state is supported only on a local filesystem; UNC and network filesystems are unsupported.
+
+Known V0.1 limitations include the generic non-model tokenizer, weak pure-synonym/semantic retrieval, incomplete TypeScript alias/package-exports and advanced Python import resolution, one repository per MCP process, no auto-index, and no real coding-host task-success evidence. Structural ranking underperformed lexical ranking in aggregate retrieval on benchmark-v1; the published negative evidence is intentional.
+
 ## Project Documents
 
 - [Product Specification](docs/PRODUCT_SPEC.md) — required product behavior, scope, and V1 acceptance criteria.
@@ -164,7 +192,10 @@ An ignored directory contributes one exclusion count; unvisited descendants are 
 - [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, benchmark, and local MCP decisions.
 - [Benchmark](docs/BENCHMARK.md) — frozen evaluation protocol, metric definitions, reproduction commands, and evidence boundary.
 - [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md) — reviewed formal quality and environment-specific performance results.
+- [Release Checklist](docs/RELEASE_CHECKLIST.md) — technical, legal, hosted, and explicitly authorized release gates.
+- [Draft V0.1 Release Notes](docs/RELEASE_NOTES_V0.1.md) — prerelease behavior, evidence, trust model, and limitations.
+- [Security Policy](SECURITY.md) and [Contributing Guide](CONTRIBUTING.md) — reporting and contribution boundaries.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
 
-The next planned engineering phase is **Phase 8 — Hardening and Release Readiness**, defined in `docs/ARCHITECTURE.md`. No release has been created.
+Phase 8 technical hardening is implemented. No merge, tag, GitHub Release, or npm publication is implied; public release remains blocked until the explicit license and version decisions in the release checklist are resolved.

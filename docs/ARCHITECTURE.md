@@ -2,22 +2,22 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–7 IMPLEMENTED**
+**APPROVED V1 DESIGN — PHASES 0–8 IMPLEMENTED; PUBLIC RELEASE BLOCKED**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation; Phase 7 provides local MCP stdio integration. Remote transports and release work remain planned, not implemented.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation; Phase 7 provides local MCP stdio integration; Phase 8 provides package, process-recovery, scale/soak, security, CI, and documentation hardening. Remote transports remain unimplemented, and no public release is authorized.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
 ## Repository Audit
 
-Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), and 2026-08-31 (Phase 7).
+Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), and 2026-08-31 (Phases 7–8).
 
 ### Current State
 
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-31, Phase 0–7 are implemented and locally exercised on Windows. The frozen benchmark evidence remains unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, actual coding-agent host QA, and release artifacts remain absent.
+- As of 2026-08-31, Phase 0–8 production and hardening code is implemented. The frozen benchmark strategies and evidence remain unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, actual Codex/Claude Code/Cursor host QA, and public release artifacts remain absent. The package remains private and unlicensed pending owner decisions.
 
 ### Existing Assets
 
@@ -46,10 +46,11 @@ This environment demonstrates why consumer-side native compilation must not be r
 - Production-path tests and honest, reproducible offline benchmarks.
 - MCP is a thin local adapter and cannot own core behavior.
 
-### Remaining Foundations
+### Remaining external evidence and decisions
 
-- hosted execution evidence for the committed Ubuntu/Windows/macOS CI workflow;
-- macOS package and filesystem validation;
+- latest-HEAD hosted execution evidence for the expanded Ubuntu/Windows/macOS release matrix;
+- explicit license and final version decisions before public release;
+- actual Codex/Claude Code/Cursor host configuration evidence;
 - external-human Gold/methodology review and large external-repository benchmark coverage.
 
 ### Principal Risks
@@ -413,7 +414,7 @@ npm run smoke
 npm pack --dry-run
 ```
 
-The workflow runs lint, typecheck, tests, build, CLI smoke, package-install smoke, and the bounded benchmark smoke on `ubuntu-latest`, `windows-latest`, and `macos-latest` with Node 24.20.0. All tests are offline by default. The full 360-case quality run, performance timings, paid-model tests, and real-agent benchmarks are not merge gates.
+The workflow runs lint, typecheck, tests, build, CLI smoke, fresh-package smoke, release hardening, benchmark validation, and bounded benchmark smoke on `ubuntu-latest`, `windows-latest`, and `macos-latest` with Node 24.20.0. Ubuntu also validates the declared minimum Node 24.15.0. One Ubuntu job runs the frozen full 360-case quality matrix. All tests are offline after dependency installation; paid-model and real-agent benchmarks are not merge gates.
 
 ## Implementation Phases
 
@@ -467,7 +468,9 @@ The first formal result is mixed and retained without production tuning: structu
 
 ### Phase 8 — Hardening and Release Readiness
 
-Run broader hardening, actual-host QA, release packaging/policy review, and production CLI acceptance. Phase 7 already includes security/failure/concurrency E2E, fresh-install MCP smoke, performance measurement, and the existing Windows/macOS/Linux hosted matrix; release work still requires explicit authorization.
+**IMPLEMENTED.** Add strict package-content and metadata review, installed-tarball process tests, independent writer/read concurrency, deterministic forced-termination recovery with SQLite integrity checks, corrupt/future schema failures, parser/Git failure paths, multiple MCP process coverage, deterministic 1,000-request soak observation, and a 1,200-file synthetic scale run. Add a cross-platform safe release-check orchestration, minimum/current Node CI, a full frozen-benchmark job, security/contribution/changelog/release documents, and explicit trust/limitation language.
+
+No production ranking, packing, estimator, graph-signal, or benchmark Gold semantics changed. A narrow index hardening correction rejects future schemas before mutation and maps corrupt databases to an actionable safe error. Actual latest-HEAD hosted evidence is required before Phase 8 can be declared complete, while public release remains independently blocked by the missing license and unfinalized version. No tag, GitHub Release, npm publication, or merge is performed by these checks.
 
 ## First Vertical Slice #1: Safe Repository Map
 
@@ -578,5 +581,6 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Task retrieval, ranking, and bounded graph expansion | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Token estimator and Context Pack | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| MCP adapter | NOT IMPLEMENTED / DEFERRED |
-| Hosted CI workflow | IMPLEMENTED (Ubuntu/Windows/macOS matrix) / NOT RUN |
+| MCP adapter | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
+| Release hardening and documentation | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
+| Hosted CI workflow | IMPLEMENTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) / LATEST PHASE 08 HEAD NOT RUN |

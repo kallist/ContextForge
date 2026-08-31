@@ -4,6 +4,20 @@
   "description": "Local-first, task-aware context compiler for coding agents",
   "license": "UNLICENSED",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kallist/ContextForge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kallist/ContextForge/issues"
+  },
+  "homepage": "https://github.com/kallist/ContextForge#readme",
+  "keywords": [
+    "coding-agents",
+    "context",
+    "mcp",
+    "repository-analysis"
+  ],
   "type": "module",
   "engines": {
     "node": ">=24.15 <25"
@@ -26,6 +40,8 @@
     "test": "node --test \".test-dist/test/**/*.test.js\"",
     "smoke": "node dist/cli/main.js --help",
     "package:smoke": "node scripts/package-smoke.mjs",
+    "release:hardening": "node scripts/release-hardening.mjs",
+    "release:check": "node scripts/release-check.mjs",
     "benchmark:validate": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js validate",
     "benchmark:smoke": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js smoke",
     "benchmark:quality": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js quality",
