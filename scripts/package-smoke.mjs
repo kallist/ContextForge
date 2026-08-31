@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -26,6 +26,16 @@ function run(command, args, cwd) {
     );
   }
   return result.stdout;
+}
+
+async function packageFiles(root, prefix = "") {
+  const files = [];
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const relativePath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...await packageFiles(join(root, entry.name), relativePath));
+    else if (entry.isFile()) files.push(relativePath);
+  }
+  return files.sort();
 }
 
 async function runMcpFlow(installedCliPath, repositoryPath) {
@@ -95,6 +105,17 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
+  if (
+    packed[0]?.files?.some(({ path }) =>
+      !(
+        path === "package.json" ||
+        path === "README.md" ||
+        path.startsWith("dist/")
+      )
+    ) === true
+  ) {
+    throw new Error("npm pack included a file outside the release allowlist.");
+  }
   const packageFile = packed[0]?.filename;
   if (typeof packageFile !== "string") throw new Error("npm pack did not report a package filename.");
   const tarballPath = join(temporaryRoot, packageFile);
@@ -102,6 +123,7 @@ try {
   run(process.execPath, [npmCliPath, "install", "--no-audit", "--no-fund", tarballPath], installRoot);
   const help = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
   if (!help.includes("contextforge map")) throw new Error("Installed CLI help is incomplete.");
+  const version = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--version"], installRoot).trim();
   const jsonOutput = run(
     process.execPath,
     [npmCliPath, "exec", "--", "contextforge", "map", fixtureRoot, "--json"],
@@ -188,6 +210,22 @@ try {
 
   const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
+  if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
+  for (const installScript of ["preinstall", "install", "postinstall", "prepare"]) {
+    if (packageDocument.scripts?.[installScript] !== undefined) {
+      throw new Error(`Installed package unexpectedly defines ${installScript}.`);
+    }
+  }
+  const installedPackageRoot = join(installRoot, "node_modules", "contextforge");
+  const installedFiles = await packageFiles(installedPackageRoot);
+  if (installedFiles.some((path) => /(^|\/)(?:test|benchmarks|scripts)(\/|$)|(^|\/)\.env(?:\..*)?$/u.test(path))) {
+    throw new Error("Installed package contains development, benchmark, script, or secret-path files.");
+  }
+  const suspiciousPattern = /C:\\+Users\\+|C:\/Users\/|\/Users\/[^/]+\/|\/home\/[^/]+\/|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|\.codex[\\/]+worktrees|Acodex work/u;
+  for (const relativePath of installedFiles.filter((path) => /\.(?:js|map|json|md|d\.ts)$/u.test(path))) {
+    const content = await readFile(join(installedPackageRoot, ...relativePath.split("/")), "utf8");
+    if (suspiciousPattern.test(content)) throw new Error(`Installed package contains suspicious private metadata in ${relativePath}.`);
+  }
   const parserAssetRoot = join(
     installRoot,
     "node_modules",

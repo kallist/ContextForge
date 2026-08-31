@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
@@ -240,6 +240,62 @@ test("opens a Phase 2 schema safely and marks its active snapshot as graphless u
   } finally {
     migrated.close();
   }
+});
+
+test("rejects a future schema without mutating its tables", async (context) => {
+  const root = await createTemporaryDirectory("sqlite-future-schema");
+  context.after(() => removeTemporaryDirectory(root));
+  const stateDirectory = join(root, ".contextforge");
+  await mkdir(stateDirectory);
+  const databasePath = join(stateDirectory, "index.sqlite");
+  const future = new DatabaseSync(databasePath);
+  try {
+    future.exec(`
+      CREATE TABLE repository_state (
+        singleton_id INTEGER PRIMARY KEY,
+        schema_version INTEGER NOT NULL,
+        active_generation_id INTEGER NULL
+      ) STRICT;
+      INSERT INTO repository_state VALUES (1, 999, NULL);
+    `);
+  } finally {
+    future.close();
+  }
+
+  const repository = new SqliteIndexRepository(root);
+  await assert.rejects(repository.loadActive(), (error: unknown) => {
+    return error instanceof Error && "code" in error && error.code === "UNSUPPORTED_SCHEMA";
+  });
+
+  const verification = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const state = verification.prepare("SELECT schema_version AS version FROM repository_state").get() as { version: number };
+    const generatedTable = verification
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'index_generation'")
+      .get();
+    assert.equal(state.version, 999);
+    assert.equal(generatedTable, undefined);
+  } finally {
+    verification.close();
+  }
+});
+
+test("reports a corrupt database with a safe actionable error", async (context) => {
+  const root = await createTemporaryDirectory("sqlite-corrupt");
+  context.after(() => removeTemporaryDirectory(root));
+  const stateDirectory = join(root, ".contextforge");
+  await mkdir(stateDirectory);
+  await writeFile(join(stateDirectory, "index.sqlite"), "not a sqlite database", "utf8");
+
+  const repository = new SqliteIndexRepository(root);
+  await assert.rejects(repository.loadActive(), (error: unknown) => {
+    return (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "INDEX_CORRUPT" &&
+      !error.message.includes(root)
+    );
+  });
 });
 
 test("rejects an invalid dangling graph before activation and preserves the prior graph snapshot", async (context) => {

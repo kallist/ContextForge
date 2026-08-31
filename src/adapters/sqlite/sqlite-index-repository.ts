@@ -143,12 +143,24 @@ function isSqliteBusy(error: unknown): boolean {
   return /database is (locked|busy)/iu.test(error.message) || /SQLITE_BUSY/u.test(error.message);
 }
 
+function isSqliteCorrupt(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /SQLITE_(CORRUPT|NOTADB)|database disk image is malformed|file is not a database/iu.test(error.message);
+}
+
 function asIndexError(error: unknown): ContextForgeError {
   if (error instanceof ContextForgeError) return error;
   if (isSqliteBusy(error)) {
     return new ContextForgeError("INDEX_BUSY", "Another ContextForge index writer holds the repository database lock.", {
       cause: error,
     });
+  }
+  if (isSqliteCorrupt(error)) {
+    return new ContextForgeError(
+      "INDEX_CORRUPT",
+      "The local ContextForge index is corrupt or is not a SQLite database. Remove .contextforge/index.sqlite and run 'contextforge index' again.",
+      { cause: error },
+    );
   }
   return new ContextForgeError("INDEX", "The durable repository index operation failed.", { cause: error });
 }
@@ -212,20 +224,42 @@ export class SqliteIndexRepository implements IndexRepository {
       timeout: this.#busyTimeoutMs,
       defensive: true,
     });
-    database.enableLoadExtension(false);
-    database.enableDefensive(true);
-    database.exec(`
-      PRAGMA foreign_keys = ON;
-      PRAGMA trusted_schema = OFF;
-      PRAGMA synchronous = NORMAL;
-      PRAGMA busy_timeout = ${this.#busyTimeoutMs};
-      PRAGMA journal_size_limit = 67108864;
-      PRAGMA wal_autocheckpoint = 1000;
-    `);
-    return database;
+    try {
+      database.enableLoadExtension(false);
+      database.enableDefensive(true);
+      database.exec(`
+        PRAGMA foreign_keys = ON;
+        PRAGMA trusted_schema = OFF;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA busy_timeout = ${this.#busyTimeoutMs};
+        PRAGMA journal_size_limit = 67108864;
+        PRAGMA wal_autocheckpoint = 1000;
+      `);
+      return database;
+    } catch (error) {
+      database.close();
+      throw error;
+    }
   }
 
   #initializeSchema(database: DatabaseSync): void {
+    const existingStateTable = database
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'repository_state'")
+      .get();
+    if (existingStateTable !== undefined) {
+      const existingState = database.prepare("SELECT schema_version FROM repository_state WHERE singleton_id = 1").get() as
+        | { schema_version?: unknown }
+        | undefined;
+      if (
+        existingState === undefined ||
+        (existingState.schema_version !== 1 && existingState.schema_version !== INDEX_SCHEMA_VERSION)
+      ) {
+        throw new ContextForgeError(
+          "UNSUPPORTED_SCHEMA",
+          "The local ContextForge index schema is unsupported by this version. Use the ContextForge version that created it or rebuild .contextforge/index.sqlite.",
+        );
+      }
+    }
     const mode = database.prepare("PRAGMA journal_mode = WAL").get() as { journal_mode?: unknown } | undefined;
     if (mode?.journal_mode !== "wal") throw new Error("SQLite did not activate WAL mode.");
     database.exec(`
@@ -376,7 +410,10 @@ export class SqliteIndexRepository implements IndexRepository {
     if (state?.schema_version === 1 && INDEX_SCHEMA_VERSION === 2) {
       database.prepare("UPDATE repository_state SET schema_version = ? WHERE singleton_id = 1").run(INDEX_SCHEMA_VERSION);
     } else if (state?.schema_version !== INDEX_SCHEMA_VERSION) {
-      throw new Error("Unsupported index schema version.");
+      throw new ContextForgeError(
+        "UNSUPPORTED_SCHEMA",
+        "The local ContextForge index schema is unsupported by this version. Use the ContextForge version that created it or rebuild .contextforge/index.sqlite.",
+      );
     }
   }
 
@@ -397,7 +434,10 @@ export class SqliteIndexRepository implements IndexRepository {
       | { schema_version: number }
       | undefined;
     if (repositoryState === undefined || (repositoryState.schema_version !== 1 && repositoryState.schema_version !== INDEX_SCHEMA_VERSION)) {
-      throw new Error("Unsupported index schema version.");
+      throw new ContextForgeError(
+        "UNSUPPORTED_SCHEMA",
+        "The local ContextForge index schema is unsupported by this version. Use the ContextForge version that created it or rebuild .contextforge/index.sqlite.",
+      );
     }
     const generationColumns = database.prepare("PRAGMA table_info(index_generation)").all() as unknown as { name: string }[];
     const hasGraphVersion = generationColumns.some(({ name }) => name === "graph_version");
