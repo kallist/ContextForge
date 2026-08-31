@@ -266,11 +266,20 @@ try {
   assert.equal(packJsonOne, packJsonTwo);
 
   await writeScaleSources(scaleRoot, 2);
-  const firstWriter = spawnCaptured(process.execPath, [cliPath, "index", scaleRoot, "--json"], installRoot);
-  const secondWriter = spawnCaptured(process.execPath, [cliPath, "index", scaleRoot, "--json"], installRoot);
-  const writerResults = await Promise.all([firstWriter.completed, secondWriter.completed]);
-  assert.equal(writerResults.filter(({ status }) => status === 0).length, 1);
-  assert.equal(writerResults.filter(({ status, stderr }) => status === 7 && stderr.includes("INDEX_BUSY")).length, 1);
+  const competingWriterReady = join(temporaryRoot, "competing-writer.ready");
+  const competingWriterRelease = join(temporaryRoot, "competing-writer.release");
+  const firstWriter = spawnCaptured(
+    process.execPath,
+    [barrierHelperPath, sqliteModulePath, scaleRoot, competingWriterReady, competingWriterRelease],
+    installRoot,
+  );
+  await waitForFile(competingWriterReady, firstWriter.child);
+  const secondWriter = run(process.execPath, [cliPath, "index", scaleRoot, "--json"], installRoot);
+  assert.equal(secondWriter.status, 7);
+  assert.match(secondWriter.stderr, /INDEX_BUSY/u);
+  await writeFile(competingWriterRelease, "release", "utf8");
+  const firstWriterResult = await firstWriter.completed;
+  assert.equal(firstWriterResult.status, 0, firstWriterResult.stderr);
 
   const generationBeforeReadWrite = sqliteHealth(databasePath).state.generation;
   const readWriteReady = join(temporaryRoot, "read-write.ready");
