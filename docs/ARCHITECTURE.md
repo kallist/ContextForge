@@ -2,9 +2,9 @@
 
 ## Status
 
-**APPROVED V1 DESIGN — PHASES 0–8 IMPLEMENTED; PUBLIC RELEASE BLOCKED**
+**APPROVED V1 DESIGN — PHASES 0–8 IMPLEMENTED; V0.1.0 RELEASE BASELINE**
 
-This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation; Phase 7 provides local MCP stdio integration; Phase 8 provides package, process-recovery, scale/soak, security, CI, and documentation hardening. Remote transports remain unimplemented, and no public release is authorized.
+This document defines the approved V1 component boundaries, technology baseline, core data, algorithms, consistency model, and implementation phases. Phase 0 and Phase 1 provide the Safe Repository Map; Phase 2 provides packaged structural parsers and a durable generation-based SQLite index; Phase 3 provides the generation-bound Repository Graph and structural signals; Phase 4 provides task normalization, retrieval, bounded graph expansion, and explainable ranking; Phase 5 provides hard-budget semantic Context Packing; Phase 6 provides frozen offline evaluation; Phase 7 provides local MCP stdio integration; Phase 8 provides package, process-recovery, scale/soak, security, CI, and documentation hardening. Remote transports remain unimplemented.
 
 The product behavior remains authoritative in `PRODUCT_SPEC.md`. Benchmark definitions remain authoritative in `BENCHMARK.md`. Significant technology choices are recorded in `docs/adr/`.
 
@@ -17,7 +17,7 @@ Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), and 2026-08-31 (Ph
 - This directory is the designated ContextForge project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
-- As of 2026-08-31, Phase 0–8 production and hardening code is implemented. The frozen benchmark strategies and evidence remain unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, actual Codex/Claude Code/Cursor host QA, and public release artifacts remain absent. The package remains private and unlicensed pending owner decisions.
+- As of 2026-08-31, Phase 0–8 production and hardening code is implemented. The frozen benchmark strategies and evidence remain unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, and actual Codex/Claude Code/Cursor host QA remain absent. The v0.1.0 package metadata is finalized for MIT-licensed public CLI distribution.
 
 ### Existing Assets
 
@@ -583,4 +583,4 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | MCP adapter | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Release hardening and documentation | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
-| Hosted CI workflow | IMPLEMENTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) / LATEST PHASE 08 HEAD NOT RUN |
+| Hosted CI workflow | IMPLEMENTED / HOSTED TESTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) |

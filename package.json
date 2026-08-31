@@ -1,9 +1,8 @@
 {
   "name": "contextforge",
-  "version": "0.1.0-dev.0",
+  "version": "0.1.0",
   "description": "Local-first, task-aware context compiler for coding agents",
-  "license": "UNLICENSED",
-  "private": true,
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kallist/ContextForge.git"

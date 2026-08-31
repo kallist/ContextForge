@@ -1,8 +1,10 @@
 # Changelog
 
-All notable changes to ContextForge will be recorded here. No public release has been created.
+All notable changes to ContextForge will be recorded here.
 
 ## Unreleased
+
+## 0.1.0 - 2026-08-31
 
 ### Added
 
@@ -12,7 +14,7 @@ All notable changes to ContextForge will be recorded here. No public release has
 - Frozen offline benchmark-v1 evidence with reviewed limitations and negative results.
 - Local repository-bound MCP stdio tools for status, index, search, and pack.
 - Release hardening for fresh tarball installation, cross-process concurrency, forced-termination recovery, corrupted/future index handling, package-content scanning, MCP soak, and synthetic scale validation.
-- Security policy, contribution guide, release checklist, and draft V0.1 release notes.
+- Security policy, contribution guide, release checklist, and v0.1.0 release notes.
 
 ### Security
 
@@ -22,6 +24,5 @@ All notable changes to ContextForge will be recorded here. No public release has
 
 ### Known limitations
 
-- The package remains `private`, `UNLICENSED`, and versioned `0.1.0-dev.0`; public release and publication are blocked pending explicit license and version decisions.
 - Retrieval is lexical/structural, the estimator is generic rather than model-specific, and TypeScript alias and advanced Python import resolution remain incomplete.
 - HTTP/remote MCP, OAuth, multi-root servers, file watching, auto-indexing, embeddings, LLM reranking/compression, and a Web UI are not implemented.

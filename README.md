@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: Phase 0–8 implemented — local hardening passed; latest-HEAD Hosted CI and public-release decisions remain pending**
+**Status: ContextForge v0.1.0 — Phase 0–8 implemented as a local-first CLI and MCP stdio release**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -31,9 +31,26 @@ Remote MCP/HTTP, remote providers, model-specific tokenizers, nested-directory `
 
 ## Release status
 
-ContextForge has not been released or published to npm. The current package is `contextforge@0.1.0-dev.0`, `private`, and `UNLICENSED`. Technical release-candidate validation is available, but public release remains **BLOCKED** until the owner explicitly chooses a license, finalizes the version, and authorizes release execution. No README instruction assumes a registry package exists.
+ContextForge v0.1.0 is distributed as the public npm CLI package `contextforge` under the MIT License. The intended distribution is a command-line application and local MCP stdio server; it does not promise a stable JavaScript library API or package `exports` surface.
 
-The intended distribution is a CLI package; no stable JavaScript library API or package `exports` surface is promised. Internal parser, SQLite, ranking, and packing modules may change between prereleases.
+Internal parser, SQLite, ranking, and packing modules may change between releases. Review the trust model and generated Context Packs before forwarding repository content outside your local trust boundary.
+
+## Install
+
+Use Node.js `>=24.15 <25`, then install the exact v0.1.0 package from npm:
+
+```text
+npm install -g contextforge@0.1.0
+contextforge --version
+```
+
+Index a repository and produce task-aware context:
+
+```text
+contextforge index /path/to/repository
+contextforge search "fix stale index activation" /path/to/repository --json
+contextforge pack "fix stale index activation" /path/to/repository --budget 8000 --out context.md
+```
 
 ## Development
 
@@ -72,7 +89,7 @@ node dist/cli/main.js search "fix stale index activation" . --json
 node dist/cli/main.js pack "fix stale index activation" . --budget 8000 --out context.md
 ```
 
-To simulate consumer installation without a public registry, create a tarball with `npm pack`, install that tarball into a clean temporary project, and run its `contextforge` bin. `npm run package:smoke` performs this complete flow automatically and deletes its temporary files.
+For source-checkout packaging validation, create a tarball with `npm pack`, install that tarball into a clean temporary project, and run its `contextforge` bin. `npm run package:smoke` performs this complete flow automatically and deletes its temporary files.
 
 To verify the installable artifact without publishing it:
 
@@ -92,7 +109,7 @@ After building, start one local stdio server bound to one repository:
 node /absolute/path/to/ContextForge/dist/cli/main.js mcp --repository /absolute/path/to/repository
 ```
 
-The same command from a fresh tarball installation is `contextforge mcp --repository <path>`. This package is not published to a public registry, so documentation does not assume `npx` or a registry install. An MCP-compatible host should configure the executable and arguments above, use stdio as the transport, and leave stdout to protocol traffic.
+The global npm installation provides `contextforge mcp --repository <path>`. An MCP-compatible host should configure that executable and its arguments, use stdio as the transport, and leave stdout to protocol traffic.
 
 The server uses the official split TypeScript SDK (`@modelcontextprotocol/server` 2.0.0), supports its modern `2026-07-28` negotiation and legacy initialization compatibility, and exposes four tools:
 

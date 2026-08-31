@@ -2,7 +2,12 @@
 
 ## Supported versions
 
-ContextForge has not yet published a supported release. Security fixes during the `0.1.0-dev.0` prerelease period are made on a best-effort basis against the current repository state. A supported-version table will be added only after an explicit release.
+| Version | Supported |
+|---|---|
+| 0.1.x | Yes |
+| Earlier development snapshots | No |
+
+Security fixes for the supported v0.1 line are handled on a best-effort basis. No response-time SLA is promised.
 
 ## Reporting a vulnerability
 
