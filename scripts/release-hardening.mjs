@@ -203,6 +203,8 @@ function createMcpClient(command, args, name) {
   return { client, transport, stderr };
 }
 
+let releaseError;
+let releaseCleanupError;
 try {
   assert.ok(Number.isSafeInteger(scaleFileCount) && scaleFileCount >= 1000);
   assert.ok(Number.isSafeInteger(soakRequests) && soakRequests >= 1000);
@@ -502,41 +504,71 @@ try {
     [cliPath, "mcp", "--repository", soakRoot],
     "contextforge-release-soak",
   );
-  await soak.client.connect(soak.transport);
-  const soakPid = soak.transport.pid;
-  assert.equal(typeof soakPid, "number");
-  const initialProcess = processObservation(soakPid);
-  let peakRssBytes = initialProcess.rssBytes;
-  let firstSearchResult;
-  let firstPackResult;
-  const soakStarted = performance.now();
-  for (let index = 0; index < soakRequests; index += 1) {
-    let result;
-    if (index % 20 === 0) {
-      result = await soak.client.callTool({ name: "pack", arguments: { task: "SoakTarget.run", budget: 2_000 } });
-      const serialized = JSON.stringify(result);
-      firstPackResult ??= serialized;
-      assert.equal(serialized, firstPackResult);
-    } else if (index % 5 === 0) {
-      result = await soak.client.callTool({ name: "search", arguments: { task: "SoakTarget.run", limit: 1 } });
-      const serialized = JSON.stringify(result);
-      firstSearchResult ??= serialized;
-      assert.equal(serialized, firstSearchResult);
-    } else {
-      result = await soak.client.callTool({ name: "status", arguments: {} });
-      assert.equal(result.structuredContent?.indexStatus, "CURRENT");
+  let soakPid;
+  let initialProcess;
+  let finalProcess;
+  let peakRssBytes;
+  let soakDurationMs;
+  let soakError;
+  const soakCleanupErrors = [];
+  try {
+    await soak.client.connect(soak.transport);
+    soakPid = soak.transport.pid;
+    assert.equal(typeof soakPid, "number");
+    initialProcess = processObservation(soakPid);
+    peakRssBytes = initialProcess.rssBytes;
+    let firstSearchResult;
+    let firstPackResult;
+    const soakStarted = performance.now();
+    for (let index = 0; index < soakRequests; index += 1) {
+      let result;
+      if (index % 20 === 0) {
+        result = await soak.client.callTool({ name: "pack", arguments: { task: "SoakTarget.run", budget: 2_000 } });
+        const serialized = JSON.stringify(result);
+        firstPackResult ??= serialized;
+        assert.equal(serialized, firstPackResult);
+      } else if (index % 5 === 0) {
+        result = await soak.client.callTool({ name: "search", arguments: { task: "SoakTarget.run", limit: 1 } });
+        const serialized = JSON.stringify(result);
+        firstSearchResult ??= serialized;
+        assert.equal(serialized, firstSearchResult);
+      } else {
+        result = await soak.client.callTool({ name: "status", arguments: {} });
+        assert.equal(result.structuredContent?.indexStatus, "CURRENT");
+      }
+      if (index % 100 === 0) {
+        const observation = processObservation(soakPid);
+        if (observation.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, observation.rssBytes);
+      }
     }
-    if (index % 100 === 0) {
-      const observation = processObservation(soakPid);
-      if (observation.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, observation.rssBytes);
+    soakDurationMs = performance.now() - soakStarted;
+    finalProcess = processObservation(soakPid);
+    if (finalProcess.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, finalProcess.rssBytes);
+  } catch (error) {
+    soakError = error;
+  } finally {
+    try {
+      await soak.client.close();
+    } catch (error) {
+      soakCleanupErrors.push(error);
+    }
+    if (typeof soakPid === "number") {
+      try {
+        await waitForExit(soakPid);
+      } catch (error) {
+        soakCleanupErrors.push(error);
+      }
     }
   }
-  const soakDurationMs = performance.now() - soakStarted;
-  const finalProcess = processObservation(soakPid);
-  if (finalProcess.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, finalProcess.rssBytes);
-  await soak.client.close();
+  if (soakCleanupErrors.length > 0) {
+    throw new AggregateError(
+      soakError === undefined ? soakCleanupErrors : [soakError, ...soakCleanupErrors],
+      "MCP soak cleanup failed.",
+      { cause: soakError ?? soakCleanupErrors[0] },
+    );
+  }
+  if (soakError !== undefined) throw soakError;
   assert.equal(soak.stderr.join(""), "");
-  await waitForExit(soakPid);
 
   const finalHealth = sqliteHealth(databasePath);
   const tarballMetadata = await stat(tarballPath);
@@ -592,11 +624,29 @@ try {
       orphanProcesses: 0,
     },
   }, null, 2)}\n`);
+} catch (error) {
+  releaseError = error;
 } finally {
-  await rm(temporaryRoot, {
-    recursive: true,
-    force: true,
-    maxRetries: 20,
-    retryDelay: 100,
-  });
+  try {
+    await rm(temporaryRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 100,
+    });
+  } catch (cleanupError) {
+    releaseCleanupError = cleanupError;
+  }
 }
+
+if (releaseCleanupError !== undefined) {
+  if (releaseError !== undefined) {
+    throw new AggregateError(
+      [releaseError, releaseCleanupError],
+      "Release hardening failed and its temporary resources could not be cleaned.",
+      { cause: releaseError },
+    );
+  }
+  throw releaseCleanupError;
+}
+if (releaseError !== undefined) throw releaseError;
