@@ -2,9 +2,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { aggregateQualityRun, renderBenchmarkReport } from "./report.js";
+import { validateFailureMatrix } from "./failure-matrix.js";
 import {
   runPerformanceBenchmark,
   runQualityBenchmark,
+  runV1RetrievalDiagnostics,
   validateDraftDataset,
   validateFormalDataset,
   writeJsonOutput,
@@ -27,6 +29,7 @@ switch (command) {
   }
   case "validate": {
     const validated = await validateFormalDataset(workspaceRoot);
+    await validateFailureMatrix(workspaceRoot, validated.dataset);
     process.stdout.write(`Validated ${validated.dataset.tasks.length} tasks across ${validated.dataset.repositories.length} repositories. Dataset hash: ${validated.hash}\n`);
     break;
   }
@@ -50,6 +53,12 @@ switch (command) {
     process.stdout.write("Performance benchmark passed with three environment-specific repetitions.\n");
     break;
   }
+  case "diagnose-v1": {
+    const result = await runV1RetrievalDiagnostics(workspaceRoot);
+    await writeJsonOutput(workspaceRoot, "v0.2-retrieval-diagnostics-v1.json", result);
+    process.stdout.write("V1 retrieval diagnostics passed for all frozen tasks.\n");
+    break;
+  }
   case "full": {
     const run = await runQualityBenchmark(workspaceRoot, "FULL");
     await writeJsonOutput(workspaceRoot, "quality-results.json", run);
@@ -59,5 +68,5 @@ switch (command) {
     break;
   }
   default:
-    throw new Error("Usage: benchmark CLI <draft-validate|validate|smoke|quality|performance|full>");
+    throw new Error("Usage: benchmark CLI <draft-validate|validate|smoke|quality|performance|diagnose-v1|full>");
 }

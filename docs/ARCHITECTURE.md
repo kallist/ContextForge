@@ -581,6 +581,7 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Task retrieval, ranking, and bounded graph expansion | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Token estimator and Context Pack | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
+| V0.2 retrieval research and design | DESIGN READY / PRODUCTION V2 NOT IMPLEMENTED |
 | MCP adapter | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Release hardening and documentation | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Hosted CI workflow | IMPLEMENTED / HOSTED TESTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) |

@@ -8,7 +8,7 @@ import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-re
 import { buildIndex } from "../../src/application/build-index.js";
 import { evaluateSelection, validateGoldAgainstRepository } from "../../benchmarks/src/metrics.js";
 import { renderBenchmarkReport } from "../../benchmarks/src/report.js";
-import { createRepositoryRuntime, runBenchmarkSystem } from "../../benchmarks/src/systems.js";
+import { createRepositoryRuntime, diagnoseBenchmarkTask, runBenchmarkSystem } from "../../benchmarks/src/systems.js";
 import {
   BENCHMARK_VERSION,
   DATASET_VERSION,
@@ -126,4 +126,23 @@ test("Gold validation fails fast and quality report serialization is determinist
     cases: [result],
   };
   assert.equal(renderBenchmarkReport(run), renderBenchmarkReport(JSON.parse(JSON.stringify(run)) as QualityRun));
+});
+
+test("V1 retrieval diagnostics are deterministic, bounded, source-free, and preserve stage evidence", async (context) => {
+  const root = await createTemporaryDirectory("benchmark-diagnostics");
+  context.after(() => removeTemporaryDirectory(root));
+  await prepare(root);
+  const runtime = await createRepositoryRuntime(root);
+
+  const first = await diagnoseBenchmarkTask(runtime, task().taskText, 4_000);
+  const second = await diagnoseBenchmarkTask(runtime, task().taskText, 4_000);
+  assert.deepEqual(first, second);
+  assert.ok(first.structural.candidates.length <= 64);
+  assert.ok(first.structural.candidates.every((candidate) => candidate.rank >= 1 && candidate.reasons.length <= 4));
+  assert.ok(first.contextforge.selectedItems.every((item) => !item.path.includes("\\") && !item.path.startsWith("/")));
+  const serialized = JSON.stringify(first);
+  assert.ok(!serialized.includes(root));
+  assert.ok(!serialized.includes("return this.store.saveWidget(value)"));
+  assert.ok(first.normalizedQuery.signals.some((signal) => signal.normalized === "widget"));
+  assert.ok(first.structural.candidates.some((candidate) => candidate.path === "src/service.ts"));
 });

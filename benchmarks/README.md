@@ -11,6 +11,8 @@ This directory contains the frozen, offline `contextforge-benchmark-v1` protocol
 - `RESULTS_REVIEW_V1.md`: post-score failure, claims, and final integrity review.
 - `corpus/`: curated TypeScript, Python, and mixed-language repositories.
 - `reference/contextforge-benchmark-v1/`: versioned source-free raw, aggregate, report, and performance evidence from the first formal run.
+- `analysis/v0.2/failure-matrix.json`: machine-readable 24-task V0.2-01 classification; it does not modify Gold or V1 results.
+- `analysis/v0.2/REVIEW.md`: independent integrity, root-cause, architecture, overfitting, scope, claims, and security review.
 - `schema/`: versioned dataset and quality-result schema descriptions.
 - `src/`: materialization, baselines, production adapters, metrics, aggregation, and deterministic report generation.
 
@@ -23,10 +25,13 @@ npm run benchmark:validate
 npm run benchmark:smoke
 npm run benchmark:quality
 npm run benchmark:performance
+npm run benchmark:diagnose-v1
 npm run benchmark
 ```
 
 Generated source-free outputs are written to ignored `.benchmark-output/`. `benchmark` and `benchmark:quality` run all 24 tasks, three systems, and 2K/4K/8K/16K/32K budgets. Performance is separate because timing is environment-dependent.
+
+`benchmark:diagnose-v1` replays all 24 tasks at 8K, records bounded top/required candidate and Pack-stage evidence without source bodies, and fails unless selected file identities match the frozen reference cases. `benchmark:validate` also validates the V0.2 failure matrix against the frozen task set and taxonomy.
 
 ## Integrity boundary
 

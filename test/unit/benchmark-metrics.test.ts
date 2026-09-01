@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { canonicalJson, sha256 } from "../../benchmarks/src/canonical.js";
-import { datasetHash, parseDataset } from "../../benchmarks/src/dataset.js";
+import { datasetHash, loadDataset, parseDataset } from "../../benchmarks/src/dataset.js";
+import { validateFailureMatrix } from "../../benchmarks/src/failure-matrix.js";
 import {
   intersectRanges,
   minimumActualTokensAtRecall,
@@ -85,4 +86,19 @@ test("dataset parser fails closed for traversal, duplicate Gold, missing arrays,
   assert.throws(() => parseDataset({ ...base, tasks: [{ ...baseTask, repositoryRevision: "other" }] }), /revision/u);
   assert.throws(() => parseDataset({ ...base, tasks: [{ ...baseTask, goldFiles: [...baseTask.goldFiles, ...baseTask.goldFiles] }] }), /duplicate/u);
   assert.throws(() => parseDataset({ ...base, tasks: [{ ...baseTask, goldSymbols: undefined }] }), /explicit arrays/u);
+});
+
+test("V0.2 failure matrix classifies every frozen task with a valid taxonomy and evidence", async () => {
+  const workspaceRoot = process.cwd();
+  const dataset = await loadDataset(workspaceRoot);
+  const summary = await validateFailureMatrix(workspaceRoot, dataset);
+  assert.equal(summary.classifications, 24);
+  assert.deepEqual(summary.countsByOutcome, { FAILURE: 4, SUCCESS: 19, WEAKNESS: 1 });
+  assert.deepEqual(summary.countsByPrimaryCause, {
+    BUDGET_ALLOCATION_MISS: 1,
+    FALSE_STRUCTURAL_BOOST: 1,
+    NO_PRIMARY_FAILURE: 19,
+    PRECISION_NOISE: 1,
+    SYMBOL_RETRIEVAL_MISS: 2,
+  });
 });
