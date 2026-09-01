@@ -4,7 +4,16 @@ All notable changes to ContextForge will be recorded here.
 
 ## Unreleased
 
+## 0.1.1 - 2026-09-01
+
+### Changed
+
+- First public npm release, distributed as `@kallist/contextforge` because npm rejected the unscoped `contextforge` name under its package-name similarity policy.
+- Package version advanced to 0.1.1 while the executable remains `contextforge`; production runtime behavior did not change.
+
 ## 0.1.0 - 2026-08-31
+
+ContextForge v0.1.0 was a technically completed and tagged release candidate. Public npm publication did not complete because npm rejected the unscoped `contextforge` package name.
 
 ### Added
 

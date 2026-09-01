@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: ContextForge v0.1.0 — Phase 0–8 implemented as a local-first CLI and MCP stdio release**
+**Status: ContextForge v0.1.1 — Phase 0–8 implemented as a local-first CLI and MCP stdio release**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -31,18 +31,20 @@ Remote MCP/HTTP, remote providers, model-specific tokenizers, nested-directory `
 
 ## Release status
 
-ContextForge v0.1.0 is distributed as the public npm CLI package `contextforge` under the MIT License. The intended distribution is a command-line application and local MCP stdio server; it does not promise a stable JavaScript library API or package `exports` surface.
+ContextForge v0.1.1 is the first public npm distribution, published as the scoped CLI package `@kallist/contextforge` under the MIT License. The v0.1.0 implementation was completed and tagged, but npm rejected its unscoped `contextforge` package name under the registry's package-name similarity policy. The distribution is a command-line application and local MCP stdio server; it does not promise a stable JavaScript library API or package `exports` surface.
 
 Internal parser, SQLite, ranking, and packing modules may change between releases. Review the trust model and generated Context Packs before forwarding repository content outside your local trust boundary.
 
 ## Install
 
-Use Node.js `>=24.15 <25`, then install the exact v0.1.0 package from npm:
+Use Node.js `>=24.15 <25`, then install the public package from npm:
 
 ```text
-npm install -g contextforge@0.1.0
+npm install -g @kallist/contextforge
 contextforge --version
 ```
+
+To verify this exact release, install `@kallist/contextforge@0.1.1`. The executable remains `contextforge`.
 
 Index a repository and produce task-aware context:
 
@@ -209,8 +211,9 @@ Known V0.1 limitations include the generic non-model tokenizer, weak pure-synony
 - [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, benchmark, and local MCP decisions.
 - [Benchmark](docs/BENCHMARK.md) — frozen evaluation protocol, metric definitions, reproduction commands, and evidence boundary.
 - [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md) — reviewed formal quality and environment-specific performance results.
-- [Release Checklist](docs/RELEASE_CHECKLIST.md) — technical, legal, hosted, and explicitly authorized release gates.
-- [Draft V0.1 Release Notes](docs/RELEASE_NOTES_V0.1.md) — prerelease behavior, evidence, trust model, and limitations.
+- [Release Checklist](docs/RELEASE_CHECKLIST.md) — v0.1.1 technical, legal, hosted, and explicitly authorized release gates.
+- [V0.1.1 Release Notes](docs/RELEASE_NOTES_V0.1.1.md) — scoped-package correction, V0.1 behavior, evidence, trust model, and limitations.
+- [V0.1.0 Release Notes](docs/RELEASE_NOTES_V0.1.md) — historical tagged-candidate record; public npm publication did not complete.
 - [Security Policy](SECURITY.md) and [Contributing Guide](CONTRIBUTING.md) — reporting and contribution boundaries.
 - [Agent Instructions](AGENTS.md) — durable rules for coding agents working in this repository.
 - [Original Master Specification](CONTEXTFORGE_MASTER_SPEC.md) — preserved source material.
