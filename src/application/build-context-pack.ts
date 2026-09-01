@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import type { RepositoryScanner } from "./map-repository.js";
+import type { RepositoryScanner, ScanResult } from "./map-repository.js";
 import type { RepositorySourceReader } from "./repository-source.js";
 import { searchRepository } from "./search-repository.js";
 import {
@@ -23,11 +23,12 @@ import {
   type RenderableContextItem,
 } from "../core/context-serialization.js";
 import { ContextForgeError } from "../core/errors.js";
-import type { IndexedFile, IndexRepositoryFactory } from "../core/repository-index.js";
+import type { IndexedFile, IndexRepositoryFactory, RepositoryIndexSnapshot } from "../core/repository-index.js";
+import type { FileCategory } from "../core/repository-map.js";
 import { selectMarkdownSectionRanges } from "../core/packing/markdown-sections.js";
 import { PACK_V1 } from "../core/packing/pack-v1.js";
 import { boundedRange, logicalLines, mergeContextRanges, rangeContains } from "../core/packing/ranges.js";
-import type { RankedFileCandidate } from "../core/task-retrieval.js";
+import type { CandidateOrigin, SearchIndexStatus } from "../core/task-retrieval.js";
 import { GenericTokenEstimator, type TokenEstimator } from "../core/token-estimation.js";
 
 export interface ContextPackRequest {
@@ -36,6 +37,55 @@ export interface ContextPackRequest {
   readonly budget: number;
 }
 
+interface PackCandidateEvidence {
+  readonly kind: string;
+  readonly family: string;
+  readonly weight: number;
+  readonly detail: string;
+}
+
+interface PackRankedCandidate {
+  readonly identity: string;
+  readonly relativePath: string;
+  readonly category: FileCategory;
+  readonly origin: CandidateOrigin;
+  readonly directEvidence: readonly PackCandidateEvidence[];
+  readonly expansionEvidence: readonly PackCandidateEvidence[];
+  readonly scoreContributions: readonly { readonly kind: string; readonly family: string; readonly value: number; readonly reason: string }[];
+  readonly rawScore: number;
+  readonly graphDistance: number | null;
+  readonly relevantSymbols: readonly {
+    readonly identity: string;
+    readonly name: string;
+    readonly qualifiedName: string;
+    readonly startLine: number;
+    readonly endLine: number;
+  }[];
+}
+
+export interface ContextPackSearchExecution {
+  readonly result: {
+    readonly repository: { readonly name: string; readonly root: "." };
+    readonly generation: number;
+    readonly rankingStrategy: string;
+    readonly indexStatus: SearchIndexStatus;
+    readonly normalizedQuery: {
+      readonly signals: readonly { readonly normalized: string; readonly lowValue: boolean }[];
+    };
+    readonly candidates: readonly PackRankedCandidate[];
+    readonly diagnostics: readonly string[];
+  };
+  readonly context: { readonly scan: ScanResult; readonly snapshot: RepositoryIndexSnapshot };
+  readonly performance: { readonly totalMs: number };
+}
+
+export type ContextPackSearch = (
+  scanner: RepositoryScanner,
+  sourceReader: RepositorySourceReader,
+  repositoryFactory: IndexRepositoryFactory,
+  request: { readonly repositoryPath: string; readonly task: string; readonly limit: number },
+) => Promise<ContextPackSearchExecution>;
+
 interface Representation {
   readonly ranges: readonly ContextRange[];
   readonly wholeFile: boolean;
@@ -43,7 +93,7 @@ interface Representation {
 }
 
 interface CandidatePlan {
-  readonly candidate: RankedFileCandidate | null;
+  readonly candidate: PackRankedCandidate | null;
   readonly file: IndexedFile;
   readonly rank: number | null;
   readonly role: Exclude<ContextRole, "GIT_CONTEXT">;
@@ -111,7 +161,7 @@ export function validateTokenBudget(budget: number): void {
   }
 }
 
-function roleFor(candidate: RankedFileCandidate): Exclude<ContextRole, "REPOSITORY_INSTRUCTION" | "GIT_CONTEXT"> {
+function roleFor(candidate: PackRankedCandidate): Exclude<ContextRole, "REPOSITORY_INSTRUCTION" | "GIT_CONTEXT"> {
   switch (candidate.category) {
     case "test": return "TEST";
     case "documentation": return "DOCUMENTATION";
@@ -120,7 +170,7 @@ function roleFor(candidate: RankedFileCandidate): Exclude<ContextRole, "REPOSITO
   }
 }
 
-function secondaryRoles(candidate: RankedFileCandidate, primary: ContextRole): ContextRole[] {
+function secondaryRoles(candidate: PackRankedCandidate, primary: ContextRole): ContextRole[] {
   const roles = new Set<ContextRole>();
   if (candidate.expansionEvidence.some((item) => item.kind === "FILE_IMPORTS_FILE" || item.kind === "FILE_IMPORTED_BY")) roles.add("DEPENDENCY");
   if (candidate.expansionEvidence.some((item) => item.kind === "TEST_RELATION")) roles.add("TEST");
@@ -129,7 +179,7 @@ function secondaryRoles(candidate: RankedFileCandidate, primary: ContextRole): C
   return PACK_V1.sectionOrder.filter((role) => roles.has(role));
 }
 
-function selectionReasons(candidate: RankedFileCandidate): ContextSelectionReason[] {
+function selectionReasons(candidate: PackRankedCandidate): ContextSelectionReason[] {
   return candidate.scoreContributions.slice(0, 16).map((contribution) => ({
     kind: contribution.kind,
     detail: contribution.reason,
@@ -187,7 +237,7 @@ function importRanges(file: IndexedFile, maximumLine: number): ContextRange[] {
 }
 
 function symbolRanges(
-  candidate: RankedFileCandidate,
+  candidate: PackRankedCandidate,
   file: IndexedFile,
   maximumLine: number,
   symbolLimit: number,
@@ -432,6 +482,7 @@ export async function buildContextPack(
   repositoryFactory: IndexRepositoryFactory,
   request: ContextPackRequest,
   tokenEstimator: TokenEstimator = new GenericTokenEstimator(),
+  searchExecutor: ContextPackSearch = searchRepository,
 ): Promise<ContextPackExecution> {
   const totalStarted = performance.now();
   validateTokenBudget(request.budget);
@@ -444,7 +495,7 @@ export async function buildContextPack(
     serializationMs: 0,
   };
   const estimator = new MeasuredEstimator(tokenEstimator, timers);
-  const search = await searchRepository(scanner, sourceReader, repositoryFactory, {
+  const search = await searchExecutor(scanner, sourceReader, repositoryFactory, {
     repositoryPath: request.repositoryPath,
     task: request.task,
     limit: PACK_V1.searchCandidateLimit,
@@ -468,7 +519,7 @@ export async function buildContextPack(
   let staleSource = false;
   let verificationLimited = false;
 
-  const recordDrop = (candidate: RankedFileCandidate | null, rank: number | null, path: string, reason: DropReason): void => {
+  const recordDrop = (candidate: PackRankedCandidate | null, rank: number | null, path: string, reason: DropReason): void => {
     droppedCounts.set(reason, (droppedCounts.get(reason) ?? 0) + 1);
     if (dropped.length < PACK_V1.maximumDroppedCandidates) {
       dropped.push({ relativePath: path, candidateRank: rank, score: candidate?.rawScore ?? null, dropReason: reason });

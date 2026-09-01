@@ -211,8 +211,9 @@ Known V0.1 limitations include the generic non-model tokenizer, weak pure-synony
 - [Architecture Decision Records](docs/adr/) — accepted runtime, parser, local-storage, graph, ranking, packing, benchmark, and local MCP decisions.
 - [Benchmark](docs/BENCHMARK.md) — frozen evaluation protocol, metric definitions, reproduction commands, and evidence boundary.
 - [Benchmark Results V1](docs/BENCHMARK_RESULTS_V1.md) — reviewed formal quality and environment-specific performance results.
-- [V0.2 Retrieval Research](docs/V0.2_RETRIEVAL_RESEARCH.md) — frozen-benchmark failure analysis across all 24 tasks; production V2 code is not implemented.
-- [Retrieval V2 Design](docs/V0.2_RETRIEVAL_DESIGN.md) — implementation-ready TaskAnalysis, ContextPlan, hybrid retrieval, Pack V2, and future evaluation contracts.
+- [V0.2 Retrieval Research](docs/V0.2_RETRIEVAL_RESEARCH.md) — frozen-benchmark failure analysis across all 24 tasks; preserves the pre-implementation evidence.
+- [Retrieval V2 Design](docs/V0.2_RETRIEVAL_DESIGN.md) — TaskAnalysis, ContextPlan, hybrid-retrieval contracts, implemented V0.2-02 boundary, and deferred Pack V2 work.
+- [V0.2 Retrieval Foundation Results](docs/V0.2_RETRIEVAL_FOUNDATION_RESULTS.md) — frozen four-system V0.2-02 quality, ablation, performance, regression, and compatibility evidence.
 - [Release Checklist](docs/RELEASE_CHECKLIST.md) — v0.1.1 technical, legal, hosted, and explicitly authorized release gates.
 - [V0.1.1 Release Notes](docs/RELEASE_NOTES_V0.1.1.md) — scoped-package correction, V0.1 behavior, evidence, trust model, and limitations.
 - [V0.1.0 Release Notes](docs/RELEASE_NOTES_V0.1.md) — historical tagged-candidate record; public npm publication did not complete.
