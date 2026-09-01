@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { arch, platform, release } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -13,7 +13,7 @@ import { PACKING_STRATEGY } from "../../src/core/context-pack.js";
 import { RANKING_STRATEGY } from "../../src/core/task-retrieval.js";
 import { GENERIC_TOKEN_ESTIMATOR_ID, GENERIC_TOKEN_ESTIMATOR_VERSION } from "../../src/core/token-estimation.js";
 import { datasetHash, loadDataset, validateDatasetFreeze, validateFixtureRevisions } from "./dataset.js";
-import { hashDirectory } from "./canonical.js";
+import { hashDirectory, sha256 } from "./canonical.js";
 import { evaluateSelection, validateGoldAgainstRepository } from "./metrics.js";
 import {
   assertCorpusUnchanged,
@@ -21,7 +21,14 @@ import {
   materializeRepository,
   removeBenchmarkTemporaryRoot,
 } from "./materialize.js";
-import { createRepositoryRuntime, runBenchmarkSystem, type BenchmarkRepositoryRuntime } from "./systems.js";
+import {
+  RETRIEVAL_ANALYSIS_BUDGET,
+  RETRIEVAL_ANALYSIS_VERSION,
+  V0_1_1_BASE,
+  assertEightKReferenceAlignment,
+  summarizeTaskDiagnostics,
+} from "./retrieval-analysis.js";
+import { createRepositoryRuntime, diagnoseBenchmarkTask, runBenchmarkSystem, type BenchmarkRepositoryRuntime } from "./systems.js";
 import {
   BENCHMARK_VERSION,
   DATASET_VERSION,
@@ -154,6 +161,67 @@ export async function runQualityBenchmark(workspaceRoot: string, mode: "SMOKE" |
         runMode: mode,
       },
       cases: results,
+    };
+  } finally {
+    await removeBenchmarkTemporaryRoot(temporaryRoot);
+  }
+}
+
+export async function runV1RetrievalDiagnostics(workspaceRoot: string): Promise<unknown> {
+  const dataset = await loadDataset(workspaceRoot);
+  const lock = await validateDatasetFreeze(dataset, workspaceRoot);
+  const referenceRoot = join(workspaceRoot, "benchmarks", "reference", "contextforge-benchmark-v1");
+  const referenceFiles = ["quality-results.json", "aggregate-results.json", "benchmark-report.md", "performance-results.json"] as const;
+  const referenceBytes = new Map<string, Uint8Array>();
+  for (const name of referenceFiles) referenceBytes.set(name, await readFile(join(referenceRoot, name)));
+  const qualityBytes = referenceBytes.get("quality-results.json");
+  if (qualityBytes === undefined) throw new Error("Frozen quality reference is unavailable.");
+  const reference = JSON.parse(Buffer.from(qualityBytes).toString("utf8")) as QualityRun;
+  if (
+    reference.manifest.benchmarkVersion !== BENCHMARK_VERSION ||
+    reference.manifest.datasetVersion !== DATASET_VERSION ||
+    reference.manifest.datasetHash !== lock.datasetHash ||
+    reference.manifest.taskCount !== dataset.tasks.length ||
+    reference.cases.length !== dataset.tasks.length * SYSTEM_IDS.length * QUALITY_BUDGETS.length
+  ) throw new Error("Frozen quality reference identity or case count is inconsistent with the dataset lock.");
+
+  const temporaryRoot = await createBenchmarkTemporaryRoot();
+  try {
+    const prepared = await prepareAll(dataset, workspaceRoot, temporaryRoot);
+    const tasks: unknown[] = [];
+    for (const repository of prepared) {
+      const repositoryTasks = dataset.tasks.filter((task) => task.repositoryId === repository.definition.repositoryId);
+      await validateGoldAgainstRepository(repository.runtime, repositoryTasks);
+      for (const task of repositoryTasks) {
+        const diagnostics = await diagnoseBenchmarkTask(repository.runtime, task.taskText, RETRIEVAL_ANALYSIS_BUDGET);
+        assertEightKReferenceAlignment(task, diagnostics, reference.cases);
+        tasks.push(summarizeTaskDiagnostics(task, diagnostics, reference.cases));
+      }
+      await assertCorpusUnchanged(repository.materialized);
+    }
+    return {
+      analysisVersion: RETRIEVAL_ANALYSIS_VERSION,
+      productionSourceBase: V0_1_1_BASE,
+      benchmarkVersion: BENCHMARK_VERSION,
+      datasetVersion: DATASET_VERSION,
+      datasetHash: lock.datasetHash,
+      analysisBudget: RETRIEVAL_ANALYSIS_BUDGET,
+      systems: SYSTEM_IDS,
+      rankingStrategy: RANKING_STRATEGY,
+      packingStrategy: PACKING_STRATEGY,
+      tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
+      tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
+      taskCount: dataset.tasks.length,
+      repositoryCount: dataset.repositories.length,
+      referenceArtifactHashes: Object.fromEntries(referenceFiles.map((name) => [name, sha256(referenceBytes.get(name) ?? new Uint8Array())])),
+      constraints: {
+        goldBlindSystemDiagnostics: true,
+        sourceBodiesPersisted: false,
+        networkUsed: false,
+        corpusSourceExecuted: false,
+        productionRankingChanged: false,
+      },
+      tasks,
     };
   } finally {
     await removeBenchmarkTemporaryRoot(temporaryRoot);

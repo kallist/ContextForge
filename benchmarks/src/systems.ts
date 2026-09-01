@@ -55,6 +55,53 @@ interface BaselineCandidate {
   readonly reason: string;
 }
 
+export interface BenchmarkCandidateDiagnostic {
+  readonly rank: number;
+  readonly path: string;
+  readonly score: number;
+  readonly category: IndexedFile["category"];
+  readonly origin: RankedFileCandidate["origin"] | "LEXICAL_BASELINE";
+  readonly relevantSymbols: readonly string[];
+  readonly evidenceKinds: readonly string[];
+  readonly evidenceFamilies: readonly string[];
+  readonly reasons: readonly string[];
+}
+
+export interface BenchmarkTaskDiagnostics {
+  readonly normalizedQuery: Awaited<ReturnType<typeof searchRepository>>["result"]["normalizedQuery"];
+  readonly indexStatus: Awaited<ReturnType<typeof searchRepository>>["result"]["indexStatus"];
+  readonly lexical: {
+    readonly candidates: readonly BenchmarkCandidateDiagnostic[];
+    readonly selectedRanges: readonly SelectedRange[];
+    readonly status: SystemSelection["status"];
+    readonly diagnostics: readonly string[];
+  };
+  readonly structural: {
+    readonly candidates: readonly BenchmarkCandidateDiagnostic[];
+    readonly selectedRanges: readonly SelectedRange[];
+    readonly status: SystemSelection["status"];
+    readonly diagnostics: readonly string[];
+  };
+  readonly contextforge: {
+    readonly selectedItems: readonly {
+      readonly path: string;
+      readonly role: string;
+      readonly candidateRank: number | null;
+      readonly candidateScore: number | null;
+      readonly relevantSymbols: readonly string[];
+      readonly selectedRanges: SelectedRange["ranges"];
+    }[];
+    readonly droppedCandidates: readonly {
+      readonly path: string;
+      readonly candidateRank: number | null;
+      readonly candidateScore: number | null;
+      readonly reason: string;
+    }[];
+    readonly status: SystemSelection["status"];
+    readonly diagnostics: readonly string[];
+  };
+}
+
 interface VerifiedWholeFile {
   readonly path: string;
   readonly content: string;
@@ -316,6 +363,95 @@ function productionRetrieval(candidates: readonly RankedFileCandidate[]): Retrie
     path: candidate.relativePath,
     relevantSymbols: candidate.relevantSymbols.map((symbol) => ({ path: candidate.relativePath, qualifiedName: symbol.qualifiedName })),
   }));
+}
+
+function lexicalCandidateDiagnostics(candidates: readonly BaselineCandidate[]): BenchmarkCandidateDiagnostic[] {
+  return candidates.map((candidate, index) => ({
+    rank: index + 1,
+    path: candidate.path,
+    score: candidate.score,
+    category: candidate.category,
+    origin: "LEXICAL_BASELINE",
+    relevantSymbols: candidate.relevantSymbols.map((symbol) => symbol.qualifiedName),
+    evidenceKinds: [],
+    evidenceFamilies: ["LEXICAL"],
+    reasons: candidate.reason.split(" + ").filter((reason) => reason.length > 0),
+  }));
+}
+
+function structuralCandidateDiagnostics(candidates: readonly RankedFileCandidate[]): BenchmarkCandidateDiagnostic[] {
+  return candidates.map((candidate, index) => ({
+    rank: index + 1,
+    path: candidate.relativePath,
+    score: candidate.rawScore,
+    category: candidate.category,
+    origin: candidate.origin,
+    relevantSymbols: candidate.relevantSymbols.map((symbol) => symbol.qualifiedName),
+    evidenceKinds: [...new Set(candidate.scoreContributions.map((contribution) => contribution.kind))].sort(compareText),
+    evidenceFamilies: [...new Set(candidate.scoreContributions.map((contribution) => contribution.family))].sort(compareText),
+    reasons: candidate.scoreContributions.slice(0, 4).map((contribution) => contribution.reason),
+  }));
+}
+
+/**
+ * Benchmark-only, Gold-blind diagnostic projection of the frozen V1 systems.
+ * It persists no source body and does not alter production ranking or packing.
+ */
+export async function diagnoseBenchmarkTask(
+  runtime: BenchmarkRepositoryRuntime,
+  task: string,
+  budget = 8_000,
+): Promise<BenchmarkTaskDiagnostics> {
+  const lexicalCandidatesForTask = await lexicalCandidates(runtime, task);
+  const search = await searchRepository(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, {
+    repositoryPath: runtime.root,
+    task,
+    limit: 64,
+  });
+  const structuralCandidatesForTask = candidatesFromProduction(search.result.candidates);
+  const [lexicalPack, structuralPack, contextforgePack] = await Promise.all([
+    packWholeFiles(runtime, task, budget, LEXICAL_BASELINE.id, LEXICAL_BASELINE.packing, lexicalCandidatesForTask),
+    packWholeFiles(runtime, task, budget, RANKING_STRATEGY, STRUCTURAL_FULL_FILE_PACKING, structuralCandidatesForTask),
+    buildContextPack(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, {
+      repositoryPath: runtime.root,
+      task,
+      budget,
+    }, estimator),
+  ]);
+  return {
+    normalizedQuery: search.result.normalizedQuery,
+    indexStatus: search.result.indexStatus,
+    lexical: {
+      candidates: lexicalCandidateDiagnostics(lexicalCandidatesForTask),
+      selectedRanges: lexicalPack.selectedRanges,
+      status: lexicalPack.status,
+      diagnostics: lexicalPack.diagnostics,
+    },
+    structural: {
+      candidates: structuralCandidateDiagnostics(search.result.candidates),
+      selectedRanges: structuralPack.selectedRanges,
+      status: structuralPack.status,
+      diagnostics: structuralPack.diagnostics,
+    },
+    contextforge: {
+      selectedItems: contextforgePack.manifest.selectedItems.map((item) => ({
+        path: item.relativePath,
+        role: item.role,
+        candidateRank: item.candidateRank,
+        candidateScore: item.candidateScore,
+        relevantSymbols: item.relevantSymbols.map((symbol) => symbol.qualifiedName),
+        selectedRanges: item.selectedRanges,
+      })),
+      droppedCandidates: contextforgePack.manifest.droppedCandidates.map((candidate) => ({
+        path: candidate.relativePath,
+        candidateRank: candidate.candidateRank,
+        candidateScore: candidate.score,
+        reason: candidate.dropReason,
+      })),
+      status: contextforgePack.manifest.packStatus,
+      diagnostics: contextforgePack.manifest.diagnostics,
+    },
+  };
 }
 
 export async function createRepositoryRuntime(root: string): Promise<BenchmarkRepositoryRuntime> {

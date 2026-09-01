@@ -45,6 +45,7 @@
     "benchmark:smoke": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js smoke",
     "benchmark:quality": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js quality",
     "benchmark:performance": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js performance",
+    "benchmark:diagnose-v1": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js diagnose-v1",
     "performance:mcp": "npm run build && node scripts/mcp-performance.mjs",
     "benchmark": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js full",
     "prepack": "npm run build"

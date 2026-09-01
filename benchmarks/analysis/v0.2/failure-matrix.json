@@ -1,0 +1,282 @@
+{
+  "analysisVersion": "contextforge-v0.2-failure-matrix-v1",
+  "benchmarkVersion": "contextforge-benchmark-v1",
+  "datasetVersion": "contextforge-dataset-v1",
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "analysisBudget": 8000,
+  "taxonomy": [
+    { "code": "TASK_ANALYSIS_MISS", "definition": "Useful coding intent in the task was not expressed as a retrieval or planning signal." },
+    { "code": "IDENTITY_MISS", "definition": "An exact path, basename, symbol, qualified symbol, error identifier, or technical literal did not receive sufficient identity evidence." },
+    { "code": "LEXICAL_MISS", "definition": "Task-correlated source or documentation text existed but was not used strongly enough." },
+    { "code": "SYMBOL_RETRIEVAL_MISS", "definition": "The correct file was available but the required symbol was absent from relevant-symbol evidence." },
+    { "code": "RELATIONSHIP_MISS", "definition": "A useful import, reference, implementation, test, documentation, or impact relationship was absent or too weak." },
+    { "code": "GRAPH_EXPANSION_MISS", "definition": "Required context was graph-reachable but traversal bounds, seed order, damping, distance, or edge priority prevented useful expansion." },
+    { "code": "FALSE_STRUCTURAL_BOOST", "definition": "Irrelevant candidates received excessive identity or relationship score relative to task-specific evidence." },
+    { "code": "TEST_LINK_MISS", "definition": "A production-to-test or test-to-production relationship was missing or insufficient." },
+    { "code": "CONFIG_CONTEXT_MISS", "definition": "Configuration, schema, manifest, default, validation, or consumer context was not appropriately discovered." },
+    { "code": "GIT_SIGNAL_MISUSE", "definition": "A weak Git signal meaningfully harmed candidate ordering." },
+    { "code": "PACKING_DROP", "definition": "Required context entered the pack candidate set but was omitted from the final artifact." },
+    { "code": "RANGE_SELECTION_MISS", "definition": "The correct file was packed but the required symbol or source range was not included." },
+    { "code": "BUDGET_ALLOCATION_MISS", "definition": "Lower-value sections consumed capacity or section slots needed by higher-value required context." },
+    { "code": "PRECISION_NOISE", "definition": "Required recall was acceptable but the selected repository content contained materially avoidable noise." },
+    { "code": "STALE_SOURCE_BOUNDARY", "definition": "Generation/source staleness correctly or incorrectly excluded evidence and must be distinguished from ordinary retrieval failure." },
+    { "code": "GOLD_OR_METHOD_LIMITATION", "definition": "The frozen benchmark does not expose enough information for a stronger product conclusion; this is not a substitute for a product miss." },
+    { "code": "NO_PRIMARY_FAILURE", "definition": "The task has no primary V1 failure at 8K; its success mechanism is recorded for regression protection." }
+  ],
+  "classifications": [
+    {
+      "taskId": "self-pack-exact",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "buildContextPack was rank 1 with its required symbol present in both lexical and structural retrieval." },
+        { "kind": "FACT", "statement": "ContextForge packed the required symbol with 1.0 required recall and 0.825092 precision at 8K while both whole-file payloads failed to include it." }
+      ]
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "outcome": "FAILURE",
+      "primaryCause": "BUDGET_ALLOCATION_MISS",
+      "secondaryCauses": ["PACKING_DROP", "FALSE_STRUCTURAL_BOOST", "TASK_ANALYSIS_MISS"],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The two required files were structural ranks 10 and 18 and both required symbols were present before packing." },
+        { "kind": "FACT", "statement": "Pack dropped both required files with SECTION_LIMIT while four generic test candidates tied at 320 or 335 points above them." },
+        { "kind": "INFERENCE", "statement": "Concurrency and writer-boundary intent was not represented strongly enough to protect the implementation files from fixed section allocation." }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "outcome": "FAILURE",
+      "primaryCause": "SYMBOL_RETRIEVAL_MISS",
+      "secondaryCauses": ["RANGE_SELECTION_MISS", "GOLD_OR_METHOD_LIMITATION"],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "search-repository.ts ranked 5 with searchRepository relevant, but the packed ranges did not contain that required symbol core." },
+        { "kind": "FACT", "statement": "repository-source-reader.ts ranked 8, but FileSystemRepositorySourceReader.readTextFile was absent from relevantSymbols and from the final selected symbol ranges." },
+        { "kind": "INFERENCE", "statement": "The frozen task tests retrieval of stale-source ownership but does not mutate source, so it cannot evaluate runtime stale-boundary correctness." }
+      ]
+    },
+    {
+      "taskId": "self-output-publish-race",
+      "outcome": "WEAKNESS",
+      "primaryCause": "PRECISION_NOISE",
+      "secondaryCauses": ["FALSE_STRUCTURAL_BOOST"],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "Both systems achieved complete required recall, but ContextForge precision was 0.125727 versus lexical 0.222582 at 8K." },
+        { "kind": "FACT", "statement": "The required adapter was lexical rank 2 but structural rank 6 behind generic test candidates boosted by common symbols such as output, after, and concurrent." }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "outcome": "FAILURE",
+      "primaryCause": "SYMBOL_RETRIEVAL_MISS",
+      "secondaryCauses": ["IDENTITY_MISS", "CONFIG_CONTEXT_MISS"],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "scripts/package-smoke.mjs was lexical rank 1 and structural rank 13, and package.json was structural rank 35; both files were packed." },
+        { "kind": "FACT", "statement": "The required common symbol run was absent from relevantSymbols for both rankers, so its core range was not recalled." },
+        { "kind": "INFERENCE", "statement": "File-level lexical evidence did not propagate to the owning symbol, and the common symbol name supplied no task identity signal." }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "outcome": "FAILURE",
+      "primaryCause": "FALSE_STRUCTURAL_BOOST",
+      "secondaryCauses": ["PACKING_DROP", "BUDGET_ALLOCATION_MISS", "LEXICAL_MISS"],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The required ADR was lexical rank 5 but structural rank 41 even though its text matched generation, packing, and source-content terms." },
+        { "kind": "FACT", "statement": "Structural top ranks were dominated by test files and common exact symbols; Pack later dropped the rank-41 ADR with SECTION_LIMIT." },
+        { "kind": "INFERENCE", "statement": "V1 structural scoring replaced a strong lexical document signal with ambiguous identity boosts and then fixed document allocation completed the miss." }
+      ]
+    },
+    {
+      "taskId": "ts-session-revoke-exact",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "SessionStore.revokeSession was rank 1 with exact required-symbol evidence and all systems achieved complete required recall at 8K." }
+      ]
+    },
+    {
+      "taskId": "ts-logout-token-bug",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "Structural retrieval placed all three required files within ranks 1 through 6 and ContextForge achieved complete required recall." },
+        { "kind": "FACT", "statement": "Lexical whole-file missed SessionStore.revokeSession and reached only 0.666667 required recall, showing useful cross-file structural recovery." }
+      ]
+    },
+    {
+      "taskId": "ts-revocation-test-failure",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The required production file and failing test were structural ranks 1 and 2; ContextForge achieved complete required recall and 0.152328 precision." }
+      ]
+    },
+    {
+      "taskId": "ts-auth-ttl-config",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The required configuration file was structural rank 4 and its required symbol core was packed with complete recall at 8K." }
+      ]
+    },
+    {
+      "taskId": "ts-session-revoke-api",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The application service and API adapter were structural ranks 1 and 2 with both required symbols relevant; ContextForge preserved complete recall." }
+      ]
+    },
+    {
+      "taskId": "ts-users-stay-signed-in",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "All three required files appeared within structural ranks 4 through 7 and ContextForge achieved complete required recall with 0.226615 precision." },
+        { "kind": "FACT", "statement": "ContextForge precision exceeded lexical precision 0.174591 on this ambiguous-language task." }
+      ]
+    },
+    {
+      "taskId": "py-release-stale-exact",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "JobStore.release_stale was structural rank 1 with exact symbol evidence and ContextForge achieved complete required recall." }
+      ]
+    },
+    {
+      "taskId": "py-expired-lease-race",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "All three required files were structural ranks 1 through 3 and all four required symbol cores were packed." },
+        { "kind": "FACT", "statement": "ContextForge precision 0.321651 trailed lexical 0.380996, so the success is recall evidence rather than a uniform precision win." }
+      ]
+    },
+    {
+      "taskId": "py-worker-test-failure",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The worker and its failing test were structural ranks 2 and 3; ContextForge achieved complete recall and improved precision to 0.202370." }
+      ]
+    },
+    {
+      "taskId": "py-queue-settings",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The required configuration file was structural rank 6 and ContextForge packed load_queue_settings with complete required recall." }
+      ]
+    },
+    {
+      "taskId": "py-submit-api-idempotency",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The state owner and API adapter were structural ranks 1 and 4; both required symbols were present and packed." }
+      ]
+    },
+    {
+      "taskId": "py-state-transition-refactor",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The two required files were structural ranks 1 and 2 and ContextForge packed all three required symbol cores with 0.268105 precision." }
+      ]
+    },
+    {
+      "taskId": "mixed-client-update-exact",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "ApiClient.updateProfile was structural rank 1 with exact symbol evidence and complete packed recall." }
+      ]
+    },
+    {
+      "taskId": "mixed-stale-profile-cache",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "All three cross-language required files appeared within structural ranks 2 through 6 and all required symbols were packed." }
+      ]
+    },
+    {
+      "taskId": "mixed-profile-test-failure",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The production file and regression test were structural ranks 2 and 3; ContextForge achieved complete recall and 0.154742 precision." }
+      ]
+    },
+    {
+      "taskId": "mixed-openapi-display-name",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The client and OpenAPI files were structural ranks 1 and 9, and ContextForge covered the required YAML range and ProfileDto symbol." }
+      ]
+    },
+    {
+      "taskId": "mixed-profile-flow-doc",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "The required profile-flow document was structural rank 4 and ContextForge achieved complete required-file recall with 0.198763 precision." }
+      ]
+    },
+    {
+      "taskId": "mixed-rename-reverts",
+      "outcome": "SUCCESS",
+      "primaryCause": "NO_PRIMARY_FAILURE",
+      "secondaryCauses": [],
+      "confidence": "HIGH",
+      "evidence": [
+        { "kind": "FACT", "statement": "All three required cross-language files appeared within structural ranks 2 through 5 and all five required symbol cores were packed." },
+        { "kind": "FACT", "statement": "ContextForge precision 0.420727 exceeded both whole-file systems at 8K." }
+      ]
+    }
+  ]
+}
