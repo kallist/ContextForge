@@ -17,6 +17,7 @@ if (typeof npmCliPath !== "string" || npmCliPath.length === 0) {
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "contextforge-release-hardening-"));
 const installRoot = join(temporaryRoot, "install");
+const installedPackageRoot = join(installRoot, "node_modules", "@kallist", "contextforge");
 const scaleRoot = join(temporaryRoot, "规模 repo with spaces");
 const contentionRoot = join(temporaryRoot, "mcp contention repo");
 const soakRoot = join(temporaryRoot, "mcp soak repo");
@@ -217,15 +218,14 @@ try {
   );
   const pack = JSON.parse(packJson)[0];
   assert.equal(typeof pack?.filename, "string");
+  assert.equal(pack.name, "@kallist/contextforge");
+  assert.equal(pack.version, "0.1.1");
   const tarballPath = join(temporaryRoot, pack.filename);
   mustRun(process.execPath, [npmCliPath, "install", "--no-audit", "--no-fund", tarballPath], installRoot);
-  const cliPath = join(installRoot, "node_modules", "contextforge", "dist", "cli", "main.js");
-  const installedPackageRoot = join(installRoot, "node_modules", "contextforge");
+  const cliPath = join(installedPackageRoot, "dist", "cli", "main.js");
   await access(cliPath);
   const sqliteModulePath = join(
-    installRoot,
-    "node_modules",
-    "contextforge",
+    installedPackageRoot,
     "dist",
     "adapters",
     "sqlite",
@@ -395,7 +395,7 @@ try {
   const parserFailureRoot = join(temporaryRoot, "parser asset failure repo");
   await mkdir(parserFailureRoot, { recursive: true });
   await writeFile(join(parserFailureRoot, "source.ts"), "export const parser = true;\n", "utf8");
-  const parserAsset = join(installRoot, "node_modules", "contextforge", "dist", "adapters", "parser", "assets", "tree-sitter-typescript.wasm");
+  const parserAsset = join(installedPackageRoot, "dist", "adapters", "parser", "assets", "tree-sitter-typescript.wasm");
   const hiddenParserAsset = `${parserAsset}.missing`;
   await rename(parserAsset, hiddenParserAsset);
   let parserFailure;

@@ -10,6 +10,7 @@ const repositoryRoot = resolve(import.meta.dirname, "..");
 const temporaryRoot = await mkdtemp(join(tmpdir(), "contextforge-package-smoke-"));
 const installRoot = join(temporaryRoot, "install");
 const fixtureRoot = join(temporaryRoot, "fixture repo");
+const installedPackageRoot = join(installRoot, "node_modules", "@kallist", "contextforge");
 const npmCliPath = process.env.npm_execpath;
 if (typeof npmCliPath !== "string" || npmCliPath.length === 0) {
   throw new Error("Package smoke must be started through npm so its CLI entry is available.");
@@ -105,6 +106,9 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
+  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.1.1") {
+    throw new Error("npm pack did not report the expected scoped v0.1.1 package identity.");
+  }
   if (
     packed[0]?.files?.some(({ path }) =>
       !(
@@ -206,10 +210,13 @@ try {
     throw new Error("Installed CLI could not produce a valid hard-budget Context Manifest.");
   }
 
-  const installedCliPath = join(installRoot, "node_modules", "contextforge", "dist", "cli", "main.js");
+  const installedCliPath = join(installedPackageRoot, "dist", "cli", "main.js");
   await runMcpFlow(installedCliPath, fixtureRoot);
 
-  const packageDocument = JSON.parse(await readFile(join(installRoot, "node_modules", "contextforge", "package.json"), "utf8"));
+  const packageDocument = JSON.parse(await readFile(join(installedPackageRoot, "package.json"), "utf8"));
+  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.1.1") {
+    throw new Error("Installed package identity differs from the reviewed scoped v0.1.1 identity.");
+  }
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
   for (const installScript of ["preinstall", "install", "postinstall", "prepare"]) {
@@ -217,7 +224,6 @@ try {
       throw new Error(`Installed package unexpectedly defines ${installScript}.`);
     }
   }
-  const installedPackageRoot = join(installRoot, "node_modules", "contextforge");
   const installedFiles = await packageFiles(installedPackageRoot);
   if (installedFiles.some((path) => /(^|\/)(?:test|benchmarks|scripts)(\/|$)|(^|\/)\.env(?:\..*)?$/u.test(path))) {
     throw new Error("Installed package contains development, benchmark, script, or secret-path files.");
@@ -228,9 +234,7 @@ try {
     if (suspiciousPattern.test(content)) throw new Error(`Installed package contains suspicious private metadata in ${relativePath}.`);
   }
   const parserAssetRoot = join(
-    installRoot,
-    "node_modules",
-    "contextforge",
+    installedPackageRoot,
     "dist",
     "adapters",
     "parser",

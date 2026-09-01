@@ -43,6 +43,9 @@ try {
 }
 if (packageDocument.license === "UNLICENSED" || !licensePresent) releaseBlockers.push("LICENSE_DECISION_REQUIRED");
 if (packageDocument.private === true) releaseBlockers.push("PUBLICATION_DISABLED");
+if (packageDocument.name !== "@kallist/contextforge") releaseBlockers.push("PACKAGE_IDENTITY_INCORRECT");
+if (packageDocument.version !== "0.1.1") releaseBlockers.push("PACKAGE_VERSION_INCORRECT");
+if (packageDocument.bin?.contextforge !== "dist/cli/main.js") releaseBlockers.push("CLI_BIN_INCORRECT");
 if (typeof packageDocument.version !== "string" || packageDocument.version.includes("-dev.")) {
   releaseBlockers.push("VERSION_FINALIZATION_REQUIRED");
 }
@@ -52,7 +55,7 @@ for (const document of [
   "CONTRIBUTING.md",
   "CHANGELOG.md",
   "docs/RELEASE_CHECKLIST.md",
-  "docs/RELEASE_NOTES_V0.1.md",
+  "docs/RELEASE_NOTES_V0.1.1.md",
 ]) {
   await access(resolve(repositoryRoot, document));
 }

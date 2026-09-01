@@ -64,4 +64,4 @@ const application = {
   search: (request) => searchRepository(scanner, sourceReader, repositoryFactory, { ...request, repositoryPath: rootRealPath }),
   pack: (request) => buildContextPack(scanner, sourceReader, repositoryFactory, { ...request, repositoryPath: rootRealPath }),
 };
-startContextForgeMcpStdio(application, "0.1.0-release-hardening");
+startContextForgeMcpStdio(application, "0.1.1-release-hardening");
