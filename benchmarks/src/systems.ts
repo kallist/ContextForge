@@ -4,10 +4,11 @@ import { performance } from "node:perf_hooks";
 import { FileSystemRepositoryScanner } from "../../src/adapters/filesystem/repository-scanner.js";
 import { FileSystemRepositorySourceReader } from "../../src/adapters/filesystem/repository-source-reader.js";
 import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-repository.js";
-import { buildContextPack } from "../../src/application/build-context-pack.js";
+import { buildContextPack, type ContextPackSearch } from "../../src/application/build-context-pack.js";
 import type { RepositoryScanner, ScanResult } from "../../src/application/map-repository.js";
 import type { RepositorySourceReader } from "../../src/application/repository-source.js";
 import { searchRepository } from "../../src/application/search-repository.js";
+import { searchRepositoryV2, type SearchExecutionV2 } from "../../src/application/search-repository-v2.js";
 import { PACKING_STRATEGY } from "../../src/core/context-pack.js";
 import { fencedBlock } from "../../src/core/context-serialization.js";
 import { ContextForgeError } from "../../src/core/errors.js";
@@ -15,6 +16,7 @@ import type { AnalyzedSymbol } from "../../src/core/language-analysis.js";
 import type { IndexedFile, IndexRepositoryFactory, RepositoryIndexSnapshot } from "../../src/core/repository-index.js";
 import { logicalLines } from "../../src/core/packing/ranges.js";
 import { RANKING_STRATEGY, type RankedFileCandidate } from "../../src/core/task-retrieval.js";
+import { RETRIEVAL_V2_STRATEGY, type RankedFileCandidateV2, type RetrievalV2Ablation } from "../../src/core/task-retrieval-v2.js";
 import { decomposeIdentifier, normalizeSearchTerm, normalizeTaskQuery, type QuerySignal } from "../../src/core/task-query.js";
 import { GenericTokenEstimator } from "../../src/core/token-estimation.js";
 import type { RetrievalCandidate, SelectedRange, SystemId, SystemSelection } from "./types.js";
@@ -97,6 +99,28 @@ export interface BenchmarkTaskDiagnostics {
       readonly candidateScore: number | null;
       readonly reason: string;
     }[];
+    readonly status: SystemSelection["status"];
+    readonly diagnostics: readonly string[];
+  };
+}
+
+export interface BenchmarkV2TaskDiagnostic {
+  readonly ablation: RetrievalV2Ablation;
+  readonly taskAnalysis: SearchExecutionV2["result"]["taskAnalysis"];
+  readonly contextPlan: SearchExecutionV2["result"]["contextPlan"];
+  readonly indexStatus: SearchExecutionV2["result"]["indexStatus"];
+  readonly candidates: readonly (BenchmarkCandidateDiagnostic & {
+    readonly priorityTier: number;
+    readonly taskSignalIds: readonly string[];
+    readonly graphDistance: number | null;
+    readonly sourceFamilies: readonly string[];
+  })[];
+  readonly counts: SearchExecutionV2["result"]["counts"];
+  readonly searchPerformance: SearchExecutionV2["performance"];
+  readonly pack: {
+    readonly selectedRanges: readonly SelectedRange[];
+    readonly selectedItems: readonly { readonly path: string; readonly candidateRank: number | null; readonly relevantSymbols: readonly string[] }[];
+    readonly droppedCandidates: readonly { readonly path: string; readonly candidateRank: number | null; readonly reason: string }[];
     readonly status: SystemSelection["status"];
     readonly diagnostics: readonly string[];
   };
@@ -358,7 +382,7 @@ async function packWholeFiles(
   };
 }
 
-function productionRetrieval(candidates: readonly RankedFileCandidate[]): RetrievalCandidate[] {
+function productionRetrieval(candidates: readonly (RankedFileCandidate | RankedFileCandidateV2)[]): RetrievalCandidate[] {
   return candidates.map((candidate) => ({
     path: candidate.relativePath,
     relevantSymbols: candidate.relevantSymbols.map((symbol) => ({ path: candidate.relativePath, qualifiedName: symbol.qualifiedName })),
@@ -391,6 +415,97 @@ function structuralCandidateDiagnostics(candidates: readonly RankedFileCandidate
     evidenceFamilies: [...new Set(candidate.scoreContributions.map((contribution) => contribution.family))].sort(compareText),
     reasons: candidate.scoreContributions.slice(0, 4).map((contribution) => contribution.reason),
   }));
+}
+
+function v2CandidateDiagnostics(candidates: readonly RankedFileCandidateV2[]): BenchmarkV2TaskDiagnostic["candidates"] {
+  return candidates.map((candidate, index) => ({
+    rank: index + 1,
+    path: candidate.relativePath,
+    score: candidate.rawScore,
+    category: candidate.category,
+    origin: candidate.origin,
+    relevantSymbols: candidate.relevantSymbols.map((symbol) => symbol.qualifiedName),
+    evidenceKinds: [...new Set(candidate.scoreContributions.map((contribution) => contribution.kind))].sort(compareText),
+    evidenceFamilies: [...new Set(candidate.scoreContributions.map((contribution) => contribution.family))].sort(compareText),
+    reasons: candidate.scoreContributions.slice(0, 4).map((contribution) => contribution.reason),
+    priorityTier: candidate.priorityTier,
+    taskSignalIds: candidate.taskSignalIds,
+    graphDistance: candidate.graphDistance,
+    sourceFamilies: candidate.sourceFamilies,
+  }));
+}
+
+export async function diagnoseBenchmarkTaskV2(
+  runtime: BenchmarkRepositoryRuntime,
+  task: string,
+  budget: number,
+  ablation: RetrievalV2Ablation,
+): Promise<{ readonly diagnostic: BenchmarkV2TaskDiagnostic; readonly selection: SystemSelection }> {
+  let retrieval: SearchExecutionV2 | undefined;
+  const v2Search: ContextPackSearch = async (searchScanner, searchReader, searchFactory, searchRequest) => {
+    retrieval = await searchRepositoryV2(searchScanner, searchReader, searchFactory, { ...searchRequest, ablation });
+    return retrieval;
+  };
+  let pack;
+  try {
+    pack = await buildContextPack(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, {
+      repositoryPath: runtime.root,
+      task,
+      budget,
+    }, estimator, v2Search);
+  } catch (error) {
+    if (!(error instanceof ContextForgeError && error.code === "BUDGET_TOO_SMALL" && retrieval !== undefined)) throw error;
+  }
+  if (retrieval === undefined) throw new Error("Retrieval V2 diagnostic did not execute the shared application path.");
+  const selectedRanges = pack?.manifest.selectedItems.map((item) => ({ path: item.relativePath, ranges: item.selectedRanges })) ?? [];
+  const status = pack === undefined ? "NO_CONTEXT" : pack.manifest.packStatus;
+  const diagnostics = pack?.manifest.diagnostics ?? ["BUDGET_TOO_SMALL"];
+  const selection: SystemSelection = {
+    systemId: "contextforge-v2",
+    rankingStrategy: RETRIEVAL_V2_STRATEGY,
+    packingStrategy: PACKING_STRATEGY,
+    tokenEstimator: estimator.id,
+    tokenEstimatorVersion: estimator.version,
+    budget,
+    payloadTokens: pack?.manifest.estimatedPayloadTokens ?? 0,
+    retrievalCandidates: productionRetrieval(retrieval.result.candidates),
+    selectedRanges,
+    status,
+    diagnostics,
+    performance: {
+      retrievalMs: retrieval.performance.totalMs,
+      packingMs: pack === undefined ? 0 : Math.max(0, pack.performance.totalMs - pack.performance.searchMs),
+      totalMs: pack?.performance.totalMs ?? retrieval.performance.totalMs,
+      stages: {
+        taskAnalysisMs: retrieval.performance.taskAnalysisMs,
+        contextPlanMs: retrieval.performance.contextPlanMs,
+        identityMs: retrieval.performance.identityMs,
+        lexicalMs: retrieval.performance.lexicalMs,
+        fusionMs: retrieval.performance.fusionMs,
+        graphExpansionMs: retrieval.performance.graphExpansionMs,
+        rankingMs: retrieval.performance.rankingMs,
+      },
+    },
+  };
+  return {
+    selection,
+    diagnostic: {
+      ablation,
+      taskAnalysis: retrieval.result.taskAnalysis,
+      contextPlan: retrieval.result.contextPlan,
+      indexStatus: retrieval.result.indexStatus,
+      candidates: v2CandidateDiagnostics(retrieval.result.candidates),
+      counts: retrieval.result.counts,
+      searchPerformance: retrieval.performance,
+      pack: {
+        selectedRanges,
+        selectedItems: pack?.manifest.selectedItems.map((item) => ({ path: item.relativePath, candidateRank: item.candidateRank, relevantSymbols: item.relevantSymbols.map((symbol) => symbol.qualifiedName) })) ?? [],
+        droppedCandidates: pack?.manifest.droppedCandidates.map((item) => ({ path: item.relativePath, candidateRank: item.candidateRank, reason: item.dropReason })) ?? [],
+        status,
+        diagnostics,
+      },
+    },
+  };
 }
 
 /**
@@ -491,6 +606,81 @@ export async function runBenchmarkSystem(
       status: pack.status,
       diagnostics: pack.diagnostics,
       performance: { retrievalMs, packingMs, totalMs: performance.now() - started },
+    };
+  }
+
+  if (systemId === "contextforge-v2") {
+    let retrieval: SearchExecutionV2 | undefined;
+    const v2Search: ContextPackSearch = async (searchScanner, searchReader, searchFactory, searchRequest) => {
+      retrieval = await searchRepositoryV2(searchScanner, searchReader, searchFactory, searchRequest);
+      return retrieval;
+    };
+    let pack;
+    try {
+      pack = await buildContextPack(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, {
+        repositoryPath: runtime.root,
+        task,
+        budget,
+      }, estimator, v2Search);
+    } catch (error) {
+      if (error instanceof ContextForgeError && error.code === "BUDGET_TOO_SMALL" && retrieval !== undefined) {
+        return {
+          systemId,
+          rankingStrategy: RETRIEVAL_V2_STRATEGY,
+          packingStrategy: PACKING_STRATEGY,
+          tokenEstimator: estimator.id,
+          tokenEstimatorVersion: estimator.version,
+          budget,
+          payloadTokens: 0,
+          retrievalCandidates: productionRetrieval(retrieval.result.candidates),
+          selectedRanges: [],
+          status: "NO_CONTEXT",
+          diagnostics: [error.code],
+          performance: {
+            retrievalMs: retrieval.performance.totalMs,
+            packingMs: 0,
+            totalMs: performance.now() - started,
+            stages: {
+              taskAnalysisMs: retrieval.performance.taskAnalysisMs,
+              contextPlanMs: retrieval.performance.contextPlanMs,
+              identityMs: retrieval.performance.identityMs,
+              lexicalMs: retrieval.performance.lexicalMs,
+              fusionMs: retrieval.performance.fusionMs,
+              graphExpansionMs: retrieval.performance.graphExpansionMs,
+              rankingMs: retrieval.performance.rankingMs,
+            },
+          },
+        };
+      }
+      throw error;
+    }
+    if (retrieval === undefined) throw new Error("Retrieval V2 did not provide a search execution to Pack V1.");
+    return {
+      systemId,
+      rankingStrategy: RETRIEVAL_V2_STRATEGY,
+      packingStrategy: PACKING_STRATEGY,
+      tokenEstimator: estimator.id,
+      tokenEstimatorVersion: estimator.version,
+      budget,
+      payloadTokens: pack.manifest.estimatedPayloadTokens,
+      retrievalCandidates: productionRetrieval(retrieval.result.candidates),
+      selectedRanges: pack.manifest.selectedItems.map((item) => ({ path: item.relativePath, ranges: item.selectedRanges })),
+      status: pack.manifest.packStatus,
+      diagnostics: pack.manifest.diagnostics,
+      performance: {
+        retrievalMs: retrieval.performance.totalMs,
+        packingMs: Math.max(0, pack.performance.totalMs - pack.performance.searchMs),
+        totalMs: pack.performance.totalMs,
+        stages: {
+          taskAnalysisMs: retrieval.performance.taskAnalysisMs,
+          contextPlanMs: retrieval.performance.contextPlanMs,
+          identityMs: retrieval.performance.identityMs,
+          lexicalMs: retrieval.performance.lexicalMs,
+          fusionMs: retrieval.performance.fusionMs,
+          graphExpansionMs: retrieval.performance.graphExpansionMs,
+          rankingMs: retrieval.performance.rankingMs,
+        },
+      },
     };
   }
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for V0.2 implementation. Not implemented and not accepted as a measured product improvement.
+Proposed for full V0.2 adoption. The V0.2-02 retrieval foundation is implemented, but the frozen evidence is mixed and does not justify acceptance or a production-default switch.
 
 ## Context
 
@@ -76,9 +76,16 @@ The formal comparison adds `contextforge-v2` to the same 24 tasks, five budgets,
 
 All candidate sources remain inside the Safe Repository Map and one active generation. Lexical evidence accepts only verified bytes; ignored/sensitive/generated/dependency/outside-root content remains ineligible. Task analysis executes no task or repository content. Task, plans, source terms, evidence, and source bodies are not persisted. Diagnostics use repository-relative identities and bounded metadata only.
 
+## V0.2-02 Evidence
+
+The first slice implemented deterministic TaskAnalysis/ContextPlan, source-provenance evidence, ambiguity-aware identity/lexical/symbol fusion, lexical-to-symbol ownership, existing structural support, and a shared application Retrieval V2 path. It required no SQLite migration and preserved the V1 CLI/MCP default, V1 strategy identities, verified-source invariant, graph bounds, estimator, and Pack V1 algorithm.
+
+On the unchanged frozen 8K evaluation, V2 retained V1 required-file recall `.917` and required-symbol recall `.864`, while overall Gold recall moved from `.871` to `.882`, range precision from `.193` to `.197`, and noise from `.807` to `.803`. Retrieval ranks improved materially through K=10, but the final symbol-recall target `.900` was not met and one former success regressed at 8K. The evidence classification is **MIXED**, not accepted improvement. Detailed results and limitations are recorded in `docs/V0.2_RETRIEVAL_FOUNDATION_RESULTS.md`.
+
 ## Open Conditions Before Acceptance
 
-- implement and ablate ambiguity-aware identity/lexical/symbol fusion;
+- correct the measured stale-source retrieval/packing regression without benchmark-specific logic;
+- demonstrate the remaining symbol-ownership and document-retrieval failure classes improve on the frozen benchmark;
 - demonstrate no V1 parity regression when shared helpers are introduced;
 - meet the frozen quality, hard-budget, determinism, security, and performance gates;
 - resolve plan-role behavior under tight budgets;

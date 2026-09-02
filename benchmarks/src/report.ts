@@ -2,6 +2,13 @@ import type { QualityCaseResult, QualityRun, SystemId } from "./types.js";
 import { MATCHED_RECALL_TARGETS, QUALITY_BUDGETS, RETRIEVAL_CUTOFFS, SYSTEM_IDS } from "./types.js";
 import { minimumActualTokensAtRecall } from "./metrics.js";
 
+type WholeFileSystem = "lexical-full-file-v1" | "structural-full-file-v1";
+type ContextSystem = "contextforge-v1" | "contextforge-v2";
+
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function format(value: number | null): string {
   return value === null ? "N/A" : value.toFixed(3);
 }
@@ -47,14 +54,14 @@ function tokensByTask(run: QualityRun, systemId: SystemId, target: number): Map<
   return result;
 }
 
-function pairedReduction(run: QualityRun, baseline: Exclude<SystemId, "contextforge-v1">, target: number): {
+function pairedReduction(run: QualityRun, baseline: WholeFileSystem, contextSystem: ContextSystem, target: number): {
   tasks: number;
   baselineMeanTokens: number | null;
   contextforgeMeanTokens: number | null;
   reduction: number | null;
 } {
   const baselineTokens = tokensByTask(run, baseline, target);
-  const contextTokens = tokensByTask(run, "contextforge-v1", target);
+  const contextTokens = tokensByTask(run, contextSystem, target);
   const pairedBaselineTokens: number[] = [];
   const pairedContextTokens: number[] = [];
   const reductions: number[] = [];
@@ -86,12 +93,12 @@ function comparison(run: QualityRun, left: SystemId, right: SystemId, budget: nu
   };
 }
 
-function winTieLoss(run: QualityRun, baseline: Exclude<SystemId, "contextforge-v1">, budget: number): { wins: number; ties: number; losses: number } {
+function winTieLoss(run: QualityRun, baseline: SystemId, contextSystem: ContextSystem, budget: number): { wins: number; ties: number; losses: number } {
   const baselineByTask = new Map(cases(run, baseline, budget).map((item) => [taskKey(item), item]));
   let wins = 0;
   let ties = 0;
   let losses = 0;
-  for (const context of cases(run, "contextforge-v1", budget)) {
+  for (const context of cases(run, contextSystem, budget)) {
     const other = baselineByTask.get(taskKey(context));
     if (other === undefined) continue;
     const contextRequired = context.requiredSymbolRecall ?? -1;
@@ -152,11 +159,14 @@ export function aggregateQualityRun(run: QualityRun): unknown {
     };
   }));
   const matchedRecall = MATCHED_RECALL_TARGETS.flatMap((target) => SYSTEM_IDS.map((systemId) => ({ target, systemId, ...matchedRecallSummary(run, systemId, target) })));
-  const tokenReduction = MATCHED_RECALL_TARGETS.flatMap((target) => ["lexical-full-file-v1", "structural-full-file-v1"].map((baseline) => ({
-    target,
-    baseline,
-    ...pairedReduction(run, baseline as Exclude<SystemId, "contextforge-v1">, target),
-  })));
+  const tokenReduction = MATCHED_RECALL_TARGETS.flatMap((target) => (["contextforge-v1", "contextforge-v2"] as const).flatMap((contextSystem) =>
+    (["lexical-full-file-v1", "structural-full-file-v1"] as const).map((baseline) => ({
+      target,
+      contextSystem,
+      baseline,
+      ...pairedReduction(run, baseline, contextSystem, target),
+    })),
+  ));
   return {
     benchmarkVersion: run.manifest.benchmarkVersion,
     datasetVersion: run.manifest.datasetVersion,
@@ -168,10 +178,13 @@ export function aggregateQualityRun(run: QualityRun): unknown {
     attributionAt8K: {
       structuralRanking: comparison(run, "structural-full-file-v1", "lexical-full-file-v1", 8_000),
       contextPacking: comparison(run, "contextforge-v1", "structural-full-file-v1", 8_000),
+      retrievalV2WithPackV1: comparison(run, "contextforge-v2", "contextforge-v1", 8_000),
     },
     winTieLossAt8K: {
-      versusLexical: winTieLoss(run, "lexical-full-file-v1", 8_000),
-      versusStructuralFullFile: winTieLoss(run, "structural-full-file-v1", 8_000),
+      contextforgeV1VersusLexical: winTieLoss(run, "lexical-full-file-v1", "contextforge-v1", 8_000),
+      contextforgeV1VersusStructuralFullFile: winTieLoss(run, "structural-full-file-v1", "contextforge-v1", 8_000),
+      contextforgeV2VersusV1: winTieLoss(run, "contextforge-v1", "contextforge-v2", 8_000),
+      contextforgeV2VersusLexical: winTieLoss(run, "lexical-full-file-v1", "contextforge-v2", 8_000),
     },
     breakdown: {
       language: breakdownRows(run, "language"),
@@ -229,7 +242,7 @@ function languageBreakdown(run: QualityRun): string[] {
 }
 
 export function renderBenchmarkReport(run: QualityRun): string {
-  const contextAtEight = cases(run, "contextforge-v1", 8_000);
+  const contextAtEight = cases(run, "contextforge-v2", 8_000);
   const lexicalAtEight = new Map(cases(run, "lexical-full-file-v1", 8_000).map((item) => [taskKey(item), item]));
   const worstAtEight = [...contextAtEight].sort((left, right) => {
     const leftMisses = left.missedRequiredFiles.length + left.missedRequiredSymbols.length;
@@ -240,7 +253,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     const rightRequiredDelta = (right.requiredSymbolRecall ?? -1) - (rightLexical?.requiredSymbolRecall ?? -1);
     const leftPrecisionDelta = (left.goldRangePrecision ?? -1) - (leftLexical?.goldRangePrecision ?? -1);
     const rightPrecisionDelta = (right.goldRangePrecision ?? -1) - (rightLexical?.goldRangePrecision ?? -1);
-    return rightMisses - leftMisses || leftRequiredDelta - rightRequiredDelta || leftPrecisionDelta - rightPrecisionDelta || left.taskId.localeCompare(right.taskId, "en");
+    return rightMisses - leftMisses || leftRequiredDelta - rightRequiredDelta || leftPrecisionDelta - rightPrecisionDelta || compareText(left.taskId, right.taskId);
   });
   const bestAtEight = contextAtEight.filter((context) => {
     const lexical = lexicalAtEight.get(taskKey(context));
@@ -256,12 +269,13 @@ export function renderBenchmarkReport(run: QualityRun): string {
     const rightRequiredDelta = (right.requiredSymbolRecall ?? -1) - (rightLexical?.requiredSymbolRecall ?? -1);
     const leftPrecisionDelta = (left.goldRangePrecision ?? -1) - (leftLexical?.goldRangePrecision ?? -1);
     const rightPrecisionDelta = (right.goldRangePrecision ?? -1) - (rightLexical?.goldRangePrecision ?? -1);
-    return rightRequiredDelta - leftRequiredDelta || rightPrecisionDelta - leftPrecisionDelta || left.taskId.localeCompare(right.taskId, "en");
+    return rightRequiredDelta - leftRequiredDelta || rightPrecisionDelta - leftPrecisionDelta || compareText(left.taskId, right.taskId);
   });
   const lines = [
-    "# ContextForge Offline Benchmark V1 Results",
+    "# ContextForge V0.2-02 Retrieval Foundation Results",
     "",
     `Benchmark: ${run.manifest.benchmarkVersion}`,
+    `Evaluation: ${run.manifest.evaluationVersion ?? "legacy-v1"}`,
     `Dataset: ${run.manifest.datasetVersion}`,
     `Dataset hash: ${run.manifest.datasetHash}`,
     `Benchmarked commit: ${run.manifest.contextforgeCommit}`,
@@ -294,19 +308,22 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     "## Matched-recall token reduction",
     "",
-    "| Target | Baseline | Paired tasks | Mean baseline tokens | Mean ContextForge tokens | Macro mean reduction |",
-    "|---:|---|---:|---:|---:|---:|",
+    "| Target | Context system | Baseline | Paired tasks | Mean baseline tokens | Mean ContextForge tokens | Macro mean reduction |",
+    "|---:|---|---|---:|---:|---:|---:|",
   );
   for (const target of MATCHED_RECALL_TARGETS) {
-    for (const baseline of ["lexical-full-file-v1", "structural-full-file-v1"] as const) {
-      const reduction = pairedReduction(run, baseline, target);
-      lines.push(`| ${(target * 100).toFixed(0)}% | ${baseline} | ${reduction.tasks} | ${format(reduction.baselineMeanTokens)} | ${format(reduction.contextforgeMeanTokens)} | ${reduction.reduction === null ? "NOT AVAILABLE" : `${(reduction.reduction * 100).toFixed(1)}%`} |`);
+    for (const contextSystem of ["contextforge-v1", "contextforge-v2"] as const) {
+      for (const baseline of ["lexical-full-file-v1", "structural-full-file-v1"] as const) {
+        const reduction = pairedReduction(run, baseline, contextSystem, target);
+        lines.push(`| ${(target * 100).toFixed(0)}% | ${contextSystem} | ${baseline} | ${reduction.tasks} | ${format(reduction.baselineMeanTokens)} | ${format(reduction.contextforgeMeanTokens)} | ${reduction.reduction === null ? "NOT AVAILABLE" : `${(reduction.reduction * 100).toFixed(1)}%`} |`);
+      }
     }
   }
   const structuralValue = comparison(run, "structural-full-file-v1", "lexical-full-file-v1", 8_000);
   const packingValue = comparison(run, "contextforge-v1", "structural-full-file-v1", 8_000);
-  const versusLexical = winTieLoss(run, "lexical-full-file-v1", 8_000);
-  const versusStructural = winTieLoss(run, "structural-full-file-v1", 8_000);
+  const retrievalV2Value = comparison(run, "contextforge-v2", "contextforge-v1", 8_000);
+  const versusLexical = winTieLoss(run, "lexical-full-file-v1", "contextforge-v2", 8_000);
+  const versusV1 = winTieLoss(run, "contextforge-v1", "contextforge-v2", 8_000);
   lines.push(
     "",
     "Reductions are macro means over paired tasks only; negative values mean ContextForge used more estimated payload tokens. `NOT AVAILABLE` means no paired task reached the target.",
@@ -317,8 +334,10 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     `ContextForge packing vs structural full-file — required-symbol recall delta: ${format(packingValue.requiredSymbolDelta)}; precision delta: ${format(packingValue.precisionDelta)}.`,
     "",
-    `Win/tie/loss vs lexical: ${versusLexical.wins}/${versusLexical.ties}/${versusLexical.losses}.`,
-    `Win/tie/loss vs structural full-file: ${versusStructural.wins}/${versusStructural.ties}/${versusStructural.losses}.`,
+    `Retrieval V2 + Pack V1 vs ContextForge V1 — required-symbol recall delta: ${format(retrievalV2Value.requiredSymbolDelta)}; precision delta: ${format(retrievalV2Value.precisionDelta)}.`,
+    "",
+    `ContextForge V2 win/tie/loss vs lexical: ${versusLexical.wins}/${versusLexical.ties}/${versusLexical.losses}.`,
+    `ContextForge V2 win/tie/loss vs ContextForge V1: ${versusV1.wins}/${versusV1.ties}/${versusV1.losses}.`,
     "",
     "## Language breakdown",
     "",
@@ -332,7 +351,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     ...breakdown(run, "taskCategory"),
     "",
-    "## Worst ContextForge cases at 8K",
+    "## Worst ContextForge V2 cases at 8K",
     "",
     "| Task | Required file | Required symbol | Missed required context | Attribution |",
     "|---|---:|---:|---|---|",
@@ -342,7 +361,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
   }
   lines.push(
     "",
-    "## Notable ContextForge wins versus lexical full-file at 8K",
+    "## Notable ContextForge V2 wins versus lexical full-file at 8K",
     "",
     "| Task | ContextForge required symbol | Lexical required symbol | ContextForge precision | Lexical precision |",
     "|---|---:|---:|---:|---:|",
@@ -360,7 +379,8 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "- Gold is evaluator-only and was manually authored from repository behavior before the formal score run.",
     "- All systems use the same materialized snapshot, task, estimator, safety boundary, and hard serialized budget.",
     "- `lexical-full-file-v1` uses only task normalization, path/symbol/source lexical evidence, and whole files.",
-    "- `structural-full-file-v1` uses production structural ranking and whole files; `contextforge-v1` uses production ranking and packing.",
+    "- `structural-full-file-v1` uses production V1 structural ranking and whole files; `contextforge-v1` uses V1 retrieval and Pack V1.",
+    "- `contextforge-v2` uses the shared Retrieval V2 application path with unchanged Pack V1 and the unchanged estimator; Pack V2 is not implemented.",
     "- This finite self/curated dataset may contain self-repository and fixture-authoring bias.",
     "- The generic estimator is not a model tokenizer; no coding agent, LLM judge, network, embedding, or corpus code execution is involved.",
     "- TypeScript aliases, advanced Python imports, pure synonym retrieval, large external repositories, and cross-platform benchmark execution remain limitations or untested paths.",

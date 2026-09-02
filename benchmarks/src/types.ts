@@ -2,7 +2,8 @@ import type { ContextRange } from "../../src/core/context-pack.js";
 
 export const BENCHMARK_VERSION = "contextforge-benchmark-v1";
 export const DATASET_VERSION = "contextforge-dataset-v1";
-export const SYSTEM_IDS = ["lexical-full-file-v1", "structural-full-file-v1", "contextforge-v1"] as const;
+export const V0_2_02_EVALUATION_VERSION = "contextforge-v0.2-02-evaluation-v1";
+export const SYSTEM_IDS = ["lexical-full-file-v1", "structural-full-file-v1", "contextforge-v1", "contextforge-v2"] as const;
 export const QUALITY_BUDGETS = [2_000, 4_000, 8_000, 16_000, 32_000] as const;
 export const RETRIEVAL_CUTOFFS = [1, 3, 5, 10, 20] as const;
 export const MATCHED_RECALL_TARGETS = [0.8, 0.9, 1] as const;
@@ -104,6 +105,15 @@ export interface SystemSelection {
     readonly retrievalMs: number;
     readonly packingMs: number;
     readonly totalMs: number;
+    readonly stages?: {
+      readonly taskAnalysisMs: number;
+      readonly contextPlanMs: number;
+      readonly identityMs: number;
+      readonly lexicalMs: number;
+      readonly fusionMs: number;
+      readonly graphExpansionMs: number;
+      readonly rankingMs: number;
+    };
   };
 }
 
@@ -154,10 +164,12 @@ export interface QualityCaseResult {
 export interface QualityRun {
   readonly manifest: {
     readonly benchmarkVersion: typeof BENCHMARK_VERSION;
+    readonly evaluationVersion?: typeof V0_2_02_EVALUATION_VERSION;
     readonly datasetVersion: typeof DATASET_VERSION;
     readonly datasetHash: string;
     readonly contextforgeCommit: string;
     readonly rankingStrategy: "contextforge-structural-v1";
+    readonly rankingStrategies?: readonly ["contextforge-structural-v1", "contextforge-retrieval-v2"];
     readonly packingStrategy: "contextforge-pack-v1";
     readonly tokenEstimator: "contextforge-generic-v1";
     readonly tokenEstimatorVersion: "1.0";
@@ -182,4 +194,5 @@ export interface PerformanceSample {
   readonly retrievalMs: number;
   readonly packingMs: number;
   readonly totalMs: number;
+  readonly stages?: NonNullable<SystemSelection["performance"]["stages"]>;
 }

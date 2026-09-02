@@ -15,6 +15,7 @@ import { GENERIC_TOKEN_ESTIMATOR_ID, GENERIC_TOKEN_ESTIMATOR_VERSION } from "../
 import { datasetHash, loadDataset, validateDatasetFreeze, validateFixtureRevisions } from "./dataset.js";
 import { hashDirectory, sha256 } from "./canonical.js";
 import { evaluateSelection, validateGoldAgainstRepository } from "./metrics.js";
+import { validateFailureMatrix } from "./failure-matrix.js";
 import {
   assertCorpusUnchanged,
   createBenchmarkTemporaryRoot,
@@ -28,20 +29,23 @@ import {
   assertEightKReferenceAlignment,
   summarizeTaskDiagnostics,
 } from "./retrieval-analysis.js";
-import { createRepositoryRuntime, diagnoseBenchmarkTask, runBenchmarkSystem, type BenchmarkRepositoryRuntime } from "./systems.js";
+import { createRepositoryRuntime, diagnoseBenchmarkTask, diagnoseBenchmarkTaskV2, runBenchmarkSystem, type BenchmarkRepositoryRuntime } from "./systems.js";
 import {
   BENCHMARK_VERSION,
   DATASET_VERSION,
   QUALITY_BUDGETS,
   SYSTEM_IDS,
+  V0_2_02_EVALUATION_VERSION,
   type BenchmarkDataset,
   type BenchmarkRepositoryDefinition,
   type PerformanceSample,
   type QualityCaseResult,
   type QualityRun,
 } from "./types.js";
+import type { RetrievalV2Ablation } from "../../src/core/task-retrieval-v2.js";
 
 const execFileAsync = promisify(execFile);
+const V1_SYSTEM_IDS = ["lexical-full-file-v1", "structural-full-file-v1", "contextforge-v1"] as const;
 
 interface PreparedRepository {
   readonly definition: BenchmarkRepositoryDefinition;
@@ -143,13 +147,16 @@ export async function runQualityBenchmark(workspaceRoot: string, mode: "SMOKE" |
       }
       await assertCorpusUnchanged(repository.materialized);
     }
+    if (mode === "FULL") await assertV1ReferenceAlignment(workspaceRoot, results);
     return {
       manifest: {
         benchmarkVersion: BENCHMARK_VERSION,
+        evaluationVersion: V0_2_02_EVALUATION_VERSION,
         datasetVersion: DATASET_VERSION,
         datasetHash: lock.datasetHash,
         contextforgeCommit: await gitHead(workspaceRoot),
         rankingStrategy: RANKING_STRATEGY,
+        rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2"],
         packingStrategy: PACKING_STRATEGY,
         tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
         tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
@@ -164,6 +171,16 @@ export async function runQualityBenchmark(workspaceRoot: string, mode: "SMOKE" |
     };
   } finally {
     await removeBenchmarkTemporaryRoot(temporaryRoot);
+  }
+}
+
+async function assertV1ReferenceAlignment(workspaceRoot: string, results: readonly QualityCaseResult[]): Promise<void> {
+  const referencePath = join(workspaceRoot, "benchmarks", "reference", "contextforge-benchmark-v1", "quality-results.json");
+  const reference = JSON.parse(await readFile(referencePath, "utf8")) as QualityRun;
+  const expected = reference.cases.filter((item) => V1_SYSTEM_IDS.includes(item.systemId as (typeof V1_SYSTEM_IDS)[number]));
+  const actual = results.filter((item) => V1_SYSTEM_IDS.includes(item.systemId as (typeof V1_SYSTEM_IDS)[number]));
+  if (actual.length !== expected.length || JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error("V1_REFERENCE_CHANGED: regenerated V1 quality cases differ from the frozen reference.");
   }
 }
 
@@ -182,7 +199,7 @@ export async function runV1RetrievalDiagnostics(workspaceRoot: string): Promise<
     reference.manifest.datasetVersion !== DATASET_VERSION ||
     reference.manifest.datasetHash !== lock.datasetHash ||
     reference.manifest.taskCount !== dataset.tasks.length ||
-    reference.cases.length !== dataset.tasks.length * SYSTEM_IDS.length * QUALITY_BUDGETS.length
+    reference.cases.length !== dataset.tasks.length * V1_SYSTEM_IDS.length * QUALITY_BUDGETS.length
   ) throw new Error("Frozen quality reference identity or case count is inconsistent with the dataset lock.");
 
   const temporaryRoot = await createBenchmarkTemporaryRoot();
@@ -206,7 +223,7 @@ export async function runV1RetrievalDiagnostics(workspaceRoot: string): Promise<
       datasetVersion: DATASET_VERSION,
       datasetHash: lock.datasetHash,
       analysisBudget: RETRIEVAL_ANALYSIS_BUDGET,
-      systems: SYSTEM_IDS,
+      systems: V1_SYSTEM_IDS,
       rankingStrategy: RANKING_STRATEGY,
       packingStrategy: PACKING_STRATEGY,
       tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
@@ -220,6 +237,122 @@ export async function runV1RetrievalDiagnostics(workspaceRoot: string): Promise<
         networkUsed: false,
         corpusSourceExecuted: false,
         productionRankingChanged: false,
+      },
+      tasks,
+    };
+  } finally {
+    await removeBenchmarkTemporaryRoot(temporaryRoot);
+  }
+}
+
+function requiredRanks(
+  task: BenchmarkDataset["tasks"][number],
+  candidates: readonly { readonly path: string; readonly relevantSymbols: readonly string[] }[],
+): { readonly fileRanks: readonly number[]; readonly symbolRanks: readonly number[] } {
+  const fileRanks = task.goldFiles
+    .filter((item) => item.importance === "REQUIRED")
+    .map((item) => candidates.findIndex((candidate) => candidate.path === item.path) + 1)
+    .filter((rank) => rank > 0);
+  const symbolRanks = task.goldSymbols
+    .filter((item) => item.importance === "REQUIRED")
+    .map((item) => candidates.findIndex((candidate) => candidate.path === item.path && candidate.relevantSymbols.includes(item.qualifiedName)) + 1)
+    .filter((rank) => rank > 0);
+  return { fileRanks, symbolRanks };
+}
+
+export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<unknown> {
+  const dataset = await loadDataset(workspaceRoot);
+  const lock = await validateDatasetFreeze(dataset, workspaceRoot);
+  const referenceRoot = join(workspaceRoot, "benchmarks", "reference", "contextforge-benchmark-v1");
+  const referenceNames = ["quality-results.json", "aggregate-results.json", "benchmark-report.md", "performance-results.json"] as const;
+  const referenceBytes = new Map<string, Uint8Array>();
+  for (const name of referenceNames) referenceBytes.set(name, await readFile(join(referenceRoot, name)));
+  await validateFailureMatrix(workspaceRoot, dataset);
+  const failureMatrix = JSON.parse(await readFile(join(workspaceRoot, "benchmarks", "analysis", "v0.2", "failure-matrix.json"), "utf8")) as {
+    readonly classifications: readonly { readonly taskId: string; readonly outcome: "SUCCESS" | "WEAKNESS" | "FAILURE" }[];
+  };
+  const v1Successes = new Set(failureMatrix.classifications.filter((item) => item.outcome === "SUCCESS").map((item) => item.taskId));
+  const ablations: readonly RetrievalV2Ablation[] = [
+    "IDENTITY_LEXICAL",
+    "IDENTITY_LEXICAL_STRUCTURAL",
+    "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY",
+    "FULL",
+  ];
+  const temporaryRoot = await createBenchmarkTemporaryRoot();
+  try {
+    const prepared = await prepareAll(dataset, workspaceRoot, temporaryRoot);
+    const tasks: unknown[] = [];
+    let v1SuccessRegressions = 0;
+    for (const repository of prepared) {
+      const repositoryTasks = dataset.tasks.filter((task) => task.repositoryId === repository.definition.repositoryId);
+      await validateGoldAgainstRepository(repository.runtime, repositoryTasks);
+      for (const task of repositoryTasks) {
+        const variants: unknown[] = [];
+        for (const ablation of ablations) {
+          const executed = await diagnoseBenchmarkTaskV2(repository.runtime, task.taskText, 8_000, ablation);
+          const metrics = await evaluateSelection(repository.runtime, task, lock.datasetHash, executed.selection);
+          const ranks = requiredRanks(task, executed.diagnostic.candidates);
+          const retrievalSymbols = new Set(executed.diagnostic.candidates.flatMap((candidate) => candidate.relevantSymbols.map((symbol) => `${candidate.path}\u0000${symbol}`)));
+          const requiredSymbolsBeforePack = task.goldSymbols.filter((item) => item.importance === "REQUIRED" && retrievalSymbols.has(`${item.path}\u0000${item.qualifiedName}`));
+          const requiredSymbolLossDuringPacking = requiredSymbolsBeforePack.filter((item) => metrics.missedRequiredSymbols.includes(`${item.path}#${item.qualifiedName}`)).length;
+          const identityOnly = executed.diagnostic.candidates.filter((candidate) => candidate.sourceFamilies.length === 1 && candidate.sourceFamilies[0] === "IDENTITY").length;
+          const lexicalOnly = executed.diagnostic.candidates.filter((candidate) => candidate.sourceFamilies.every((family) => family === "LEXICAL" || family === "SYMBOL") && candidate.sourceFamilies.includes("LEXICAL")).length;
+          const structuralOnly = executed.diagnostic.candidates.filter((candidate) => candidate.sourceFamilies.length === 1 && candidate.sourceFamilies[0] === "STRUCTURAL").length;
+          variants.push({
+            ablation,
+            taskAnalysis: ablation === "FULL" ? executed.diagnostic.taskAnalysis : undefined,
+            contextPlan: ablation === "FULL" ? executed.diagnostic.contextPlan : undefined,
+            candidates: executed.diagnostic.candidates,
+            counts: executed.diagnostic.counts,
+            pack: executed.diagnostic.pack,
+            retrieval: {
+              firstRequiredFileRank: ranks.fileRanks.length === 0 ? null : Math.min(...ranks.fileRanks),
+              firstRequiredSymbolRank: ranks.symbolRanks.length === 0 ? null : Math.min(...ranks.symbolRanks),
+              requiredFileRanks: ranks.fileRanks,
+              requiredSymbolRanks: ranks.symbolRanks,
+              identityOnlyDiscoveries: identityOnly,
+              lexicalOnlyDiscoveries: lexicalOnly,
+              structuralOnlyDiscoveries: structuralOnly,
+              graphPromotionEvents: executed.diagnostic.candidates.filter((candidate) => candidate.graphDistance !== null && candidate.origin === "DIRECT_AND_EXPANDED").length,
+              requiredSymbolsBeforePack: requiredSymbolsBeforePack.length,
+              requiredSymbolLossDuringPacking,
+            },
+            quality: {
+              requiredFileRecall: metrics.requiredFileRecall,
+              requiredSymbolRecall: metrics.requiredSymbolRecall,
+              overallGoldRecall: metrics.overallGoldRecall,
+              goldRangePrecision: metrics.goldRangePrecision,
+              noiseRatio: metrics.noiseRatio,
+              payloadTokens: metrics.payloadTokens,
+              missedRequiredFiles: metrics.missedRequiredFiles,
+              missedRequiredSymbols: metrics.missedRequiredSymbols,
+            },
+          });
+          if (ablation === "FULL" && v1Successes.has(task.taskId) && (metrics.missedRequiredFiles.length > 0 || metrics.missedRequiredSymbols.length > 0)) v1SuccessRegressions += 1;
+        }
+        tasks.push({ taskId: task.taskId, repositoryId: task.repositoryId, variants });
+      }
+      await assertCorpusUnchanged(repository.materialized);
+    }
+    return {
+      diagnosticsVersion: "contextforge-retrieval-v2-diagnostics-v1",
+      evaluationVersion: V0_2_02_EVALUATION_VERSION,
+      benchmarkVersion: BENCHMARK_VERSION,
+      datasetVersion: DATASET_VERSION,
+      datasetHash: lock.datasetHash,
+      analysisBudget: 8_000,
+      ablations,
+      taskCount: dataset.tasks.length,
+      repositoryCount: dataset.repositories.length,
+      v1SuccessTasks: v1Successes.size,
+      v1SuccessRegressions,
+      referenceArtifactHashes: Object.fromEntries(referenceNames.map((name) => [name, sha256(referenceBytes.get(name) ?? new Uint8Array())])),
+      constraints: {
+        goldBlindSystemBoundary: true,
+        sourceBodiesPersisted: false,
+        timingExcludedFromDeterministicDiagnostics: true,
+        networkUsed: false,
+        modelUsed: false,
       },
       tasks,
     };
@@ -266,6 +399,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
           retrievalMs: selection.performance.retrievalMs,
           packingMs: selection.performance.packingMs,
           totalMs: selection.performance.totalMs,
+          ...(selection.performance.stages === undefined ? {} : { stages: selection.performance.stages }),
         });
       }
       await assertCorpusUnchanged(prepared.materialized);
@@ -297,6 +431,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
           retrievalMs: selection.performance.retrievalMs,
           packingMs: selection.performance.packingMs,
           totalMs: selection.performance.totalMs,
+          ...(selection.performance.stages === undefined ? {} : { stages: selection.performance.stages }),
         });
       }
       await assertCorpusUnchanged(materialized);
@@ -306,10 +441,12 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
   }
   return {
     benchmarkVersion: BENCHMARK_VERSION,
+    evaluationVersion: V0_2_02_EVALUATION_VERSION,
     datasetVersion: DATASET_VERSION,
     datasetHash: datasetHash(dataset),
     contextforgeCommit: await gitHead(workspaceRoot),
     rankingStrategy: RANKING_STRATEGY,
+    rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2"],
     packingStrategy: PACKING_STRATEGY,
     tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
     tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
