@@ -137,12 +137,20 @@ export function deriveSymbolRelationshipsV2(
   let unresolvedCalls = 0;
   let ambiguousCalls = 0;
   let unresolvedImplementations = 0;
+  let shadowedCalls = 0;
+  let unprovenBindings = 0;
 
   for (const file of [...files].sort((left, right) => compareText(left.relativePath, right.relativePath))) {
     const syntax = syntaxByPath.get(file.relativePath);
     if (syntax === undefined || syntax.parserStatus !== "parsed") continue;
     const imports = importTargets(file, syntax, resolvedImports, fileByPath);
     for (const call of syntax.calls) {
+      if (call.form === "IDENTIFIER" && call.localBindingGuard !== undefined) {
+        if (call.localBindingGuard === "SHADOWED") shadowedCalls += 1;
+        else unprovenBindings += 1;
+        unresolvedCalls += 1;
+        continue;
+      }
       const caller = findNarrowestOwningSymbolV2(file.analysis, call);
       if (caller === null) {
         unresolvedCalls += 1;
@@ -187,6 +195,8 @@ export function deriveSymbolRelationshipsV2(
   }
 
   const diagnostics = [
+    ...(shadowedCalls > 0 ? [`RELATIONSHIP_CALL_SHADOWED:${shadowedCalls}`] : []),
+    ...(unprovenBindings > 0 ? [`SHADOW_DETECTION_PARTIAL:${unprovenBindings}`] : []),
     ...(unresolvedCalls > 0 ? [`RELATIONSHIP_CALL_UNRESOLVED:${unresolvedCalls}`] : []),
     ...(ambiguousCalls > 0 ? [`RELATIONSHIP_CALL_AMBIGUOUS:${ambiguousCalls}`] : []),
     ...(unresolvedImplementations > 0 ? [`RELATIONSHIP_IMPLEMENTATION_UNRESOLVED:${unresolvedImplementations}`] : []),

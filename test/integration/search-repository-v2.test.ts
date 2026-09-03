@@ -247,3 +247,56 @@ test("relationship-enabled Retrieval V2 links direct callers, imports, implement
   assert.equal(ambiguousImplementation.relationships.some((item) => item.type === "SYMBOL_IMPLEMENTS_SYMBOL" && item.source.qualifiedName === "AmbiguousImplementation"), false);
   assert.ok(ambiguousImplementation.diagnostics.some((item) => item.startsWith("RELATIONSHIP_IMPLEMENTATION_UNRESOLVED:")));
 });
+
+test("relationship-enabled search never fuses shadowed outer caller facts", async (context) => {
+  const root = await createTemporaryDirectory("search-v2-shadowing");
+  context.after(() => removeTemporaryDirectory(root));
+  await writeFixture(root, "src/helper.ts", "export function helper() { return true; }\n");
+  await writeFixture(root, "src/caller.ts", [
+    'import { helper } from "./helper.js";',
+    "export function parameter(helper: () => boolean) { return helper(); }",
+    "export function local() { const helper = () => false; return helper(); }",
+    "export function valid() { return helper(); }",
+  ].join("\n"));
+  const analyzer = new TreeSitterLanguageAnalyzer();
+  await buildIndex(scanner, sourceReader, analyzer, factory, { repositoryPath: root });
+  const request = { repositoryPath: root, task: "helper", limit: 100, ablation: "RELATION_FULL" } as const;
+  const result = (await searchRepositoryV2(scanner, sourceReader, factory, request, analyzer)).result;
+  assert.deepEqual(result.relationships.filter((item) => item.type === "SYMBOL_REFERENCES_SYMBOL").map((item) => item.source.qualifiedName), ["valid"]);
+  const caller = result.candidates.find((item) => item.relativePath === "src/caller.ts");
+  assert.ok(caller?.relevantSymbols.some((symbol) => symbol.name === "valid" && symbol.evidence.some((item) => item.matchKind === "CALLER")));
+  assert.equal(caller?.relevantSymbols.some((symbol) => ["parameter", "local"].includes(symbol.name) && symbol.evidence.some((item) => item.matchKind === "CALLER")), false);
+  assert.ok(result.diagnostics.includes("RELATIONSHIP_CALL_SHADOWED:2"));
+  assert.deepEqual(result, (await searchRepositoryV2(scanner, sourceReader, factory, request, analyzer)).result);
+});
+
+test("relationship families reuse each selected syntax file once per search, never across requests", async (context) => {
+  const root = await createTemporaryDirectory("search-v2-syntax-reuse");
+  context.after(() => removeTemporaryDirectory(root));
+  await writeFixture(root, "src/helper.ts", "export function helper() { return true; }\nexport interface Port { run(): void; }\n");
+  await writeFixture(root, "src/caller.ts", [
+    'import { helper, Port } from "./helper.js";',
+    "export class Caller implements Port { run() { helper(); helper(); } }",
+    "export function other() { helper(); }",
+  ].join("\n"));
+  await writeFixture(root, "tests/helper.test.ts", 'import { helper } from "../src/helper.js";\nexport function verifies() { helper(); helper(); }\n');
+  const analyzer = new TreeSitterLanguageAnalyzer();
+  await buildIndex(scanner, sourceReader, analyzer, factory, { repositoryPath: root });
+  const analyzed = new Map<string, number>();
+  const countedAnalyzer = {
+    analyzeRelationships(request: Parameters<typeof analyzer.analyzeRelationships>[0]) {
+      analyzed.set(request.relativePath, (analyzed.get(request.relativePath) ?? 0) + 1);
+      return analyzer.analyzeRelationships(request);
+    },
+  };
+  const request = { repositoryPath: root, task: "helper Port Caller", limit: 100, ablation: "RELATION_FULL" } as const;
+  const first = (await searchRepositoryV2(scanner, sourceReader, factory, request, countedAnalyzer)).result;
+  assert.deepEqual([...analyzed.keys()].sort(), ["src/caller.ts", "src/helper.ts", "tests/helper.test.ts"]);
+  assert.ok([...analyzed.values()].every((count) => count === 1));
+  assert.ok(first.relationships.some((item) => item.type === "SYMBOL_REFERENCES_SYMBOL"));
+  assert.ok(first.relationships.some((item) => item.type === "TEST_REFERENCES_SYMBOL"));
+  assert.ok(first.relationships.some((item) => item.type === "SYMBOL_IMPLEMENTS_SYMBOL"));
+  const second = (await searchRepositoryV2(scanner, sourceReader, factory, request, countedAnalyzer)).result;
+  assert.deepEqual(second, first);
+  assert.ok([...analyzed.values()].every((count) => count === 2));
+});

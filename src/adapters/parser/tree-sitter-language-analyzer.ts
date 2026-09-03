@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
 import { Language, Parser, type Node as SyntaxNode } from "web-tree-sitter";
+import { bareCallShadowGuard } from "./bare-call-shadowing.js";
 
 import { ContextForgeError } from "../../core/errors.js";
 import {
@@ -320,38 +321,34 @@ function addPythonImports(root: SyntaxNode, relativePath: string): AnalyzedImpor
   return imports;
 }
 
-function addDirectCalls(root: SyntaxNode, language: SupportedLanguage): AnalyzedDirectCall[] {
+function addDirectCalls(nodes: readonly SyntaxNode[], bindingGuard: ReturnType<typeof bareCallShadowGuard>): AnalyzedDirectCall[] {
   const calls: AnalyzedDirectCall[] = [];
-  function visit(node: SyntaxNode): void {
-    const isCall = language === "python" ? node.type === "call" : node.type === "call_expression";
-    if (isCall) {
-      const callee = node.childForFieldName("function");
-      if (callee?.type === "identifier") {
-        if (callee.text !== "require" && callee.text !== "import") {
-          calls.push({ calleeName: callee.text, receiverName: null, form: "IDENTIFIER", ...rangeOf(node) });
-        }
-      } else if (callee?.type === "member_expression" || callee?.type === "attribute") {
-        const object = callee.childForFieldName("object");
-        const property = callee.childForFieldName("property") ?? callee.childForFieldName("attribute");
-        if (property !== null && (property.type === "property_identifier" || property.type === "identifier")) {
-          const selfReceiver = object?.type === "this" || (object?.type === "identifier" && object.text === "self");
-          const namedReceiver = object?.type === "identifier" ? object.text : null;
-          calls.push({
-            calleeName: property.text,
-            receiverName: selfReceiver ? object?.text ?? null : namedReceiver,
-            form: selfReceiver ? "SELF_MEMBER" : namedReceiver === null ? "UNRESOLVED_MEMBER" : "NAMESPACE_MEMBER",
-            ...rangeOf(node),
-          });
-        }
+  for (const node of nodes) {
+    const callee = node.childForFieldName("function");
+    if (callee?.type === "identifier") {
+      if (callee.text !== "require" && callee.text !== "import") {
+        const localBindingGuard = bindingGuard(node, callee.text);
+        calls.push({ calleeName: callee.text, receiverName: null, form: "IDENTIFIER", ...rangeOf(node), ...(localBindingGuard === null ? {} : { localBindingGuard }) });
+      }
+    } else if (callee?.type === "member_expression" || callee?.type === "attribute") {
+      const object = callee.childForFieldName("object");
+      const property = callee.childForFieldName("property") ?? callee.childForFieldName("attribute");
+      if (property !== null && (property.type === "property_identifier" || property.type === "identifier")) {
+        const selfReceiver = object?.type === "this" || (object?.type === "identifier" && object.text === "self");
+        const namedReceiver = object?.type === "identifier" ? object.text : null;
+        calls.push({
+          calleeName: property.text,
+          receiverName: selfReceiver ? object?.text ?? null : namedReceiver,
+          form: selfReceiver ? "SELF_MEMBER" : namedReceiver === null ? "UNRESOLVED_MEMBER" : "NAMESPACE_MEMBER",
+          ...rangeOf(node),
+        });
       }
     }
-    for (const child of node.namedChildren) visit(child);
   }
-  visit(root);
   return calls;
 }
 
-function addJavascriptImportBindings(root: SyntaxNode): AnalyzedImportBinding[] {
+function addJavascriptImportBindings(nodes: readonly SyntaxNode[]): AnalyzedImportBinding[] {
   const bindings: AnalyzedImportBinding[] = [];
   function visit(node: SyntaxNode): void {
     if (node.type === "import_statement") {
@@ -378,13 +375,12 @@ function addJavascriptImportBindings(root: SyntaxNode): AnalyzedImportBinding[] 
       }
       return;
     }
-    for (const child of node.namedChildren) visit(child);
   }
-  visit(root);
+  for (const node of nodes) visit(node);
   return bindings;
 }
 
-function addPythonImportBindings(root: SyntaxNode): AnalyzedImportBinding[] {
+function addPythonImportBindings(nodes: readonly SyntaxNode[]): AnalyzedImportBinding[] {
   const bindings: AnalyzedImportBinding[] = [];
   function visit(node: SyntaxNode): void {
     if (node.type === "import_from_statement") {
@@ -416,13 +412,12 @@ function addPythonImportBindings(root: SyntaxNode): AnalyzedImportBinding[] {
       }
       return;
     }
-    for (const child of node.namedChildren) visit(child);
   }
-  visit(root);
+  for (const node of nodes) visit(node);
   return bindings;
 }
 
-function addTypescriptImplementations(root: SyntaxNode, language: SupportedLanguage): AnalyzedImplementationSyntax[] {
+function addTypescriptImplementations(nodes: readonly SyntaxNode[], language: SupportedLanguage): AnalyzedImplementationSyntax[] {
   if (language !== "typescript" && language !== "tsx") return [];
   const implementations: AnalyzedImplementationSyntax[] = [];
   function visit(node: SyntaxNode): void {
@@ -438,10 +433,28 @@ function addTypescriptImplementations(root: SyntaxNode, language: SupportedLangu
         }
       }
     }
-    for (const child of node.namedChildren) visit(child);
   }
-  visit(root);
+  for (const node of nodes) visit(node);
   return implementations;
+}
+
+function relationshipSyntax(root: SyntaxNode, language: SupportedLanguage) {
+  const calls: SyntaxNode[] = [];
+  const imports: SyntaxNode[] = [];
+  const implementations: SyntaxNode[] = [];
+  // Reuse the binding traversal for syntax-family discovery. Keep tree nodes
+  // only until extraction finishes; no syntax tree or scope escapes this parse.
+  const bindingGuard = bareCallShadowGuard(root, language, (node, type) => {
+    if (type === (language === "python" ? "call" : "call_expression")) calls.push(node);
+    if (type === "import_statement" || (language === "python" && type === "import_from_statement")) imports.push(node);
+    if (type === "class_declaration" || type === "abstract_class_declaration") implementations.push(node);
+  });
+  // Query only after all scopes have been collected, preserving hoisting/TDZ.
+  return {
+    calls: addDirectCalls(calls, bindingGuard),
+    importBindings: language === "python" ? addPythonImportBindings(imports) : addJavascriptImportBindings(imports),
+    implementations: addTypescriptImplementations(implementations, language),
+  };
 }
 
 export class TreeSitterLanguageAnalyzer implements LanguageAnalyzer, RelationshipSyntaxAnalyzer {
@@ -575,9 +588,7 @@ export class TreeSitterLanguageAnalyzer implements LanguageAnalyzer, Relationshi
           relativePath: request.relativePath,
           language,
           parserStatus: root.hasError ? "degraded" : "parsed",
-          calls: addDirectCalls(root, language),
-          importBindings: language === "python" ? addPythonImportBindings(root) : addJavascriptImportBindings(root),
-          implementations: addTypescriptImplementations(root, language),
+          ...relationshipSyntax(root, language),
           diagnostics: root.hasError ? [{ code: "PARSE_SYNTAX_ERROR", message: "Tree-sitter relationship extraction is partial because the source contains syntax errors." }] : [],
         };
       } finally {

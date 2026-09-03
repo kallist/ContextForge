@@ -72,6 +72,8 @@ export interface AnalyzedDirectCall extends SourceRange {
   readonly calleeName: string;
   readonly receiverName: string | null;
   readonly form: DirectCallForm;
+  /** Transient parser-backed rejection of unsafe outer-symbol binding. */
+  readonly localBindingGuard?: "SHADOWED" | "UNPROVEN";
 }
 
 export interface AnalyzedImportBinding extends SourceRange {
