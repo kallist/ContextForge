@@ -23,6 +23,7 @@ export const RETRIEVAL_V2 = {
     LEXICAL: 120,
     SYMBOL: 64,
     STRUCTURAL: 55,
+    RELATIONSHIP: 18,
     GIT: 3,
   } satisfies Record<CandidateEvidenceFamily, number>,
   perTaskSignalCap: 92,
@@ -58,13 +59,35 @@ export const RETRIEVAL_V2 = {
     },
     inheritedScoreFactor: 0.18,
   },
+  relationships: {
+    maximumSeeds: 24,
+    maximumSeedSymbols: 24,
+    maximumSyntaxFiles: 128,
+    maximumRelationsPerSeed: 16,
+    maximumCallersPerSeed: 8,
+    maximumTestsPerSeed: 8,
+    maximumImplementationsPerSeed: 8,
+    maximumTotalEvidence: 256,
+    hubDegreeThreshold: 24,
+    inheritedScoreFactor: 0.06,
+    relationFactors: {
+      SYMBOL_REFERENCE: 0.74,
+      CALLER: 0.86,
+      INTERFACE: 0.68,
+      IMPLEMENTATION: 0.82,
+      TEST_REFERENCE: 0.84,
+      TEST_IMPORT: 0.72,
+      TEST_ASSOCIATION: 0.42,
+      BOUNDED_DEPENDENT: 0.62,
+    },
+  },
   cli: {
     defaultLimit: 20,
     maximumLimit: 100,
   },
 } as const;
 
-const FAMILY_ORDER: Record<CandidateEvidenceFamily, number> = { IDENTITY: 0, LEXICAL: 1, SYMBOL: 2, STRUCTURAL: 3, GIT: 4 };
+const FAMILY_ORDER: Record<CandidateEvidenceFamily, number> = { IDENTITY: 0, LEXICAL: 1, SYMBOL: 2, RELATIONSHIP: 3, STRUCTURAL: 4, GIT: 5 };
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -147,11 +170,11 @@ export function scoreV2Evidence(evidence: readonly CandidateEvidenceV2[]): { rea
     if (item.taskSignalId !== null) perSignal.set(item.taskSignalId, signalRemaining - value);
     contributions.push({ evidenceId: item.id, kind: item.matchKind, family: item.family, value: roundV2Score(value), reason: item.explanation });
   }
-  const directSignals = new Set(deduplicated.filter((item) => item.family !== "STRUCTURAL" && item.family !== "GIT").flatMap((item) => item.taskSignalId === null ? [] : [item.taskSignalId]));
+  const directSignals = new Set(deduplicated.filter((item) => item.family !== "STRUCTURAL" && item.family !== "RELATIONSHIP" && item.family !== "GIT").flatMap((item) => item.taskSignalId === null ? [] : [item.taskSignalId]));
   const signalBonus = Math.min(RETRIEVAL_V2.maximumDistinctSignalBonus, Math.max(0, directSignals.size - 1) * RETRIEVAL_V2.distinctSignalBonus);
   if (signalBonus > 0) contributions.push({ evidenceId: null, kind: "DISTINCT_TASK_SIGNAL_COVERAGE", family: "FUSION", value: signalBonus, reason: `${directSignals.size} distinct task signals contribute bounded direct evidence.` });
   const independentFamilies = new Set(deduplicated
-    .filter((item) => item.family !== "GIT")
+    .filter((item) => item.family !== "GIT" && item.family !== "RELATIONSHIP")
     .map((item) => item.family === "SYMBOL" ? "LEXICAL" : item.family));
   const familyBonus = Math.min(RETRIEVAL_V2.maximumIndependentFamilyBonus, Math.max(0, independentFamilies.size - 1) * RETRIEVAL_V2.independentFamilyBonus);
   if (familyBonus > 0) contributions.push({ evidenceId: null, kind: "SOURCE_FAMILY_AGREEMENT", family: "FUSION", value: familyBonus, reason: `${independentFamilies.size} independent evidence families agree on this candidate.` });
@@ -163,7 +186,7 @@ export function evidencePriorityTier(evidence: readonly CandidateEvidenceV2[]): 
   if (evidence.some((item) => item.matchKind === "EXACT_SYMBOL" || item.matchKind === "EXACT_BASENAME")) return 1;
   if (evidence.some((item) => (item.matchKind === "LEXICAL_SYMBOL_OWNERSHIP" || item.matchKind === "VERIFIED_LEXICAL") && item.boundedContribution >= 30)) return 2;
   if (evidence.some((item) => item.family === "IDENTITY" || item.family === "LEXICAL" || item.family === "SYMBOL")) return 3;
-  if (evidence.some((item) => item.family === "STRUCTURAL")) return 4;
+  if (evidence.some((item) => item.family === "RELATIONSHIP" || item.family === "STRUCTURAL")) return 4;
   return 5;
 }
 

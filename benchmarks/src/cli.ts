@@ -8,6 +8,7 @@ import {
   runQualityBenchmark,
   runV1RetrievalDiagnostics,
   runV2RetrievalDiagnostics,
+  runV2RelationshipDiagnostics,
   validateDraftDataset,
   validateFormalDataset,
   writeJsonOutput,
@@ -36,15 +37,15 @@ switch (command) {
   }
   case "smoke": {
     const run = await runQualityBenchmark(workspaceRoot, "SMOKE");
-    await writeJsonOutput(workspaceRoot, "smoke-results-v0.2-02.json", run);
+    await writeJsonOutput(workspaceRoot, "smoke-results-v0.2-03.json", run);
     process.stdout.write(`Benchmark smoke passed: ${run.cases.length} case/system/budget results.\n`);
     break;
   }
   case "quality": {
     const run = await runQualityBenchmark(workspaceRoot, "FULL");
-    await writeJsonOutput(workspaceRoot, "quality-results-v0.2-02.json", run);
-    await writeJsonOutput(workspaceRoot, "aggregate-results-v0.2-02.json", aggregateQualityRun(run));
-    await writeReport("benchmark-report-v0.2-02.md", renderBenchmarkReport(run));
+    await writeJsonOutput(workspaceRoot, "quality-results-v0.2-03.json", run);
+    await writeJsonOutput(workspaceRoot, "aggregate-results-v0.2-03.json", aggregateQualityRun(run));
+    await writeReport("benchmark-report-v0.2-03.md", renderBenchmarkReport(run));
     process.stdout.write(`Full quality benchmark passed: ${run.cases.length} raw results.\n`);
     break;
   }
@@ -66,14 +67,20 @@ switch (command) {
     process.stdout.write("V2 retrieval diagnostics and bounded ablations passed for all frozen tasks.\n");
     break;
   }
+  case "diagnose-v2-relations": {
+    const result = await runV2RelationshipDiagnostics(workspaceRoot);
+    await writeJsonOutput(workspaceRoot, "v0.2-03-relationship-diagnostics.json", result);
+    process.stdout.write("V0.2-03 relationship diagnostics and bounded ablations passed for all frozen tasks.\n");
+    break;
+  }
   case "full": {
     const run = await runQualityBenchmark(workspaceRoot, "FULL");
-    await writeJsonOutput(workspaceRoot, "quality-results-v0.2-02.json", run);
-    await writeJsonOutput(workspaceRoot, "aggregate-results-v0.2-02.json", aggregateQualityRun(run));
-    await writeReport("benchmark-report-v0.2-02.md", renderBenchmarkReport(run));
+    await writeJsonOutput(workspaceRoot, "quality-results-v0.2-03.json", run);
+    await writeJsonOutput(workspaceRoot, "aggregate-results-v0.2-03.json", aggregateQualityRun(run));
+    await writeReport("benchmark-report-v0.2-03.md", renderBenchmarkReport(run));
     process.stdout.write(`Full benchmark quality phase passed: ${run.cases.length} raw results. Run npm run benchmark:performance for timing evidence.\n`);
     break;
   }
   default:
-    throw new Error("Usage: benchmark CLI <draft-validate|validate|smoke|quality|performance|diagnose-v1|diagnose-v2|full>");
+    throw new Error("Usage: benchmark CLI <draft-validate|validate|smoke|quality|performance|diagnose-v1|diagnose-v2|diagnose-v2-relations|full>");
 }

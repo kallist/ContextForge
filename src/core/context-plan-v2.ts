@@ -18,6 +18,7 @@ export type CandidateSourceId =
   | "SYMBOL_OWNERSHIP"
   | "FILE_STRUCTURAL"
   | "TEST_DOCUMENTATION"
+  | "RELATIONSHIP"
   | "GIT";
 
 export interface PlannedSection {
@@ -41,7 +42,7 @@ export interface ContextPlan {
 }
 
 const DIRECT = ["IDENTITY", "VERIFIED_LEXICAL", "SYMBOL_OWNERSHIP"] as const;
-const STRUCTURAL = ["FILE_STRUCTURAL", "TEST_DOCUMENTATION"] as const;
+const STRUCTURAL = ["FILE_STRUCTURAL", "TEST_DOCUMENTATION", "RELATIONSHIP"] as const;
 
 function section(
   role: PlannedContextRole,
@@ -59,42 +60,42 @@ function sectionsFor(mode: TaskMode): PlannedSection[] {
   switch (mode) {
     case "CONCURRENCY": return [
       section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, DIRECT, "Start with direct implementation evidence."),
-      section("STATE_OWNER", "REQUIRED", 1, 4, [...DIRECT, "FILE_STRUCTURAL"], "Include the mutation, transaction, or lock boundary."),
+      section("STATE_OWNER", "REQUIRED", 1, 4, [...DIRECT, "FILE_STRUCTURAL", "RELATIONSHIP"], "Include the mutation, transaction, or lock boundary."),
       section("CALLER_OR_DEPENDENT", "PREFERRED", 0, 4, STRUCTURAL, "Inspect bounded callers and dependents of the mutation boundary."),
-      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL"], "Prefer concurrency and regression tests."),
+      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL", "RELATIONSHIP"], "Prefer concurrency and regression tests."),
       instructions,
     ];
     case "TEST_FAILURE": return [
-      section("TEST", "REQUIRED", 1, 4, [...DIRECT, "TEST_DOCUMENTATION"], "Retain the failing test evidence."),
-      section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, [...DIRECT, "FILE_STRUCTURAL"], "Retain the implementation exercised by the test."),
-      section("STATE_OWNER", "PREFERRED", 0, 4, ["FILE_STRUCTURAL", "SYMBOL_OWNERSHIP"], "Include state owners when structurally supported."),
+      section("TEST", "REQUIRED", 1, 4, [...DIRECT, "TEST_DOCUMENTATION", "RELATIONSHIP"], "Retain the failing test evidence."),
+      section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, [...DIRECT, "FILE_STRUCTURAL", "RELATIONSHIP"], "Retain the implementation exercised by the test."),
+      section("STATE_OWNER", "PREFERRED", 0, 4, ["FILE_STRUCTURAL", "SYMBOL_OWNERSHIP", "RELATIONSHIP"], "Include state owners when structurally supported."),
       instructions,
     ];
     case "CONFIGURATION": return [
       section("CONFIGURATION", "REQUIRED", 1, 4, [...DIRECT, "FILE_STRUCTURAL"], "Retain configuration, schema, manifest, or defaults."),
       section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, [...DIRECT, "FILE_STRUCTURAL"], "Retain validators and consumers."),
-      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL"], "Prefer configuration behavior tests."),
+      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL", "RELATIONSHIP"], "Prefer configuration behavior tests."),
       section("DOCUMENTATION", "OPTIONAL", 0, 2, ["VERIFIED_LEXICAL", "TEST_DOCUMENTATION"], "Add documentation only when evidence supports it."),
       instructions,
     ];
     case "ARCHITECTURE": return [
       section("DOCUMENTATION", "REQUIRED", 1, 4, [...DIRECT, "TEST_DOCUMENTATION"], "Retain the requested decision or architecture document."),
       section("PRIMARY_IMPLEMENTATION", "PREFERRED", 0, 6, [...DIRECT, "FILE_STRUCTURAL"], "Relate the decision to concrete implementation evidence."),
-      section("TEST", "OPTIONAL", 0, 2, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL"], "Tests are secondary unless directly evidenced."),
+      section("TEST", "OPTIONAL", 0, 2, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL", "RELATIONSHIP"], "Tests are secondary unless directly evidenced."),
       instructions,
     ];
     case "EXACT_TARGET": return [
       section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, DIRECT, "Retain the explicit target."),
       section("CALLER_OR_DEPENDENT", "PREFERRED", 0, 4, STRUCTURAL, "Add direct structural context around the target."),
-      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL"], "Add related tests when available."),
+      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL", "RELATIONSHIP"], "Add related tests when available."),
       instructions,
     ];
     case "BEHAVIORAL":
     case "GENERAL": return [
       section("PRIMARY_IMPLEMENTATION", "REQUIRED", 1, 6, DIRECT, "Prefer the strongest direct task evidence."),
-      section("STATE_OWNER", "PREFERRED", 0, 4, [...DIRECT, "FILE_STRUCTURAL"], "Add state ownership when supported."),
+      section("STATE_OWNER", "PREFERRED", 0, 4, [...DIRECT, "FILE_STRUCTURAL", "RELATIONSHIP"], "Add state ownership when supported."),
       section("CALLER_OR_DEPENDENT", "PREFERRED", 0, 4, STRUCTURAL, "Add bounded related implementation context."),
-      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL"], "Add related tests when available."),
+      section("TEST", "PREFERRED", 0, 4, ["TEST_DOCUMENTATION", "FILE_STRUCTURAL", "RELATIONSHIP"], "Add related tests when available."),
       section("DOCUMENTATION", "OPTIONAL", 0, 2, ["VERIFIED_LEXICAL", "TEST_DOCUMENTATION"], "Documentation remains optional without direct evidence."),
       instructions,
     ];

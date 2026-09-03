@@ -60,6 +60,41 @@ async function prepare(root: string): Promise<void> {
   }
   await writeFixture(root, "docs/ADR-006.md", "# Snapshot packing architecture\n\nGeneration-verified source snapshot packing preserves one active generation.\n");
   await writeFixture(root, "src/generic-architecture.ts", "export function generation() {}\nexport function snapshot() {}\nexport function packing() {}\n");
+  await writeFixture(root, "src/caller.ts", [
+    "export function readOnce() {",
+    '  return "RELATIONSHIP_CALLER_SENTINEL";',
+    "}",
+    "export function readTextFile() {",
+    "  return readOnce();",
+    "}",
+    "",
+  ].join("\n"));
+  await writeFixture(root, "src/helper.ts", "export function helperTarget() { return true; }\n");
+  await writeFixture(root, "src/public-api.ts", [
+    'import { helperTarget } from "./helper.js";',
+    "export function publicMethod() { return helperTarget(); }",
+    "export function unresolved(value: { helperTarget(): boolean }) { return value.helperTarget(); }",
+    "",
+  ].join("\n"));
+  await writeFixture(root, "src/port.ts", "export interface SessionPort { save(): void }\n");
+  await writeFixture(root, "src/implementation.ts", [
+    'import { SessionPort } from "./port.js";',
+    "export class SqlSessionPort implements SessionPort { save(): void {} }",
+    "",
+  ].join("\n"));
+  await writeFixture(root, "src/ambiguous-port.ts", "export interface AmbiguousPort { save(): void }\n");
+  await writeFixture(root, "src/ambiguous-port.tsx", "export interface AmbiguousPort { save(): void }\n");
+  await writeFixture(root, "src/ambiguous-implementation.ts", [
+    'import { AmbiguousPort } from "./ambiguous-port.js";',
+    "export class AmbiguousImplementation implements AmbiguousPort { save(): void {} }",
+    "",
+  ].join("\n"));
+  await writeFixture(root, "tests/helper.test.ts", [
+    'import { helperTarget } from "../src/helper.js";',
+    "export function verifiesHelper() { return helperTarget(); }",
+    "",
+  ].join("\n"));
+  await writeFixture(root, ".env", "RELATIONSHIP_CALLER_SENTINEL=secret\n");
   await buildIndex(scanner, sourceReader, new TreeSitterLanguageAnalyzer(), factory, { repositoryPath: root });
 }
 
@@ -161,4 +196,54 @@ test("Retrieval V2 prefers a directly matched architecture document and preserve
   assert.equal(stale.indexStatus.status, "STALE");
   assert.equal(stale.candidates.some((candidate) => candidate.directEvidence.some((item) => item.matchKind === "VERIFIED_LEXICAL" && item.target.file === "src/owner.ts")), false);
   assert.ok(stale.diagnostics.includes("LEXICAL_SOURCE_STALE"));
+});
+
+test("relationship-enabled Retrieval V2 links direct callers, imports, implementations, and tests without admitting excluded files", async (context) => {
+  const root = await createTemporaryDirectory("search-v2-relationships");
+  context.after(() => removeTemporaryDirectory(root));
+  await prepare(root);
+  const relationshipAnalyzer = new TreeSitterLanguageAnalyzer();
+
+  const sameFile = (await searchRepositoryV2(scanner, sourceReader, factory, {
+    repositoryPath: root,
+    task: "RELATIONSHIP_CALLER_SENTINEL",
+    limit: 100,
+    ablation: "RELATION_FULL",
+  }, relationshipAnalyzer)).result;
+  const callerFile = sameFile.candidates.find((candidate) => candidate.relativePath === "src/caller.ts");
+  assert.equal(sameFile.rankingStrategy, "contextforge-retrieval-v2-relations");
+  assert.ok(callerFile?.relevantSymbols.some((symbol) => symbol.name === "readTextFile" && symbol.evidence.some((item) => item.matchKind === "CALLER")));
+  assert.ok(sameFile.relationships.some((item) => item.type === "SYMBOL_REFERENCES_SYMBOL" && item.source.qualifiedName === "readTextFile" && item.target.qualifiedName === "readOnce" && item.classification === "STRUCTURAL_FACT"));
+  assert.equal(sameFile.candidates.some((candidate) => candidate.relativePath === ".env"), false);
+
+  const imported = (await searchRepositoryV2(scanner, sourceReader, factory, {
+    repositoryPath: root,
+    task: "helperTarget",
+    limit: 100,
+    ablation: "RELATION_FULL",
+  }, relationshipAnalyzer)).result;
+  const publicApi = imported.candidates.find((candidate) => candidate.relativePath === "src/public-api.ts");
+  const testFile = imported.candidates.find((candidate) => candidate.relativePath === "tests/helper.test.ts");
+  assert.ok(publicApi?.relevantSymbols.some((symbol) => symbol.name === "publicMethod" && symbol.evidence.some((item) => item.matchKind === "CALLER")));
+  assert.ok(testFile?.relevantSymbols.some((symbol) => symbol.name === "verifiesHelper" && symbol.evidence.some((item) => item.matchKind === "TEST_REFERENCE")));
+  assert.equal(publicApi?.relevantSymbols.some((symbol) => symbol.name === "unresolved" && symbol.evidence.some((item) => item.matchKind === "CALLER")), false);
+
+  const implementation = (await searchRepositoryV2(scanner, sourceReader, factory, {
+    repositoryPath: root,
+    task: "SessionPort",
+    limit: 100,
+    ablation: "RELATION_FULL",
+  }, relationshipAnalyzer)).result;
+  const implementationFile = implementation.candidates.find((candidate) => candidate.relativePath === "src/implementation.ts");
+  assert.ok(implementationFile?.relevantSymbols.some((symbol) => symbol.name === "SqlSessionPort" && symbol.evidence.some((item) => item.matchKind === "IMPLEMENTATION")));
+  assert.ok(implementation.relationships.some((item) => item.type === "SYMBOL_IMPLEMENTS_SYMBOL" && item.source.qualifiedName === "SqlSessionPort" && item.target.qualifiedName === "SessionPort"));
+
+  const ambiguousImplementation = (await searchRepositoryV2(scanner, sourceReader, factory, {
+    repositoryPath: root,
+    task: "AmbiguousPort",
+    limit: 100,
+    ablation: "RELATION_FULL",
+  }, relationshipAnalyzer)).result;
+  assert.equal(ambiguousImplementation.relationships.some((item) => item.type === "SYMBOL_IMPLEMENTS_SYMBOL" && item.source.qualifiedName === "AmbiguousImplementation"), false);
+  assert.ok(ambiguousImplementation.diagnostics.some((item) => item.startsWith("RELATIONSHIP_IMPLEMENTATION_UNRESOLVED:")));
 });

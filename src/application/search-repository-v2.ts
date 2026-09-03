@@ -7,6 +7,8 @@ import { fuseCandidateEvidenceV2 } from "../core/candidate-fusion-v2.js";
 import { buildContextPlan } from "../core/context-plan-v2.js";
 import { ContextForgeError } from "../core/errors.js";
 import type { AnalyzedSymbol } from "../core/language-analysis.js";
+import type { RelationshipSyntaxAnalyzer } from "../core/language-analysis.js";
+import { deriveSymbolRelationshipsV2 } from "../core/derive-symbol-relationships-v2.js";
 import type { IndexedFile, IndexRepositoryFactory, RepositoryIndexSnapshot } from "../core/repository-index.js";
 import type { GitFileSignal, GraphEdge } from "../core/repository-graph.js";
 import {
@@ -33,6 +35,12 @@ import {
   type SearchResultV2,
 } from "../core/task-retrieval-v2.js";
 import type { SearchIndexStatus } from "../core/task-retrieval.js";
+import {
+  expandRelationshipEvidenceV2,
+  graphRelationshipEvidenceV2,
+  type RelationshipFamiliesV2,
+} from "../core/relationship-expansion-v2.js";
+import { deduplicateRelationshipEvidenceV2 } from "../core/relationship-intelligence-v2.js";
 
 export interface SearchRepositoryV2Request {
   readonly repositoryPath: string;
@@ -94,13 +102,55 @@ function isSearchEligible(file: IndexedFile): boolean {
   );
 }
 
-function ablationSettings(ablation: RetrievalV2Ablation): { readonly structural: boolean; readonly ambiguity: boolean; readonly ownership: boolean } {
+function ablationSettings(ablation: RetrievalV2Ablation): {
+  readonly structural: boolean;
+  readonly ambiguity: boolean;
+  readonly ownership: boolean;
+  readonly relationships: RelationshipFamiliesV2 | null;
+} {
   switch (ablation) {
-    case "IDENTITY_LEXICAL": return { structural: false, ambiguity: false, ownership: false };
-    case "IDENTITY_LEXICAL_STRUCTURAL": return { structural: true, ambiguity: false, ownership: false };
-    case "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY": return { structural: true, ambiguity: true, ownership: false };
-    case "FULL": return { structural: true, ambiguity: true, ownership: true };
+    case "IDENTITY_LEXICAL": return { structural: false, ambiguity: false, ownership: false, relationships: null };
+    case "IDENTITY_LEXICAL_STRUCTURAL": return { structural: true, ambiguity: false, ownership: false, relationships: null };
+    case "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY": return { structural: true, ambiguity: true, ownership: false, relationships: null };
+    case "FULL": return { structural: true, ambiguity: true, ownership: true, relationships: null };
+    case "RELATION_REFERENCES": return { structural: true, ambiguity: true, ownership: true, relationships: { references: true, callers: false, implementations: false, tests: false, dependents: false } };
+    case "RELATION_CALLERS": return { structural: true, ambiguity: true, ownership: true, relationships: { references: true, callers: true, implementations: false, tests: false, dependents: false } };
+    case "RELATION_IMPLEMENTATIONS": return { structural: true, ambiguity: true, ownership: true, relationships: { references: true, callers: true, implementations: true, tests: false, dependents: false } };
+    case "RELATION_TESTS": return { structural: true, ambiguity: true, ownership: true, relationships: { references: true, callers: true, implementations: true, tests: true, dependents: false } };
+    case "RELATION_FULL": return { structural: true, ambiguity: true, ownership: true, relationships: { references: true, callers: true, implementations: true, tests: true, dependents: true } };
   }
+}
+
+function relationshipSyntaxPaths(
+  primary: readonly RankedFileCandidateV2[],
+  verifiedSources: ReadonlyMap<string, string>,
+): { readonly paths: readonly string[]; readonly truncated: boolean } {
+  const seeds = primary.filter((candidate) => candidate.priorityTier <= 2).slice(0, RETRIEVAL_V2.relationships.maximumSeeds);
+  const seedSymbols = seeds.flatMap((candidate) => candidate.relevantSymbols.map((symbol) => ({ path: candidate.relativePath, symbol })))
+    .slice(0, RETRIEVAL_V2.relationships.maximumSeedSymbols);
+  const seedNames = new Set(seedSymbols.map((item) => item.symbol.name));
+  const seedPaths = new Set(seeds.map((candidate) => candidate.relativePath));
+  const tokenPaths = new Set<string>();
+  // Every supported exact cross-file relation spells the seed name in the caller,
+  // import, test, or implements clause. Prefiltering on that invariant avoids
+  // parsing unrelated graph neighbors without weakening the fail-closed contract.
+  for (const [path, source] of verifiedSources) {
+    if (seedNames.size === 0) break;
+    for (const match of source.matchAll(SOURCE_TOKEN)) {
+      if (seedNames.has(match[0])) {
+        tokenPaths.add(path);
+        break;
+      }
+    }
+  }
+  const ordered = [
+    ...[...seedPaths].sort(compareText),
+    ...[...tokenPaths].filter((path) => !seedPaths.has(path)).sort(compareText),
+  ].filter((path) => verifiedSources.has(path));
+  return {
+    paths: ordered.slice(0, RETRIEVAL_V2.relationships.maximumSyntaxFiles),
+    truncated: ordered.length > RETRIEVAL_V2.relationships.maximumSyntaxFiles,
+  };
 }
 
 function identityEvidence(
@@ -432,6 +482,7 @@ async function executeSearchRepositoryV2(
   sourceReader: RepositorySourceReader,
   repositoryFactory: IndexRepositoryFactory,
   request: SearchRepositoryV2Request,
+  relationshipAnalyzer?: RelationshipSyntaxAnalyzer,
 ): Promise<SearchExecutionV2> {
   const totalStarted = performance.now();
   const ablation = request.ablation ?? "FULL";
@@ -477,6 +528,7 @@ async function executeSearchRepositoryV2(
     if (current !== undefined && (current.content !== file.contentStatus || current.size !== file.size)) changed.add(file.relativePath);
   }
   const lexicalFiles: LexicalFileEvidence[] = [];
+  const verifiedSources = new Map<string, string>();
   let lexicalFilesScanned = 0;
   let lexicalBytesScanned = 0;
   let lexicalSkippedFiles = [...changed, ...deleted].filter((path) => fileByPath.get(path)?.contentStatus === "text").length;
@@ -506,6 +558,7 @@ async function executeSearchRepositoryV2(
     }
     lexicalFilesScanned += 1;
     lexicalBytesScanned += source.size;
+    if (settings.relationships !== null) verifiedSources.set(file.relativePath, source.source);
     if (lowInformation) continue;
     const items: CandidateEvidenceV2[] = [];
     const locationsBySignal = lexicalLocationsBySignal(source.source, taskAnalysis.signals);
@@ -540,10 +593,36 @@ async function executeSearchRepositoryV2(
     : { evidence: [] as CandidateEvidenceV2[], expandedPaths: new Set<string>() as ReadonlySet<string>, truncated: false };
   const graphExpansionMs = performance.now() - expansionStarted;
 
+  const relationshipDerivationStarted = performance.now();
+  if (settings.relationships !== null && relationshipAnalyzer === undefined) {
+    throw new ContextForgeError("SEARCH_FAILED", "Relationship-enabled Retrieval V2 requires the configured transient syntax analyzer.");
+  }
+  const syntaxSelection = settings.relationships === null
+    ? { paths: [] as readonly string[], truncated: false }
+    : relationshipSyntaxPaths(primary, verifiedSources);
+  const syntaxAnalyses = relationshipAnalyzer === undefined ? [] : await Promise.all(syntaxSelection.paths.map((path) =>
+    relationshipAnalyzer.analyzeRelationships({ relativePath: path, source: verifiedSources.get(path) ?? "" }),
+  ));
+  const symbolRelationships = settings.relationships === null
+    ? { relationships: [], diagnostics: [], unresolvedCalls: 0, ambiguousCalls: 0, unresolvedImplementations: 0 }
+    : deriveSymbolRelationshipsV2(eligibleFiles, syntaxAnalyses, active.graph.resolvedImports, active.generation);
+  const graphRelationships = settings.relationships === null ? [] : graphRelationshipEvidenceV2(active.graph.edges, active.generation);
+  const relationshipDerivationMs = performance.now() - relationshipDerivationStarted;
+
+  const relationshipExpansionStarted = performance.now();
+  const relationshipExpansion = settings.relationships === null
+    ? { evidence: [] as CandidateEvidenceV2[], relationships: [], expandedPaths: new Set<string>() as ReadonlySet<string>, fanoutCapEvents: 0, hubSuppressions: 0, truncated: false }
+    : expandRelationshipEvidenceV2(primary, eligibleFiles, symbolRelationships.relationships, contextPlan, settings.relationships);
+  const seedPaths = new Set(primary.filter((candidate) => candidate.priorityTier <= 2).slice(0, RETRIEVAL_V2.relationships.maximumSeeds).map((candidate) => candidate.relativePath));
+  const visibleGraphRelationships = graphRelationships.filter((relation) => seedPaths.has(relation.source.file) || seedPaths.has(relation.target.file));
+  const reportedRelationships = deduplicateRelationshipEvidenceV2([...relationshipExpansion.relationships, ...visibleGraphRelationships])
+    .slice(0, RETRIEVAL_V2.relationships.maximumTotalEvidence);
+  const relationshipExpansionMs = performance.now() - relationshipExpansionStarted;
+
   const rankingStarted = performance.now();
-  const preGitFusion = fuseCandidateEvidenceV2(eligibleFiles, [...identity, ...lexical, ...expanded.evidence], active.generation);
+  const preGitFusion = fuseCandidateEvidenceV2(eligibleFiles, [...identity, ...lexical, ...expanded.evidence, ...relationshipExpansion.evidence], active.generation);
   const git = active.graph.git.status === "available" ? gitEvidence(preGitFusion.candidates, active.graph.git.files) : [];
-  const finalFusion = fuseCandidateEvidenceV2(eligibleFiles, [...identity, ...lexical, ...expanded.evidence, ...git], active.generation);
+  const finalFusion = fuseCandidateEvidenceV2(eligibleFiles, [...identity, ...lexical, ...expanded.evidence, ...relationshipExpansion.evidence, ...git], active.generation);
   const finalRanked = finalFusion.candidates.slice(0, RETRIEVAL_V2.expansion.finalCandidateLimit);
   const rankingMs = performance.now() - rankingStarted;
   const fusionMs = fusionFirstMs;
@@ -560,6 +639,10 @@ async function executeSearchRepositoryV2(
     ...(changed.size > 0 ? ["LEXICAL_SOURCE_STALE"] : []),
     ...(lexicalTruncated ? ["LEXICAL_SCAN_TRUNCATED"] : []),
     ...(expanded.truncated ? ["GRAPH_EXPANSION_TRUNCATED"] : []),
+    ...symbolRelationships.diagnostics,
+    ...(syntaxSelection.truncated ? ["RELATIONSHIP_SYNTAX_FILE_CAP"] : []),
+    ...(relationshipExpansion.truncated ? ["RELATIONSHIP_FANOUT_CAP"] : []),
+    ...(relationshipExpansion.hubSuppressions > 0 ? [`RELATIONSHIP_HUB_DAMPED:${relationshipExpansion.hubSuppressions}`] : []),
     ...(ownershipFallbacks > 0 ? [`LEXICAL_OWNERSHIP_FALLBACK:${ownershipFallbacks}`] : []),
     ...(ambiguityDiscounts > 0 ? [`AMBIGUITY_DISCOUNT_APPLIED:${ambiguityDiscounts}`] : []),
     ...(capEvents > 0 ? [`CANDIDATE_EVIDENCE_CAP:${capEvents}`] : []),
@@ -569,11 +652,12 @@ async function executeSearchRepositoryV2(
     task: request.task,
     repository: { name: basename(scan.rootRealPath), root: "." as const },
     generation: active.generation,
-    rankingStrategy: RETRIEVAL_V2_STRATEGY,
+    rankingStrategy: settings.relationships === null ? RETRIEVAL_V2_STRATEGY : "contextforge-retrieval-v2-relations",
     ablation,
     indexStatus: status,
     taskAnalysis,
     contextPlan,
+    relationships: reportedRelationships,
     normalizedQuery: {
       schemaVersion: taskAnalysis.schemaVersion,
       queryVersion: taskAnalysis.strategy,
@@ -591,8 +675,19 @@ async function executeSearchRepositoryV2(
       lexicalEvidence: lexical.filter((item) => item.matchKind === "VERIFIED_LEXICAL").length,
       ownershipEvidence: lexical.filter((item) => item.matchKind === "LEXICAL_SYMBOL_OWNERSHIP").length,
       structuralEvidence: expanded.evidence.length,
+      relationshipEvidence: relationshipExpansion.evidence.length,
+      reportedRelationships: reportedRelationships.length,
+      structuralRelationshipFacts: reportedRelationships.filter((item) => item.classification === "STRUCTURAL_FACT").length,
+      heuristicRelationships: reportedRelationships.filter((item) => item.classification === "HEURISTIC").length,
+      relationshipOnlyDiscoveries: finalRanked.filter((candidate) => candidate.directEvidence.length === 0 && candidate.expansionEvidence.some((item) => item.family === "RELATIONSHIP")).length,
+      callerDiscoveries: relationshipExpansion.evidence.filter((item) => item.matchKind === "CALLER").length,
+      testDiscoveries: relationshipExpansion.evidence.filter((item) => item.matchKind === "TEST_REFERENCE").length,
+      implementationDiscoveries: relationshipExpansion.evidence.filter((item) => item.matchKind === "IMPLEMENTATION" || item.matchKind === "INTERFACE").length,
+      heuristicDiscoveries: relationshipExpansion.evidence.filter((item) => item.derivation === "HEURISTIC").length,
+      relationshipFanoutCapEvents: relationshipExpansion.fanoutCapEvents,
+      relationshipHubSuppressions: relationshipExpansion.hubSuppressions,
       fusedCandidates: finalRanked.length,
-      expandedCandidates: expanded.expandedPaths.size,
+      expandedCandidates: new Set([...expanded.expandedPaths, ...relationshipExpansion.expandedPaths]).size,
       ambiguityDiscounts,
       lexicalOwnershipSuccesses: ownershipSuccesses,
       lexicalOwnershipFallbacks: ownershipFallbacks,
@@ -613,6 +708,8 @@ async function executeSearchRepositoryV2(
       lexicalMs,
       fusionMs,
       graphExpansionMs,
+      relationshipDerivationMs,
+      relationshipExpansionMs,
       rankingMs,
       totalMs: performance.now() - totalStarted,
     },
@@ -624,9 +721,10 @@ export async function searchRepositoryV2(
   sourceReader: RepositorySourceReader,
   repositoryFactory: IndexRepositoryFactory,
   request: SearchRepositoryV2Request,
+  relationshipAnalyzer?: RelationshipSyntaxAnalyzer,
 ): Promise<SearchExecutionV2> {
   try {
-    return await executeSearchRepositoryV2(scanner, sourceReader, repositoryFactory, request);
+    return await executeSearchRepositoryV2(scanner, sourceReader, repositoryFactory, request, relationshipAnalyzer);
   } catch (error) {
     if (error instanceof ContextForgeError) throw error;
     throw new ContextForgeError("SEARCH_FAILED", "Repository retrieval v2 failed without changing the active index.", { cause: error });

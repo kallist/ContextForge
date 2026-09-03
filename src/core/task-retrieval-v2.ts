@@ -5,12 +5,14 @@ import type { AnalyzedSymbol, FileAnalysis, SourceRange } from "./language-analy
 import type { FileCategory } from "./repository-map.js";
 import type { SignalAmbiguity, TaskAnalysis } from "./task-analysis-v2.js";
 import type { CandidateOrigin, SearchIndexStatus } from "./task-retrieval.js";
+import type { RelationshipEvidenceV2 } from "./relationship-intelligence-v2.js";
 
 export const RETRIEVAL_V2_SCHEMA_VERSION = "1.0";
 export const RETRIEVAL_V2_STRATEGY = "contextforge-retrieval-v2";
+export const RETRIEVAL_V2_RELATIONSHIPS_STRATEGY = "contextforge-retrieval-v2-relations";
 export const RETRIEVAL_V2_DIAGNOSTICS_VERSION = "contextforge-retrieval-v2-diagnostics-v1";
 
-export type CandidateEvidenceFamily = "IDENTITY" | "LEXICAL" | "SYMBOL" | "STRUCTURAL" | "GIT";
+export type CandidateEvidenceFamily = "IDENTITY" | "LEXICAL" | "SYMBOL" | "STRUCTURAL" | "RELATIONSHIP" | "GIT";
 export type CandidateEvidenceDerivation = "STRUCTURAL" | "HEURISTIC" | "VERIFIED_SOURCE";
 export type CandidateEvidenceKindV2 =
   | "EXACT_PATH"
@@ -27,6 +29,14 @@ export type CandidateEvidenceKindV2 =
   | "FILE_IMPORTED_BY"
   | "TEST_RELATION"
   | "DOCUMENT_RELATION"
+  | "SYMBOL_REFERENCE"
+  | "CALLER"
+  | "INTERFACE"
+  | "IMPLEMENTATION"
+  | "TEST_REFERENCE"
+  | "TEST_IMPORT"
+  | "TEST_ASSOCIATION"
+  | "BOUNDED_DEPENDENT"
   | "GIT_DIRTY"
   | "GIT_RECENCY";
 
@@ -128,7 +138,7 @@ export interface RankedFileCandidateV2 {
   readonly rawScore: number;
   readonly priorityTier: number;
   readonly graphDistance: number | null;
-  readonly rankingStrategy: typeof RETRIEVAL_V2_STRATEGY;
+  readonly rankingStrategy: typeof RETRIEVAL_V2_STRATEGY | typeof RETRIEVAL_V2_RELATIONSHIPS_STRATEGY;
   readonly generation: number;
   readonly relevantSymbols: readonly RelevantSymbolV2[];
   readonly sourceFamilies: readonly CandidateEvidenceFamily[];
@@ -139,18 +149,24 @@ export type RetrievalV2Ablation =
   | "IDENTITY_LEXICAL"
   | "IDENTITY_LEXICAL_STRUCTURAL"
   | "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY"
-  | "FULL";
+  | "FULL"
+  | "RELATION_REFERENCES"
+  | "RELATION_CALLERS"
+  | "RELATION_IMPLEMENTATIONS"
+  | "RELATION_TESTS"
+  | "RELATION_FULL";
 
 export interface SearchResultV2 {
   readonly schemaVersion: typeof RETRIEVAL_V2_SCHEMA_VERSION;
   readonly task: string;
   readonly repository: { readonly name: string; readonly root: "." };
   readonly generation: number;
-  readonly rankingStrategy: typeof RETRIEVAL_V2_STRATEGY;
+  readonly rankingStrategy: typeof RETRIEVAL_V2_STRATEGY | typeof RETRIEVAL_V2_RELATIONSHIPS_STRATEGY;
   readonly ablation: RetrievalV2Ablation;
   readonly indexStatus: SearchIndexStatus;
   readonly taskAnalysis: TaskAnalysis;
   readonly contextPlan: ContextPlan;
+  readonly relationships: readonly RelationshipEvidenceV2[];
   readonly normalizedQuery: {
     readonly schemaVersion: TaskAnalysis["schemaVersion"];
     readonly queryVersion: TaskAnalysis["strategy"];
@@ -165,6 +181,17 @@ export interface SearchResultV2 {
     readonly lexicalEvidence: number;
     readonly ownershipEvidence: number;
     readonly structuralEvidence: number;
+    readonly relationshipEvidence: number;
+    readonly reportedRelationships: number;
+    readonly structuralRelationshipFacts: number;
+    readonly heuristicRelationships: number;
+    readonly relationshipOnlyDiscoveries: number;
+    readonly callerDiscoveries: number;
+    readonly testDiscoveries: number;
+    readonly implementationDiscoveries: number;
+    readonly heuristicDiscoveries: number;
+    readonly relationshipFanoutCapEvents: number;
+    readonly relationshipHubSuppressions: number;
     readonly fusedCandidates: number;
     readonly expandedCandidates: number;
     readonly ambiguityDiscounts: number;
@@ -185,6 +212,8 @@ export interface SearchPerformanceV2 {
   readonly lexicalMs: number;
   readonly fusionMs: number;
   readonly graphExpansionMs: number;
+  readonly relationshipDerivationMs: number;
+  readonly relationshipExpansionMs: number;
   readonly rankingMs: number;
   readonly totalMs: number;
 }

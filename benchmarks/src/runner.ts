@@ -36,6 +36,7 @@ import {
   QUALITY_BUDGETS,
   SYSTEM_IDS,
   V0_2_02_EVALUATION_VERSION,
+  V0_2_03_EVALUATION_VERSION,
   type BenchmarkDataset,
   type BenchmarkRepositoryDefinition,
   type PerformanceSample,
@@ -151,12 +152,12 @@ export async function runQualityBenchmark(workspaceRoot: string, mode: "SMOKE" |
     return {
       manifest: {
         benchmarkVersion: BENCHMARK_VERSION,
-        evaluationVersion: V0_2_02_EVALUATION_VERSION,
+        evaluationVersion: V0_2_03_EVALUATION_VERSION,
         datasetVersion: DATASET_VERSION,
         datasetHash: lock.datasetHash,
         contextforgeCommit: await gitHead(workspaceRoot),
         rankingStrategy: RANKING_STRATEGY,
-        rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2"],
+        rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2", "contextforge-retrieval-v2-relations"],
         packingStrategy: PACKING_STRATEGY,
         tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
         tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
@@ -260,7 +261,7 @@ function requiredRanks(
   return { fileRanks, symbolRanks };
 }
 
-export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<unknown> {
+async function runV2Diagnostics(workspaceRoot: string, relationshipsEnabled: boolean): Promise<unknown> {
   const dataset = await loadDataset(workspaceRoot);
   const lock = await validateDatasetFreeze(dataset, workspaceRoot);
   const referenceRoot = join(workspaceRoot, "benchmarks", "reference", "contextforge-benchmark-v1");
@@ -272,12 +273,10 @@ export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<
     readonly classifications: readonly { readonly taskId: string; readonly outcome: "SUCCESS" | "WEAKNESS" | "FAILURE" }[];
   };
   const v1Successes = new Set(failureMatrix.classifications.filter((item) => item.outcome === "SUCCESS").map((item) => item.taskId));
-  const ablations: readonly RetrievalV2Ablation[] = [
-    "IDENTITY_LEXICAL",
-    "IDENTITY_LEXICAL_STRUCTURAL",
-    "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY",
-    "FULL",
-  ];
+  const ablations: readonly RetrievalV2Ablation[] = relationshipsEnabled
+    ? ["FULL", "RELATION_REFERENCES", "RELATION_CALLERS", "RELATION_IMPLEMENTATIONS", "RELATION_TESTS", "RELATION_FULL"]
+    : ["IDENTITY_LEXICAL", "IDENTITY_LEXICAL_STRUCTURAL", "IDENTITY_LEXICAL_STRUCTURAL_AMBIGUITY", "FULL"];
+  const finalAblation: RetrievalV2Ablation = relationshipsEnabled ? "RELATION_FULL" : "FULL";
   const temporaryRoot = await createBenchmarkTemporaryRoot();
   try {
     const prepared = await prepareAll(dataset, workspaceRoot, temporaryRoot);
@@ -302,6 +301,7 @@ export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<
             ablation,
             taskAnalysis: ablation === "FULL" ? executed.diagnostic.taskAnalysis : undefined,
             contextPlan: ablation === "FULL" ? executed.diagnostic.contextPlan : undefined,
+            relationships: ablation.startsWith("RELATION_") ? executed.diagnostic.relationships : undefined,
             candidates: executed.diagnostic.candidates,
             counts: executed.diagnostic.counts,
             pack: executed.diagnostic.pack,
@@ -328,15 +328,15 @@ export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<
               missedRequiredSymbols: metrics.missedRequiredSymbols,
             },
           });
-          if (ablation === "FULL" && v1Successes.has(task.taskId) && (metrics.missedRequiredFiles.length > 0 || metrics.missedRequiredSymbols.length > 0)) v1SuccessRegressions += 1;
+          if (ablation === finalAblation && v1Successes.has(task.taskId) && (metrics.missedRequiredFiles.length > 0 || metrics.missedRequiredSymbols.length > 0)) v1SuccessRegressions += 1;
         }
         tasks.push({ taskId: task.taskId, repositoryId: task.repositoryId, variants });
       }
       await assertCorpusUnchanged(repository.materialized);
     }
     return {
-      diagnosticsVersion: "contextforge-retrieval-v2-diagnostics-v1",
-      evaluationVersion: V0_2_02_EVALUATION_VERSION,
+      diagnosticsVersion: relationshipsEnabled ? "contextforge-relationship-intelligence-v2-diagnostics-v1" : "contextforge-retrieval-v2-diagnostics-v1",
+      evaluationVersion: relationshipsEnabled ? V0_2_03_EVALUATION_VERSION : V0_2_02_EVALUATION_VERSION,
       benchmarkVersion: BENCHMARK_VERSION,
       datasetVersion: DATASET_VERSION,
       datasetHash: lock.datasetHash,
@@ -359,6 +359,14 @@ export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<
   } finally {
     await removeBenchmarkTemporaryRoot(temporaryRoot);
   }
+}
+
+export async function runV2RetrievalDiagnostics(workspaceRoot: string): Promise<unknown> {
+  return runV2Diagnostics(workspaceRoot, false);
+}
+
+export async function runV2RelationshipDiagnostics(workspaceRoot: string): Promise<unknown> {
+  return runV2Diagnostics(workspaceRoot, true);
 }
 
 function budgetsForMode(mode: "SMOKE" | "FULL"): readonly number[] {
@@ -441,12 +449,12 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
   }
   return {
     benchmarkVersion: BENCHMARK_VERSION,
-    evaluationVersion: V0_2_02_EVALUATION_VERSION,
+    evaluationVersion: V0_2_03_EVALUATION_VERSION,
     datasetVersion: DATASET_VERSION,
     datasetHash: datasetHash(dataset),
     contextforgeCommit: await gitHead(workspaceRoot),
     rankingStrategy: RANKING_STRATEGY,
-    rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2"],
+    rankingStrategies: [RANKING_STRATEGY, "contextforge-retrieval-v2", "contextforge-retrieval-v2-relations"],
     packingStrategy: PACKING_STRATEGY,
     tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID,
     tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION,
