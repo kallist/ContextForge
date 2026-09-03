@@ -141,6 +141,52 @@ test("extracts Python qualified symbols and structured imports", async () => {
   );
 });
 
+test("extracts only bounded direct-call, import-binding, and TypeScript implementation syntax for transient relationship analysis", async () => {
+  const typescript = await analyzer.analyzeRelationships({
+    relativePath: "src/implementation.ts",
+    source: [
+      'import { helper as importedHelper } from "./helper.js";',
+      'import * as helpers from "./helpers.js";',
+      'import { Port } from "./port.js";',
+      "export class Implementation implements Port {",
+      "  run() { return importedHelper(); }",
+      "  local() { return this.run(); }",
+      "  namespaced() { return helpers.work(); }",
+      "  dynamic(value: { work(): void }) { return value.work(); }",
+      "}",
+      "",
+    ].join("\n"),
+  });
+  assert.equal(typescript.parserStatus, "parsed");
+  assert.deepEqual(typescript.importBindings.map(({ moduleSpecifier, importedName, localName, kind }) => [moduleSpecifier, importedName, localName, kind]), [
+    ["./helper.js", "helper", "importedHelper", "NAMED"],
+    ["./helpers.js", "*", "helpers", "NAMESPACE"],
+    ["./port.js", "Port", "Port", "NAMED"],
+  ]);
+  assert.deepEqual(typescript.calls.map(({ calleeName, receiverName, form }) => [calleeName, receiverName, form]), [
+    ["importedHelper", null, "IDENTIFIER"],
+    ["run", "this", "SELF_MEMBER"],
+    ["work", "helpers", "NAMESPACE_MEMBER"],
+    ["work", "value", "NAMESPACE_MEMBER"],
+  ]);
+  assert.deepEqual(typescript.implementations.map(({ implementationName, interfaceName }) => [implementationName, interfaceName]), [["Implementation", "Port"]]);
+
+  const python = await analyzer.analyzeRelationships({
+    relativePath: "app/worker.py",
+    source: "from app.helper import work as do_work\nimport app.tools as tools\nclass Worker:\n    def run(self):\n        do_work()\n        self.finish()\n        tools.flush()\n",
+  });
+  assert.deepEqual(python.importBindings.map(({ moduleSpecifier, importedName, localName, kind }) => [moduleSpecifier, importedName, localName, kind]), [
+    ["app.helper", "work", "do_work", "NAMED"],
+    ["app.tools", "*", "tools", "NAMESPACE"],
+  ]);
+  assert.deepEqual(python.calls.map(({ calleeName, receiverName, form }) => [calleeName, receiverName, form]), [
+    ["do_work", null, "IDENTIFIER"],
+    ["finish", "self", "SELF_MEMBER"],
+    ["flush", "tools", "NAMESPACE_MEMBER"],
+  ]);
+  assert.deepEqual(python.implementations, []);
+});
+
 test("keeps one-based line ranges correct across CRLF, LF, and Unicode", async () => {
   const crlf = await analyzer.analyze({
     relativePath: "src/unicode.ts",

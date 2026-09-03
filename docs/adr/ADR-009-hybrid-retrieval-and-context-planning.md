@@ -82,9 +82,13 @@ The first slice implemented deterministic TaskAnalysis/ContextPlan, source-prove
 
 On the unchanged frozen 8K evaluation, V2 retained V1 required-file recall `.917` and required-symbol recall `.864`, while overall Gold recall moved from `.871` to `.882`, range precision from `.193` to `.197`, and noise from `.807` to `.803`. Retrieval ranks improved materially through K=10, but the final symbol-recall target `.900` was not met and one former success regressed at 8K. The evidence classification is **MIXED**, not accepted improvement. Detailed results and limitations are recorded in `docs/V0.2_RETRIEVAL_FOUNDATION_RESULTS.md`.
 
+## V0.2-03 Evidence
+
+V0.2-03 added transient, one-hop, fact/heuristic-explicit relationship evidence through the shared V2 fusion/ranking path. On the unchanged frozen 8K comparison it preserved V2 required-file and required-symbol recall (`.917`/`.864`) but reduced overall Gold from `.882` to `.871` and precision from `.196758` to `.194651`. It established the general direct-caller mechanism and improved the stale-source `readTextFile -> readOnce` pre-Pack ranks; unchanged Pack V1 still dropped the required context through `SECTION_LIMIT`. The evidence remains **MIXED**, so this ADR stays Proposed. The narrower decision and measurements are in ADR-010 and `docs/V0.2_RELATIONSHIP_LINKING_RESULTS.md`.
+
 ## Open Conditions Before Acceptance
 
-- correct the measured stale-source retrieval/packing regression without benchmark-specific logic;
+- resolve the measured stale-source Pack residual without benchmark-specific logic;
 - demonstrate the remaining symbol-ownership and document-retrieval failure classes improve on the frozen benchmark;
 - demonstrate no V1 parity regression when shared helpers are introduced;
 - meet the frozen quality, hard-budget, determinism, security, and performance gates;

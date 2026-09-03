@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 
 import { FileSystemRepositoryScanner } from "../../src/adapters/filesystem/repository-scanner.js";
 import { FileSystemRepositorySourceReader } from "../../src/adapters/filesystem/repository-source-reader.js";
+import { TreeSitterLanguageAnalyzer } from "../../src/adapters/parser/tree-sitter-language-analyzer.js";
 import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-repository.js";
 import { buildContextPack, type ContextPackSearch } from "../../src/application/build-context-pack.js";
 import type { RepositoryScanner, ScanResult } from "../../src/application/map-repository.js";
@@ -16,7 +17,7 @@ import type { AnalyzedSymbol } from "../../src/core/language-analysis.js";
 import type { IndexedFile, IndexRepositoryFactory, RepositoryIndexSnapshot } from "../../src/core/repository-index.js";
 import { logicalLines } from "../../src/core/packing/ranges.js";
 import { RANKING_STRATEGY, type RankedFileCandidate } from "../../src/core/task-retrieval.js";
-import { RETRIEVAL_V2_STRATEGY, type RankedFileCandidateV2, type RetrievalV2Ablation } from "../../src/core/task-retrieval-v2.js";
+import type { RankedFileCandidateV2, RetrievalV2Ablation } from "../../src/core/task-retrieval-v2.js";
 import { decomposeIdentifier, normalizeSearchTerm, normalizeTaskQuery, type QuerySignal } from "../../src/core/task-query.js";
 import { GenericTokenEstimator } from "../../src/core/token-estimation.js";
 import type { RetrievalCandidate, SelectedRange, SystemId, SystemSelection } from "./types.js";
@@ -109,6 +110,7 @@ export interface BenchmarkV2TaskDiagnostic {
   readonly taskAnalysis: SearchExecutionV2["result"]["taskAnalysis"];
   readonly contextPlan: SearchExecutionV2["result"]["contextPlan"];
   readonly indexStatus: SearchExecutionV2["result"]["indexStatus"];
+  readonly relationships: SearchExecutionV2["result"]["relationships"];
   readonly candidates: readonly (BenchmarkCandidateDiagnostic & {
     readonly priorityTier: number;
     readonly taskSignalIds: readonly string[];
@@ -134,6 +136,7 @@ interface VerifiedWholeFile {
 }
 
 const estimator = new GenericTokenEstimator();
+const relationshipAnalyzer = new TreeSitterLanguageAnalyzer();
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -443,7 +446,7 @@ export async function diagnoseBenchmarkTaskV2(
 ): Promise<{ readonly diagnostic: BenchmarkV2TaskDiagnostic; readonly selection: SystemSelection }> {
   let retrieval: SearchExecutionV2 | undefined;
   const v2Search: ContextPackSearch = async (searchScanner, searchReader, searchFactory, searchRequest) => {
-    retrieval = await searchRepositoryV2(searchScanner, searchReader, searchFactory, { ...searchRequest, ablation });
+    retrieval = await searchRepositoryV2(searchScanner, searchReader, searchFactory, { ...searchRequest, ablation }, ablation.startsWith("RELATION_") ? relationshipAnalyzer : undefined);
     return retrieval;
   };
   let pack;
@@ -461,8 +464,8 @@ export async function diagnoseBenchmarkTaskV2(
   const status = pack === undefined ? "NO_CONTEXT" : pack.manifest.packStatus;
   const diagnostics = pack?.manifest.diagnostics ?? ["BUDGET_TOO_SMALL"];
   const selection: SystemSelection = {
-    systemId: "contextforge-v2",
-    rankingStrategy: RETRIEVAL_V2_STRATEGY,
+    systemId: ablation.startsWith("RELATION_") ? "contextforge-v2-relations" : "contextforge-v2",
+    rankingStrategy: retrieval.result.rankingStrategy,
     packingStrategy: PACKING_STRATEGY,
     tokenEstimator: estimator.id,
     tokenEstimatorVersion: estimator.version,
@@ -483,6 +486,8 @@ export async function diagnoseBenchmarkTaskV2(
         lexicalMs: retrieval.performance.lexicalMs,
         fusionMs: retrieval.performance.fusionMs,
         graphExpansionMs: retrieval.performance.graphExpansionMs,
+        relationshipDerivationMs: retrieval.performance.relationshipDerivationMs,
+        relationshipExpansionMs: retrieval.performance.relationshipExpansionMs,
         rankingMs: retrieval.performance.rankingMs,
       },
     },
@@ -494,6 +499,7 @@ export async function diagnoseBenchmarkTaskV2(
       taskAnalysis: retrieval.result.taskAnalysis,
       contextPlan: retrieval.result.contextPlan,
       indexStatus: retrieval.result.indexStatus,
+      relationships: retrieval.result.relationships,
       candidates: v2CandidateDiagnostics(retrieval.result.candidates),
       counts: retrieval.result.counts,
       searchPerformance: retrieval.performance,
@@ -609,10 +615,16 @@ export async function runBenchmarkSystem(
     };
   }
 
-  if (systemId === "contextforge-v2") {
+  if (systemId === "contextforge-v2" || systemId === "contextforge-v2-relations") {
     let retrieval: SearchExecutionV2 | undefined;
     const v2Search: ContextPackSearch = async (searchScanner, searchReader, searchFactory, searchRequest) => {
-      retrieval = await searchRepositoryV2(searchScanner, searchReader, searchFactory, searchRequest);
+      retrieval = await searchRepositoryV2(
+        searchScanner,
+        searchReader,
+        searchFactory,
+        { ...searchRequest, ablation: systemId === "contextforge-v2-relations" ? "RELATION_FULL" : "FULL" },
+        systemId === "contextforge-v2-relations" ? relationshipAnalyzer : undefined,
+      );
       return retrieval;
     };
     let pack;
@@ -626,7 +638,7 @@ export async function runBenchmarkSystem(
       if (error instanceof ContextForgeError && error.code === "BUDGET_TOO_SMALL" && retrieval !== undefined) {
         return {
           systemId,
-          rankingStrategy: RETRIEVAL_V2_STRATEGY,
+          rankingStrategy: retrieval.result.rankingStrategy,
           packingStrategy: PACKING_STRATEGY,
           tokenEstimator: estimator.id,
           tokenEstimatorVersion: estimator.version,
@@ -646,8 +658,10 @@ export async function runBenchmarkSystem(
               identityMs: retrieval.performance.identityMs,
               lexicalMs: retrieval.performance.lexicalMs,
               fusionMs: retrieval.performance.fusionMs,
-              graphExpansionMs: retrieval.performance.graphExpansionMs,
-              rankingMs: retrieval.performance.rankingMs,
+                graphExpansionMs: retrieval.performance.graphExpansionMs,
+                relationshipDerivationMs: retrieval.performance.relationshipDerivationMs,
+                relationshipExpansionMs: retrieval.performance.relationshipExpansionMs,
+                rankingMs: retrieval.performance.rankingMs,
             },
           },
         };
@@ -657,7 +671,7 @@ export async function runBenchmarkSystem(
     if (retrieval === undefined) throw new Error("Retrieval V2 did not provide a search execution to Pack V1.");
     return {
       systemId,
-      rankingStrategy: RETRIEVAL_V2_STRATEGY,
+      rankingStrategy: retrieval.result.rankingStrategy,
       packingStrategy: PACKING_STRATEGY,
       tokenEstimator: estimator.id,
       tokenEstimatorVersion: estimator.version,
@@ -678,6 +692,8 @@ export async function runBenchmarkSystem(
           lexicalMs: retrieval.performance.lexicalMs,
           fusionMs: retrieval.performance.fusionMs,
           graphExpansionMs: retrieval.performance.graphExpansionMs,
+          relationshipDerivationMs: retrieval.performance.relationshipDerivationMs,
+          relationshipExpansionMs: retrieval.performance.relationshipExpansionMs,
           rankingMs: retrieval.performance.rankingMs,
         },
       },

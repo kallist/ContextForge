@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
 import { Language, Parser, type Node as SyntaxNode } from "web-tree-sitter";
+import { bareCallShadowGuard } from "./bare-call-shadowing.js";
 
 import { ContextForgeError } from "../../core/errors.js";
 import {
@@ -13,11 +14,16 @@ import {
   createStableSymbolId,
   unsupportedFileAnalysis,
   type AnalyzeSourceRequest,
+  type AnalyzedDirectCall,
+  type AnalyzedImplementationSyntax,
+  type AnalyzedImportBinding,
   type AnalyzedImport,
   type AnalyzedSymbol,
   type FileAnalysis,
   type ImportKind,
   type LanguageAnalyzer,
+  type RelationshipSyntaxAnalysis,
+  type RelationshipSyntaxAnalyzer,
   type SourceRange,
   type SupportedLanguage,
   type SymbolKind,
@@ -315,7 +321,143 @@ function addPythonImports(root: SyntaxNode, relativePath: string): AnalyzedImpor
   return imports;
 }
 
-export class TreeSitterLanguageAnalyzer implements LanguageAnalyzer {
+function addDirectCalls(nodes: readonly SyntaxNode[], bindingGuard: ReturnType<typeof bareCallShadowGuard>): AnalyzedDirectCall[] {
+  const calls: AnalyzedDirectCall[] = [];
+  for (const node of nodes) {
+    const callee = node.childForFieldName("function");
+    if (callee?.type === "identifier") {
+      if (callee.text !== "require" && callee.text !== "import") {
+        const localBindingGuard = bindingGuard(node, callee.text);
+        calls.push({ calleeName: callee.text, receiverName: null, form: "IDENTIFIER", ...rangeOf(node), ...(localBindingGuard === null ? {} : { localBindingGuard }) });
+      }
+    } else if (callee?.type === "member_expression" || callee?.type === "attribute") {
+      const object = callee.childForFieldName("object");
+      const property = callee.childForFieldName("property") ?? callee.childForFieldName("attribute");
+      if (property !== null && (property.type === "property_identifier" || property.type === "identifier")) {
+        const selfReceiver = object?.type === "this" || (object?.type === "identifier" && object.text === "self");
+        const namedReceiver = object?.type === "identifier" ? object.text : null;
+        calls.push({
+          calleeName: property.text,
+          receiverName: selfReceiver ? object?.text ?? null : namedReceiver,
+          form: selfReceiver ? "SELF_MEMBER" : namedReceiver === null ? "UNRESOLVED_MEMBER" : "NAMESPACE_MEMBER",
+          ...rangeOf(node),
+        });
+      }
+    }
+  }
+  return calls;
+}
+
+function addJavascriptImportBindings(nodes: readonly SyntaxNode[]): AnalyzedImportBinding[] {
+  const bindings: AnalyzedImportBinding[] = [];
+  function visit(node: SyntaxNode): void {
+    if (node.type === "import_statement") {
+      const source = node.childForFieldName("source") ?? node.namedChildren.find((child) => child.type === "string");
+      if (source !== undefined && source !== null) {
+        const moduleSpecifier = unquote(source.text);
+        const collect = (child: SyntaxNode): void => {
+          if (child.type === "import_specifier") {
+            const imported = child.childForFieldName("name") ?? child.namedChild(0);
+            const local = child.childForFieldName("alias") ?? imported;
+            if (imported !== null && local !== null) {
+              bindings.push({ moduleSpecifier, importedName: imported.text, localName: local.text, kind: "NAMED", ...rangeOf(child) });
+            }
+            return;
+          }
+          if (child.type === "namespace_import") {
+            const local = child.namedChildren.at(-1);
+            if (local !== undefined) bindings.push({ moduleSpecifier, importedName: "*", localName: local.text, kind: "NAMESPACE", ...rangeOf(child) });
+            return;
+          }
+          for (const nested of child.namedChildren) collect(nested);
+        };
+        collect(node);
+      }
+      return;
+    }
+  }
+  for (const node of nodes) visit(node);
+  return bindings;
+}
+
+function addPythonImportBindings(nodes: readonly SyntaxNode[]): AnalyzedImportBinding[] {
+  const bindings: AnalyzedImportBinding[] = [];
+  function visit(node: SyntaxNode): void {
+    if (node.type === "import_from_statement") {
+      const module = node.childForFieldName("module_name") ?? node.namedChildren[0];
+      if (module !== undefined && module !== null) {
+        for (const child of node.namedChildren) {
+          if (child.id === module.id) continue;
+          if (child.type === "aliased_import") {
+            const imported = child.childForFieldName("name") ?? child.namedChild(0);
+            const local = child.childForFieldName("alias") ?? child.namedChildren.at(-1);
+            if (imported !== null && imported !== undefined && local !== null && local !== undefined) {
+              bindings.push({ moduleSpecifier: module.text, importedName: imported.text, localName: local.text, kind: "NAMED", ...rangeOf(child) });
+            }
+          } else if (child.type === "identifier" || child.type === "dotted_name") {
+            bindings.push({ moduleSpecifier: module.text, importedName: child.text, localName: child.text, kind: "NAMED", ...rangeOf(child) });
+          }
+        }
+      }
+      return;
+    }
+    if (node.type === "import_statement") {
+      for (const child of node.namedChildren) {
+        const imported = child.type === "aliased_import" ? child.childForFieldName("name") ?? child.namedChild(0) : child;
+        const alias = child.type === "aliased_import" ? child.childForFieldName("alias") ?? child.namedChildren.at(-1) : null;
+        if (imported !== null && imported !== undefined && (imported.type === "identifier" || imported.type === "dotted_name")) {
+          const localName = alias?.text ?? imported.text.split(".")[0] ?? imported.text;
+          bindings.push({ moduleSpecifier: imported.text, importedName: "*", localName, kind: "NAMESPACE", ...rangeOf(child) });
+        }
+      }
+      return;
+    }
+  }
+  for (const node of nodes) visit(node);
+  return bindings;
+}
+
+function addTypescriptImplementations(nodes: readonly SyntaxNode[], language: SupportedLanguage): AnalyzedImplementationSyntax[] {
+  if (language !== "typescript" && language !== "tsx") return [];
+  const implementations: AnalyzedImplementationSyntax[] = [];
+  function visit(node: SyntaxNode): void {
+    if (node.type === "class_declaration" || node.type === "abstract_class_declaration") {
+      const implementationName = symbolName(node);
+      const heritage = node.namedChildren.find((child) => child.type === "class_heritage");
+      const clause = heritage?.namedChildren.find((child) => child.type === "implements_clause");
+      if (implementationName !== null && clause !== undefined) {
+        for (const target of clause.namedChildren) {
+          if (target.type === "type_identifier" || target.type === "identifier") {
+            implementations.push({ implementationName, interfaceName: target.text, ...rangeOf(target) });
+          }
+        }
+      }
+    }
+  }
+  for (const node of nodes) visit(node);
+  return implementations;
+}
+
+function relationshipSyntax(root: SyntaxNode, language: SupportedLanguage) {
+  const calls: SyntaxNode[] = [];
+  const imports: SyntaxNode[] = [];
+  const implementations: SyntaxNode[] = [];
+  // Reuse the binding traversal for syntax-family discovery. Keep tree nodes
+  // only until extraction finishes; no syntax tree or scope escapes this parse.
+  const bindingGuard = bareCallShadowGuard(root, language, (node, type) => {
+    if (type === (language === "python" ? "call" : "call_expression")) calls.push(node);
+    if (type === "import_statement" || (language === "python" && type === "import_from_statement")) imports.push(node);
+    if (type === "class_declaration" || type === "abstract_class_declaration") implementations.push(node);
+  });
+  // Query only after all scopes have been collected, preserving hoisting/TDZ.
+  return {
+    calls: addDirectCalls(calls, bindingGuard),
+    importBindings: language === "python" ? addPythonImportBindings(imports) : addJavascriptImportBindings(imports),
+    implementations: addTypescriptImplementations(implementations, language),
+  };
+}
+
+export class TreeSitterLanguageAnalyzer implements LanguageAnalyzer, RelationshipSyntaxAnalyzer {
   readonly analysisVersion = LANGUAGE_ANALYSIS_VERSION;
   readonly #slots = new Map<GrammarId, ParserSlot>();
   readonly #assetDirectory: URL;
@@ -415,6 +557,45 @@ export class TreeSitterLanguageAnalyzer implements LanguageAnalyzer {
         imports: [],
         diagnostics: [{ code: "PARSE_FAILED", message: "The file could not be analyzed by its initialized parser." }],
       };
+    } finally {
+      slot.parser.reset();
+      release();
+    }
+  }
+
+  async analyzeRelationships(request: AnalyzeSourceRequest): Promise<RelationshipSyntaxAnalysis> {
+    const language = analysisLanguageForPath(request.relativePath);
+    if (language === null) {
+      return { relativePath: request.relativePath, language: null, parserStatus: "unsupported", calls: [], importBindings: [], implementations: [], diagnostics: [] };
+    }
+    await this.initialize();
+    const slot = this.#slots.get(grammarForLanguage(language));
+    if (slot === undefined) throw new ContextForgeError("PARSER_UNAVAILABLE", `The packaged ${language} grammar is unavailable.`);
+
+    const previous = slot.tail;
+    let release = (): void => undefined;
+    slot.tail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      slot.parser.reset();
+      const tree = slot.parser.parse(request.source);
+      if (tree === null) {
+        return { relativePath: request.relativePath, language, parserStatus: "failed", calls: [], importBindings: [], implementations: [], diagnostics: [{ code: "PARSE_NO_TREE", message: "The parser did not return a syntax tree." }] };
+      }
+      try {
+        const root = tree.rootNode;
+        return {
+          relativePath: request.relativePath,
+          language,
+          parserStatus: root.hasError ? "degraded" : "parsed",
+          ...relationshipSyntax(root, language),
+          diagnostics: root.hasError ? [{ code: "PARSE_SYNTAX_ERROR", message: "Tree-sitter relationship extraction is partial because the source contains syntax errors." }] : [],
+        };
+      } finally {
+        tree.delete();
+      }
+    } catch {
+      return { relativePath: request.relativePath, language, parserStatus: "failed", calls: [], importBindings: [], implementations: [], diagnostics: [{ code: "PARSE_FAILED", message: "The file could not be analyzed for relationships." }] };
     } finally {
       slot.parser.reset();
       release();

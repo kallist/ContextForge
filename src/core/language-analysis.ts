@@ -66,6 +66,42 @@ export interface LanguageAnalyzer {
   analyze(request: AnalyzeSourceRequest): Promise<FileAnalysis>;
 }
 
+export type DirectCallForm = "IDENTIFIER" | "SELF_MEMBER" | "NAMESPACE_MEMBER" | "UNRESOLVED_MEMBER";
+
+export interface AnalyzedDirectCall extends SourceRange {
+  readonly calleeName: string;
+  readonly receiverName: string | null;
+  readonly form: DirectCallForm;
+  /** Transient parser-backed rejection of unsafe outer-symbol binding. */
+  readonly localBindingGuard?: "SHADOWED" | "UNPROVEN";
+}
+
+export interface AnalyzedImportBinding extends SourceRange {
+  readonly moduleSpecifier: string;
+  readonly importedName: string;
+  readonly localName: string;
+  readonly kind: "NAMED" | "NAMESPACE";
+}
+
+export interface AnalyzedImplementationSyntax extends SourceRange {
+  readonly implementationName: string;
+  readonly interfaceName: string;
+}
+
+export interface RelationshipSyntaxAnalysis {
+  readonly relativePath: string;
+  readonly language: SupportedLanguage | null;
+  readonly parserStatus: ParserStatus;
+  readonly calls: readonly AnalyzedDirectCall[];
+  readonly importBindings: readonly AnalyzedImportBinding[];
+  readonly implementations: readonly AnalyzedImplementationSyntax[];
+  readonly diagnostics: readonly AnalysisDiagnostic[];
+}
+
+export interface RelationshipSyntaxAnalyzer {
+  analyzeRelationships(request: AnalyzeSourceRequest): Promise<RelationshipSyntaxAnalysis>;
+}
+
 export function analysisLanguageForPath(relativePath: string): SupportedLanguage | null {
   switch (extname(relativePath).toLowerCase()) {
     case ".js":

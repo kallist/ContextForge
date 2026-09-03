@@ -14,6 +14,7 @@ const SOURCE_CAPS: Readonly<Record<CandidateEvidenceV2["source"], number>> = {
   SYMBOL_OWNERSHIP: 32,
   FILE_STRUCTURAL: 32,
   TEST_DOCUMENTATION: 32,
+  RELATIONSHIP: 32,
   GIT: 4,
 };
 
@@ -121,8 +122,8 @@ export function fuseCandidateEvidenceV2(
     if (file === undefined) return [];
     const bounded = boundedEvidence(items);
     capEvents += bounded.capEvents;
-    const directItems = bounded.evidence.filter((item) => item.family !== "STRUCTURAL");
-    const expansionItems = bounded.evidence.filter((item) => item.family === "STRUCTURAL");
+    const directItems = bounded.evidence.filter((item) => item.family !== "STRUCTURAL" && item.family !== "RELATIONSHIP");
+    const expansionItems = bounded.evidence.filter((item) => item.family === "STRUCTURAL" || item.family === "RELATIONSHIP");
     capEvents += Math.max(0, directItems.length - RETRIEVAL_V2.retrieval.maximumDirectEvidencePerCandidate);
     capEvents += Math.max(0, expansionItems.length - RETRIEVAL_V2.expansion.maximumExpansionEvidencePerCandidate);
     const directEvidence = directItems
@@ -131,12 +132,13 @@ export function fuseCandidateEvidenceV2(
       .slice(0, RETRIEVAL_V2.expansion.maximumExpansionEvidencePerCandidate);
     const allEvidence = [...directEvidence, ...expansionEvidence];
     const scored = scoreV2Evidence(allEvidence);
-    const direct = directEvidence.some((item) => item.family !== "GIT");
-    const expanded = expansionEvidence.length > 0;
+    const scoringEvidence = allEvidence.filter((item) => item.boundedContribution > 0);
+    const direct = directEvidence.some((item) => item.family !== "GIT" && item.boundedContribution > 0);
+    const expanded = expansionEvidence.some((item) => item.boundedContribution > 0);
     const origin = direct && expanded ? "DIRECT_AND_EXPANDED" : direct ? "DIRECT" : "EXPANDED";
-    const sourceFamilies = [...new Set(allEvidence.map((item) => item.family))].sort(compareText);
+    const sourceFamilies = [...new Set(scoringEvidence.map((item) => item.family))].sort(compareText);
     const taskSignalIds = [...new Set(allEvidence.flatMap((item) => item.taskSignalId === null ? [] : [item.taskSignalId]))].sort(compareText);
-    const graphDistances = expansionEvidence.map((item) => item.graphDistance).filter((distance) => distance > 0);
+    const graphDistances = expansionEvidence.filter((item) => item.boundedContribution > 0).map((item) => item.graphDistance).filter((distance) => distance > 0);
     return [{
       identity: `file:${path}`,
       relativePath: path,
@@ -148,7 +150,7 @@ export function fuseCandidateEvidenceV2(
       scoreContributions: scored.contributions,
       score: scored.rawScore,
       rawScore: scored.rawScore,
-      priorityTier: evidencePriorityTier(allEvidence),
+      priorityTier: evidencePriorityTier(scoringEvidence),
       graphDistance: graphDistances.length === 0 ? null : Math.min(...graphDistances),
       rankingStrategy: RETRIEVAL_V2_STRATEGY,
       generation,

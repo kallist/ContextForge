@@ -3,7 +3,7 @@ import { MATCHED_RECALL_TARGETS, QUALITY_BUDGETS, RETRIEVAL_CUTOFFS, SYSTEM_IDS 
 import { minimumActualTokensAtRecall } from "./metrics.js";
 
 type WholeFileSystem = "lexical-full-file-v1" | "structural-full-file-v1";
-type ContextSystem = "contextforge-v1" | "contextforge-v2";
+type ContextSystem = "contextforge-v1" | "contextforge-v2" | "contextforge-v2-relations";
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -159,7 +159,7 @@ export function aggregateQualityRun(run: QualityRun): unknown {
     };
   }));
   const matchedRecall = MATCHED_RECALL_TARGETS.flatMap((target) => SYSTEM_IDS.map((systemId) => ({ target, systemId, ...matchedRecallSummary(run, systemId, target) })));
-  const tokenReduction = MATCHED_RECALL_TARGETS.flatMap((target) => (["contextforge-v1", "contextforge-v2"] as const).flatMap((contextSystem) =>
+  const tokenReduction = MATCHED_RECALL_TARGETS.flatMap((target) => (["contextforge-v1", "contextforge-v2", "contextforge-v2-relations"] as const).flatMap((contextSystem) =>
     (["lexical-full-file-v1", "structural-full-file-v1"] as const).map((baseline) => ({
       target,
       contextSystem,
@@ -179,12 +179,14 @@ export function aggregateQualityRun(run: QualityRun): unknown {
       structuralRanking: comparison(run, "structural-full-file-v1", "lexical-full-file-v1", 8_000),
       contextPacking: comparison(run, "contextforge-v1", "structural-full-file-v1", 8_000),
       retrievalV2WithPackV1: comparison(run, "contextforge-v2", "contextforge-v1", 8_000),
+      relationshipV2WithPackV1: comparison(run, "contextforge-v2-relations", "contextforge-v2", 8_000),
     },
     winTieLossAt8K: {
       contextforgeV1VersusLexical: winTieLoss(run, "lexical-full-file-v1", "contextforge-v1", 8_000),
       contextforgeV1VersusStructuralFullFile: winTieLoss(run, "structural-full-file-v1", "contextforge-v1", 8_000),
       contextforgeV2VersusV1: winTieLoss(run, "contextforge-v1", "contextforge-v2", 8_000),
       contextforgeV2VersusLexical: winTieLoss(run, "lexical-full-file-v1", "contextforge-v2", 8_000),
+      contextforgeV2RelationsVersusV2: winTieLoss(run, "contextforge-v2", "contextforge-v2-relations", 8_000),
     },
     breakdown: {
       language: breakdownRows(run, "language"),
@@ -242,7 +244,7 @@ function languageBreakdown(run: QualityRun): string[] {
 }
 
 export function renderBenchmarkReport(run: QualityRun): string {
-  const contextAtEight = cases(run, "contextforge-v2", 8_000);
+  const contextAtEight = cases(run, "contextforge-v2-relations", 8_000);
   const lexicalAtEight = new Map(cases(run, "lexical-full-file-v1", 8_000).map((item) => [taskKey(item), item]));
   const worstAtEight = [...contextAtEight].sort((left, right) => {
     const leftMisses = left.missedRequiredFiles.length + left.missedRequiredSymbols.length;
@@ -272,7 +274,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     return rightRequiredDelta - leftRequiredDelta || rightPrecisionDelta - leftPrecisionDelta || compareText(left.taskId, right.taskId);
   });
   const lines = [
-    "# ContextForge V0.2-02 Retrieval Foundation Results",
+    "# ContextForge V0.2-03 Relationship Intelligence Results",
     "",
     `Benchmark: ${run.manifest.benchmarkVersion}`,
     `Evaluation: ${run.manifest.evaluationVersion ?? "legacy-v1"}`,
@@ -312,7 +314,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "|---:|---|---|---:|---:|---:|---:|",
   );
   for (const target of MATCHED_RECALL_TARGETS) {
-    for (const contextSystem of ["contextforge-v1", "contextforge-v2"] as const) {
+    for (const contextSystem of ["contextforge-v1", "contextforge-v2", "contextforge-v2-relations"] as const) {
       for (const baseline of ["lexical-full-file-v1", "structural-full-file-v1"] as const) {
         const reduction = pairedReduction(run, baseline, contextSystem, target);
         lines.push(`| ${(target * 100).toFixed(0)}% | ${contextSystem} | ${baseline} | ${reduction.tasks} | ${format(reduction.baselineMeanTokens)} | ${format(reduction.contextforgeMeanTokens)} | ${reduction.reduction === null ? "NOT AVAILABLE" : `${(reduction.reduction * 100).toFixed(1)}%`} |`);
@@ -322,8 +324,10 @@ export function renderBenchmarkReport(run: QualityRun): string {
   const structuralValue = comparison(run, "structural-full-file-v1", "lexical-full-file-v1", 8_000);
   const packingValue = comparison(run, "contextforge-v1", "structural-full-file-v1", 8_000);
   const retrievalV2Value = comparison(run, "contextforge-v2", "contextforge-v1", 8_000);
-  const versusLexical = winTieLoss(run, "lexical-full-file-v1", "contextforge-v2", 8_000);
-  const versusV1 = winTieLoss(run, "contextforge-v1", "contextforge-v2", 8_000);
+  const relationshipValue = comparison(run, "contextforge-v2-relations", "contextforge-v2", 8_000);
+  const versusLexical = winTieLoss(run, "lexical-full-file-v1", "contextforge-v2-relations", 8_000);
+  const versusV1 = winTieLoss(run, "contextforge-v1", "contextforge-v2-relations", 8_000);
+  const versusV2 = winTieLoss(run, "contextforge-v2", "contextforge-v2-relations", 8_000);
   lines.push(
     "",
     "Reductions are macro means over paired tasks only; negative values mean ContextForge used more estimated payload tokens. `NOT AVAILABLE` means no paired task reached the target.",
@@ -336,8 +340,11 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     `Retrieval V2 + Pack V1 vs ContextForge V1 — required-symbol recall delta: ${format(retrievalV2Value.requiredSymbolDelta)}; precision delta: ${format(retrievalV2Value.precisionDelta)}.`,
     "",
-    `ContextForge V2 win/tie/loss vs lexical: ${versusLexical.wins}/${versusLexical.ties}/${versusLexical.losses}.`,
-    `ContextForge V2 win/tie/loss vs ContextForge V1: ${versusV1.wins}/${versusV1.ties}/${versusV1.losses}.`,
+    `Relationship V2 + Pack V1 vs foundation V2 — required-symbol recall delta: ${format(relationshipValue.requiredSymbolDelta)}; precision delta: ${format(relationshipValue.precisionDelta)}.`,
+    "",
+    `Relationship V2 win/tie/loss vs lexical: ${versusLexical.wins}/${versusLexical.ties}/${versusLexical.losses}.`,
+    `Relationship V2 win/tie/loss vs ContextForge V1: ${versusV1.wins}/${versusV1.ties}/${versusV1.losses}.`,
+    `Relationship V2 win/tie/loss vs foundation V2: ${versusV2.wins}/${versusV2.ties}/${versusV2.losses}.`,
     "",
     "## Language breakdown",
     "",
@@ -351,7 +358,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     ...breakdown(run, "taskCategory"),
     "",
-    "## Worst ContextForge V2 cases at 8K",
+    "## Worst relationship-enabled ContextForge V2 cases at 8K",
     "",
     "| Task | Required file | Required symbol | Missed required context | Attribution |",
     "|---|---:|---:|---|---|",
@@ -361,7 +368,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
   }
   lines.push(
     "",
-    "## Notable ContextForge V2 wins versus lexical full-file at 8K",
+    "## Notable relationship-enabled V2 wins versus lexical full-file at 8K",
     "",
     "| Task | ContextForge required symbol | Lexical required symbol | ContextForge precision | Lexical precision |",
     "|---|---:|---:|---:|---:|",
@@ -381,6 +388,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "- `lexical-full-file-v1` uses only task normalization, path/symbol/source lexical evidence, and whole files.",
     "- `structural-full-file-v1` uses production V1 structural ranking and whole files; `contextforge-v1` uses V1 retrieval and Pack V1.",
     "- `contextforge-v2` uses the shared Retrieval V2 application path with unchanged Pack V1 and the unchanged estimator; Pack V2 is not implemented.",
+    "- `contextforge-v2-relations` adds bounded distance-1 relationship evidence through the same Retrieval V2 fusion/ranking path; it does not claim a complete call graph, test coverage, or sound whole-program impact analysis.",
     "- This finite self/curated dataset may contain self-repository and fixture-authoring bias.",
     "- The generic estimator is not a model tokenizer; no coding agent, LLM judge, network, embedding, or corpus code execution is involved.",
     "- TypeScript aliases, advanced Python imports, pure synonym retrieval, large external repositories, and cross-platform benchmark execution remain limitations or untested paths.",
