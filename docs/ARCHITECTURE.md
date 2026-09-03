@@ -18,7 +18,8 @@ Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), 2026-08-31 (Phases
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
 - As of 2026-08-31, Phase 0–8 production and hardening code is implemented. The frozen benchmark strategies and evidence remain unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, and actual Codex/Claude Code/Cursor host QA remain absent. The v0.1.0 package metadata is finalized for MIT-licensed public CLI distribution.
-- As of 2026-09-01, the V0.2-02 retrieval foundation is implemented behind a shared application use case and a benchmark-only selector. TaskAnalysis, ContextPlan, explicit candidate provenance/fusion, ambiguity-aware Ranking V2, and lexical-to-symbol ownership are present. Public CLI/MCP Search and Pack remain on V1; Pack V2, plan-aware allocation, full Test/Impact Linking, persistence changes, and remote/model retrieval remain absent. The frozen comparison is mixed and does not authorize a default switch.
+- As of 2026-09-01, the V0.2-02 retrieval foundation is implemented behind a shared application use case and a benchmark-only selector. TaskAnalysis, ContextPlan, explicit candidate provenance/fusion, ambiguity-aware Ranking V2, and lexical-to-symbol ownership are present. Public CLI/MCP Search and Pack remain on V1; Pack V2, plan-aware allocation, compiler-complete relationship analysis, persistence changes, and remote/model retrieval remain absent. The frozen comparison is mixed and does not authorize a default switch.
+- As of 2026-09-03, V0.2-03 adds benchmark-selectable transient relationship evidence for bounded exact callers, symbol references, direct test references, and uniquely resolved TypeScript implementations. It reuses existing graph facts, expands one hop through the shared V2 fusion/ranking path, and keeps schema version 2, Pack V1, and public defaults unchanged. The frozen result is mixed; this is not a complete call graph, runtime test coverage, or sound global impact analysis.
 
 ### Existing Assets
 
@@ -583,7 +584,8 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Token estimator and Context Pack | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | V0.2-02 TaskAnalysis, ContextPlan, CandidateEvidence/Fusion, and Retrieval V2 benchmark path | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.19.0 / PUBLIC DEFAULT UNCHANGED |
-| Full V0.2 Pack V2 and Test/Impact Linking | NOT IMPLEMENTED |
+| V0.2-03 bounded Symbol/Test/Impact Linking benchmark path | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.19.0 / PUBLIC DEFAULT UNCHANGED |
+| Full V0.2 Pack V2 | NOT IMPLEMENTED |
 | MCP adapter | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Release hardening and documentation | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Hosted CI workflow | IMPLEMENTED / HOSTED TESTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) |
