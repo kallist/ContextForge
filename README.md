@@ -1,6 +1,6 @@
 # ContextForge
 
-**Status: ContextForge v0.1.1 — Phase 0–8 implemented as a local-first CLI and MCP stdio release**
+**Status: ContextForge v0.2.0 — stable V1 CLI/MCP with internal experimental V2 intelligence**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -44,7 +44,7 @@ npm install -g @kallist/contextforge
 contextforge --version
 ```
 
-To verify this exact release, install `@kallist/contextforge@0.1.1`. The executable remains `contextforge`.
+To verify this exact release, install `@kallist/contextforge@0.2.0`. The executable remains `contextforge`. Publication and verification status are recorded in the [V0.2 release report](docs/V0.2_RELEASE_REPORT.md).
 
 Index a repository and produce task-aware context:
 
@@ -125,6 +125,16 @@ Repository binding is resolved once at startup. Tool calls cannot redirect the s
 Stdio inherits the permissions of the local host process; it is not remote authentication or an OS filesystem sandbox. ContextForge adds no network listener, telemetry, command-execution tool, arbitrary-file tool, Resources, or Prompts. Official-client stdio interoperability is tested, but actual Codex, Claude Code, Cursor, paid-agent task success, and remote MCP hosts are **NOT TESTED**.
 
 ## Offline benchmark evidence
+
+### V0.2 experimental intelligence
+
+V0.2 adds deterministic TaskAnalysis, hybrid evidence fusion and lexical symbol ownership, bounded relationship intelligence, and an experimental ContextPlan/Pack V2 pipeline. The selected experimental candidate is `contextforge-v2-plan-pack`. It remains **internal only**: there is no public V2 CLI flag or MCP strategy field. Search and Pack continue to use **V1 by default**.
+
+The final comparison contains six systems, 24 frozen tasks, four repositories and five budgets (720 cases). At 8K, the selected candidate has required-symbol recall 0.886364 versus V1's 0.863636 and Overall Gold recall 0.899802 versus 0.870866. Required-file recall is unchanged at 0.916667. It retains 36/39 pre-Pack-present required symbols versus the relationship candidate's Pack V1 result of 35/39, and preserves the 19 V1 successes with no new misses.
+
+Evidence remains mixed: the candidate has weaker 2K symbol recall and weaker 16K/32K file recall than the V2 Pack V1 alternatives; precision is weaker outside 8K versus the relationship alternative. Task-aware planning is not proven stably superior. The 0.900 required-symbol design target is not met. **Coding-agent success was not measured.** See [final evaluation](docs/V0.2_FINAL_EVALUATION.md) for all budgets, failures, measured performance and exact claim boundaries.
+
+### Preserved V1 evidence
 
 `contextforge-benchmark-v1` contains 24 frozen Gold tasks across a pinned ContextForge revision and curated TypeScript, Python, and mixed-language repositories. It runs offline against `lexical-full-file-v1`, `structural-full-file-v1`, and the production `contextforge-v1` path at 2K, 4K, 8K, 16K, and 32K estimator-token budgets.
 

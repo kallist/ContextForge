@@ -2,6 +2,8 @@
 
 ## Status
 
+Accepted as maintained experimental architecture in V0.2-05. The frozen corrected/optimized implementation is selected as `contextforge-v2-plan-pack`, with 720 historical case objects reproduced, 19/0 preserved successes, deterministic diagnostics and a measured 1.478582x fixed-corpus ratio within the 1.5x gate. PACK_VALUE_MIXED and task-aware planning NOT PROVEN STABLY SUPERIOR remain explicit. Cross-budget losses and limited performance headroom prevent public-default promotion. ADR-009 and ADR-010 are likewise accepted only for experimental maintenance. The paragraphs below preserve the prior Proposed status and failed-experiment history; see `../V0.2_FINAL_EVALUATION.md` for the final decision.
+
 Proposed. The initial candidate failed quality; V0.2-04R recovered the 8K quality gate but failed performance. V0.2-04P preserves the corrected policy and passes local performance/validation through bounded request-local fragment reuse. Quality remains mixed and task-aware planning is not proven stably superior; public CLI/MCP continue to use V1. ADR-009 and ADR-010 remain Proposed. See `../V0.2_PLAN_AWARE_PACKING_RESULTS.md` for the complete historical chain and final local evidence. Hosted CI and adoption require their separate gates.
 
 ## Decision frozen before evaluation

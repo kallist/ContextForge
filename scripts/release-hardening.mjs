@@ -219,7 +219,7 @@ try {
   const pack = JSON.parse(packJson)[0];
   assert.equal(typeof pack?.filename, "string");
   assert.equal(pack.name, "@kallist/contextforge");
-  assert.equal(pack.version, "0.1.1");
+  assert.equal(pack.version, "0.2.0");
   const tarballPath = join(temporaryRoot, pack.filename);
   mustRun(process.execPath, [npmCliPath, "install", "--no-audit", "--no-fund", tarballPath], installRoot);
   const cliPath = join(installedPackageRoot, "dist", "cli", "main.js");

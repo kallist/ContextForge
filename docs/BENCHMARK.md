@@ -41,6 +41,8 @@ The dataset hash is SHA-256 over canonical JSON with recursively sorted object k
 
 ## Systems
 
+The three V1 definitions below remain frozen. The current evaluator also registers `contextforge-v2` (V2 retrieval + Pack V1), `contextforge-v2-relations` (relationship-enabled retrieval + Pack V1), and `contextforge-v2-plan-pack` (the same relationship retrieval + ContextPlan/Pack V2). The final matrix is 720 cases, with unchanged V1 objects, metrics and budgets. Current results and the explicit internal-only candidate decision are in `V0.2_FINAL_EVALUATION.md`; V1 remains public/default.
+
 ### `lexical-full-file-v1`
 
 Uses the production task normalizer plus fixed benchmark-only path, basename, symbol-name/component, and generation-verified source lexical evidence. It uses no graph expansion, related-test/document relationship, Git score, embedding, or model. Weights and per-signal caps are frozen in `benchmarks/src/systems.ts`.

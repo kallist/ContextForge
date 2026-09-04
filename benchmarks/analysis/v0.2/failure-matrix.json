@@ -4,6 +4,11 @@
   "datasetVersion": "contextforge-dataset-v1",
   "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
   "analysisBudget": 8000,
+  "finalEvaluation": {
+    "report": "docs/V0.2_FINAL_EVALUATION.md",
+    "artifact": "benchmarks/analysis/v0.2/final/failure-matrix-v0.2.json",
+    "note": "Final all-budget Pack V2 required misses supplement the preserved V0.2-01 taxonomy below. Historical classifications are unchanged."
+  },
   "taxonomy": [
     { "code": "TASK_ANALYSIS_MISS", "definition": "Useful coding intent in the task was not expressed as a retrieval or planning signal." },
     { "code": "IDENTITY_MISS", "definition": "An exact path, basename, symbol, qualified symbol, error identifier, or technical literal did not receive sufficient identity evidence." },

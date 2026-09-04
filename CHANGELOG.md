@@ -4,6 +4,22 @@ All notable changes to ContextForge will be recorded here.
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-04
+
+### Added / experimental
+
+- Deterministic TaskAnalysis, hybrid Retrieval V2 evidence fusion and lexical symbol ownership.
+- Bounded transient symbol/caller/test/implementation relationship intelligence.
+- Packing ContextPlan and plan-aware Pack V2 with direct-context priority and bounded request-local fragment reuse.
+- Final frozen six-system, 720-case evaluation, candidate decision, failure taxonomy, performance and determinism evidence.
+
+### Stable default and limitations
+
+- V1 remains the public CLI/MCP Search and Pack behavior. Selected V2 candidate `contextforge-v2-plan-pack` remains internal only.
+- V2 evidence is mixed across budgets; task-aware planning is not proven stably superior. The 0.900 required-symbol target is not met.
+- Context-quality measurements do not establish coding-agent success, general token savings or universal superiority.
+- No new ranking policy, database migration, provider, public strategy API or V0.3 feature is introduced by release finalization.
+
 ## 0.1.1 - 2026-09-01
 
 ### Changed

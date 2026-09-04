@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "package": {
+    "filename": "kallist-contextforge-0.1.1.tgz",
+    "files": 169,
+    "bytes": 663137
+  },
+  "scale": {
+    "generatedFiles": 1200,
+    "indexedFiles": 1202,
+    "symbols": 1202,
+    "graphEdges": 1199,
+    "databaseBytes": 5423104,
+    "coldIndexMs": 22797.87,
+    "warmIndexMs": 5928.13,
+    "searchMs": 4459.43,
+    "pack8kMs": 4761.45,
+    "pack16kMs": 5212.95
+  },
+  "concurrency": {
+    "indexIndex": "one success, one INDEX_BUSY",
+    "indexIndexIterations": 10,
+    "indexIndexFailures": 0,
+    "indexSearchGeneration": 3,
+    "indexPackGeneration": 3,
+    "multipleMcpServers": "PASS"
+  },
+  "crashRecovery": {
+    "killedDuringTransaction": true,
+    "preservedGeneration": 4,
+    "incompleteGenerations": 0,
+    "integrityCheck": [
+      "ok"
+    ],
+    "foreignKeyProblems": 0,
+    "recoveredGeneration": 5,
+    "recoveryMs": 6317.28
+  },
+  "failureHardening": {
+    "corruptDatabase": "INDEX_CORRUPT",
+    "futureSchema": "UNSUPPORTED_SCHEMA",
+    "missingParserAsset": "PARSER_UNAVAILABLE",
+    "gitUnavailable": "graceful",
+    "nonGitRepository": "PASS"
+  },
+  "determinism": {
+    "searchJson": "PASS",
+    "packMarkdown": "PASS",
+    "packJson": "PASS",
+    "soak": "PASS"
+  },
+  "soak": {
+    "requests": 1000,
+    "durationMs": 19537.93,
+    "initialRssBytes": 72159232,
+    "peakRssBytes": 138706944,
+    "finalRssBytes": 101040128,
+    "initialHandles": 199,
+    "finalHandles": 199,
+    "orphanProcesses": 0
+  }
+}
