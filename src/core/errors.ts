@@ -1,4 +1,5 @@
 export type ContextForgeErrorCode =
+  | "INVALID_CAPSULE"
   | "USAGE"
   | "PATH"
   | "ACCESS"
@@ -21,6 +22,7 @@ export type ContextForgeErrorCode =
   | "OUTPUT_WRITE_FAILED";
 
 const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
+  INVALID_CAPSULE: 14,
   USAGE: 2,
   PATH: 2,
   ACCESS: 3,

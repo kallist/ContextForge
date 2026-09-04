@@ -1,4 +1,5 @@
 import type { SearchIndexStatus } from "./task-retrieval.js";
+import type { ContextCapsuleV1 } from "./context-capsule.js";
 
 export const CONTEXT_PACK_SCHEMA_VERSION = "1.0";
 export const PACKING_STRATEGY = "contextforge-pack-v1";
@@ -124,6 +125,7 @@ export interface ContextPackPerformance {
 }
 
 export interface ContextPackExecution {
+  readonly capsule?: ContextCapsuleV1;
   readonly markdown: string;
   readonly manifest: ContextPackManifest;
   /** Measurements stay outside deterministic pack artifacts. */

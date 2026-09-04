@@ -71,3 +71,4 @@ jobs:
       - run: npm audit --json
       - run: npm run benchmark
       - run: node scripts/release-evidence-check.mjs
+      - run: node .benchmark-dist/benchmarks/src/capsule-conformance.js conformance

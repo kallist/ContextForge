@@ -40,9 +40,10 @@ import {
   graphRelationshipEvidenceV2,
   type RelationshipFamiliesV2,
 } from "../core/relationship-expansion-v2.js";
-import { deduplicateRelationshipEvidenceV2 } from "../core/relationship-intelligence-v2.js";
+import { deduplicateRelationshipEvidenceV2, type RelationshipEvidenceV2 } from "../core/relationship-intelligence-v2.js";
 
 export interface SearchRepositoryV2Request {
+  readonly captureCapsule?: boolean;
   readonly repositoryPath: string;
   readonly task: string;
   readonly limit?: number;
@@ -51,7 +52,7 @@ export interface SearchRepositoryV2Request {
 
 export interface SearchExecutionV2 {
   readonly result: SearchResultV2;
-  readonly context: { readonly scan: ScanResult; readonly snapshot: RepositoryIndexSnapshot };
+  readonly context: { readonly scan: ScanResult; readonly snapshot: RepositoryIndexSnapshot; readonly capsuleRelationships?: readonly RelationshipEvidenceV2[] };
   readonly performance: SearchPerformanceV2;
 }
 
@@ -700,7 +701,7 @@ async function executeSearchRepositoryV2(
   } as const;
   return {
     result,
-    context: { scan, snapshot: active },
+    context: { scan, snapshot: active, ...(request.captureCapsule === true ? { capsuleRelationships: relationshipExpansion.relationships } : {}) },
     performance: {
       taskAnalysisMs,
       contextPlanMs,
