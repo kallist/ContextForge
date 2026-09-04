@@ -1,6 +1,6 @@
 {
   "name": "@kallist/contextforge",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local-first, task-aware context compiler for coding agents",
   "license": "MIT",
   "repository": {

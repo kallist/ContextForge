@@ -1,4 +1,22 @@
-# ContextForge v0.1.1 Scoped-Package Release Checklist
+# ContextForge release checklist
+
+## V0.2.0 release gates
+
+The sections below this list preserve the v0.1.1 checklist as historical context. V0.2.0 uses the same gate ordering with exact identity `@kallist/contextforge@0.2.0` and annotated tag `v0.2.0`.
+
+- [ ] Frozen 720-case evidence, source hashes, deterministic candidate decision and final failure report verified.
+- [ ] V1 public/default and V2 INTERNAL_ONLY decisions confirmed; no algorithm/schema/provider changes.
+- [ ] Local release:check, npm audit, package file/asset review and clean Git state pass.
+- [ ] Final release PR review has zero BLOCKING/IMPORTANT unresolved findings and five final-head Hosted CI passes.
+- [ ] Merge commit validated by five post-main Hosted CI jobs; local main synchronized and clean.
+- [ ] Post-main release:check and package smoke pass before annotated v0.2.0 creation.
+- [ ] Correct annotated tag target, package/version/bin, tarball contents and npm authentication verified before publication.
+- [ ] Public npm 0.2.0/latest/integrity verified; fresh-cache public CLI/MCP smoke passes with V1 defaults.
+- [ ] GitHub Release published as latest with final closeout evidence; no tag rewriting; V0.3 not started.
+
+Use `V0.2_RELEASE_REPORT.md` for evidence and `RELEASE_NOTES_V0.2.0.md` for the reviewed notes. Package smoke public mode is `npm run package:smoke -- --public-registry` and must follow verified publication.
+
+## Historical v0.1.1 scoped-package checklist
 
 This checklist separates validation, review, merge, and irreversible publication. `npm run release:check` is validation-only: it never pushes, tags, publishes, creates a release, or changes Git history.
 

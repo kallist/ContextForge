@@ -1,0 +1,187 @@
+{
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "prePackEvidence": "8K diagnostics of budget-independent top-64 relationship retrieval; no extra scoring run",
+  "rows": [
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 35
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 32
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 38
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 31
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 39
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 34
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 39
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 34
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 41
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 35
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 41
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 36
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 42
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 36
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 41
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 36
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 42
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-relations",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 37
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "FILE",
+      "prePackPresent": 44,
+      "retained": 41
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "kind": "SYMBOL",
+      "prePackPresent": 39,
+      "retained": 37
+    }
+  ],
+  "taskRetentionComparison": {
+    "left": "contextforge-v2-plan-pack",
+    "right": "contextforge-v2-relations",
+    "comparisons": [
+      {
+        "budget": 2000,
+        "wins": 3,
+        "ties": 19,
+        "losses": 2,
+        "mixed": 0
+      },
+      {
+        "budget": 4000,
+        "wins": 0,
+        "ties": 24,
+        "losses": 0,
+        "mixed": 0
+      },
+      {
+        "budget": 8000,
+        "wins": 1,
+        "ties": 22,
+        "losses": 1,
+        "mixed": 0
+      },
+      {
+        "budget": 16000,
+        "wins": 0,
+        "ties": 23,
+        "losses": 1,
+        "mixed": 0
+      },
+      {
+        "budget": 32000,
+        "wins": 0,
+        "ties": 23,
+        "losses": 1,
+        "mixed": 0
+      }
+    ]
+  }
+}

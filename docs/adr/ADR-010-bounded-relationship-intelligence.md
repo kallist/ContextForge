@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed. V0.2-03 is implemented as a benchmark-selectable experiment, but the frozen quality evidence is mixed and does not justify a public-default switch or acceptance as a generally superior ranker.
+Accepted as maintained experimental architecture in V0.2-05. B remains RETAIN_FOR_RESEARCH as a product candidate; its bounded relationship layer is also part of selected candidate C. Exact, ambiguity-aware and transient evidence is worth maintaining despite RELATIONSHIP_VALUE_MIXED. This accepts the architecture, not a generally superior ranker or a public-default switch. See `../V0.2_FINAL_EVALUATION.md`.
+
+Earlier Proposed decisions and evaluation checkpoints below remain historical; current ADR status is stated above.
 
 ## Context
 

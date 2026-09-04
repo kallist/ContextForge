@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed for full V0.2 adoption. The V0.2-02 retrieval foundation is implemented, but the frozen evidence is mixed and does not justify acceptance or a production-default switch.
+Accepted as maintained experimental architecture in V0.2-05. The foundation is used by all three V2 candidates, including the selected `contextforge-v2-plan-pack`. Deterministic provenance and application boundaries are retained; quality remains mixed and V1 remains public/default. Acceptance is an architecture-maintenance decision, not a superiority or promotion claim. See `../V0.2_FINAL_EVALUATION.md`.
+
+Earlier Proposed decisions and evaluation checkpoints below are preserved as history; this final status supersedes their conditional adoption language.
 
 ## Context
 

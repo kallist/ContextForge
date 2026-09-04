@@ -68,4 +68,6 @@ jobs:
           node-version: 24.20.0
           cache: npm
       - run: npm ci
+      - run: npm audit --json
       - run: npm run benchmark
+      - run: node scripts/release-evidence-check.mjs

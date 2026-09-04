@@ -29,10 +29,10 @@ npm run benchmark:diagnose-v1
 npm run benchmark
 ```
 
-Generated source-free outputs are written to ignored `.benchmark-output/`. `benchmark` and `benchmark:quality` run all 24 tasks, three systems, and 2K/4K/8K/16K/32K budgets. Performance is separate because timing is environment-dependent.
+Generated source-free outputs are written to ignored `.benchmark-output/`. `benchmark` and `benchmark:quality` now run all 24 tasks, six systems, and 2K/4K/8K/16K/32K budgets (720 cases). Performance is separate because timing is environment-dependent. Current runner filenames retain `v0.2-04`; final V0.2-05 evidence is recorded in `analysis/v0.2/final/`, with its exact evaluated commit and integrity checks. V1 reference files remain unchanged.
 
 `benchmark:diagnose-v1` replays all 24 tasks at 8K, records bounded top/required candidate and Pack-stage evidence without source bodies, and fails unless selected file identities match the frozen reference cases. `benchmark:validate` also validates the V0.2 failure matrix against the frozen task set and taxonomy.
 
 ## Integrity boundary
 
-Gold is accepted only by validation and metric evaluation. System adapters accept task text, repository runtime, and budget; their types do not accept Gold. All three systems use the same safe indexed snapshot and `contextforge-generic-v1` estimator. No corpus application code is executed, no network is used, and no production ranking or packing parameter is benchmark-configurable.
+Gold is accepted only by validation and metric evaluation. System adapters accept task text, repository runtime, and budget; their types do not accept Gold. All six systems use the same safe indexed snapshot and `contextforge-generic-v1` estimator. No corpus application code is executed, no network is used, and no production ranking or packing parameter is benchmark-configurable.

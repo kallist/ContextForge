@@ -1,0 +1,651 @@
+{
+  "evaluationVersion": "contextforge-v0.2-final-evaluation-v1",
+  "evaluationCommit": "0f864bd5fadd4990958b82613968c17f3c6960e7",
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "selectedExperimentalCandidate": "contextforge-v2-plan-pack",
+  "publicDefault": "contextforge-v1",
+  "defaultSwitch": false,
+  "publicExposure": "INTERNAL_ONLY",
+  "candidates": [
+    {
+      "systemId": "contextforge-v2",
+      "classification": "ACCEPTABLE_EXPERIMENTAL",
+      "selected": false,
+      "fixedCorpusRatio": 1.0872252448463036,
+      "performanceGate": "PASS"
+    },
+    {
+      "systemId": "contextforge-v2-relations",
+      "classification": "RETAIN_FOR_RESEARCH",
+      "selected": false,
+      "fixedCorpusRatio": 1.4247793043075416,
+      "performanceGate": "PASS"
+    },
+    {
+      "systemId": "contextforge-v2-plan-pack",
+      "classification": "ACCEPTABLE_EXPERIMENTAL",
+      "selected": true,
+      "fixedCorpusRatio": 1.4785819556993953,
+      "performanceGate": "PASS"
+    }
+  ],
+  "qualityInterpretation": "MIXED",
+  "relationshipValue": "RELATIONSHIP_VALUE_MIXED",
+  "packingValue": "PACK_VALUE_MIXED",
+  "taskAwarePlanning": "NOT PROVEN STABLY SUPERIOR",
+  "agentSuccess": "NOT MEASURED",
+  "reason": "C supplies differentiated required-symbol retention at 8K and higher Overall Gold across the five budgets, with explicit file/symbol/precision regressions. A remains a viable precision-oriented experimental alternative. This is not a dominance claim.",
+  "allBudget": [
+    {
+      "budget": 2000,
+      "systemId": "lexical-full-file-v1",
+      "requiredFileRecall": 0.736111125,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "overallGoldRecall": 0.7361467083333334,
+      "goldRangePrecision": 0.140178,
+      "noiseRatio": 0.8598220000000002,
+      "payloadTokens": 1893.4583333333333
+    },
+    {
+      "budget": 2000,
+      "systemId": "structural-full-file-v1",
+      "requiredFileRecall": 0.7291666666666666,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "overallGoldRecall": 0.7320792500000001,
+      "goldRangePrecision": 0.15473991666666664,
+      "noiseRatio": 0.8452600833333332,
+      "payloadTokens": 1924.25
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v1",
+      "requiredFileRecall": 0.7569444583333333,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "overallGoldRecall": 0.7409823750000001,
+      "goldRangePrecision": 0.16084365217391303,
+      "noiseRatio": 0.8391563478260871,
+      "payloadTokens": 1818.0416666666667
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2",
+      "requiredFileRecall": 0.7569444583333333,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "overallGoldRecall": 0.784137125,
+      "goldRangePrecision": 0.22420086956521743,
+      "noiseRatio": 0.7757991304347825,
+      "payloadTokens": 1819.5416666666667
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-relations",
+      "requiredFileRecall": 0.7569444583333333,
+      "requiredSymbolRecall": 0.7575757727272727,
+      "overallGoldRecall": 0.7573514166666667,
+      "goldRangePrecision": 0.1913883043478261,
+      "noiseRatio": 0.8086116956521737,
+      "payloadTokens": 1812.375
+    },
+    {
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "requiredFileRecall": 0.8125,
+      "requiredSymbolRecall": 0.7121212272727273,
+      "overallGoldRecall": 0.7865735833333333,
+      "goldRangePrecision": 0.17432604166666665,
+      "noiseRatio": 0.8256739583333333,
+      "payloadTokens": 1960.5
+    },
+    {
+      "budget": 4000,
+      "systemId": "lexical-full-file-v1",
+      "requiredFileRecall": 0.7777777916666667,
+      "requiredSymbolRecall": 0.8030303181818182,
+      "overallGoldRecall": 0.7857142916666667,
+      "goldRangePrecision": 0.15955604166666668,
+      "noiseRatio": 0.8404439583333333,
+      "payloadTokens": 2506.4166666666665
+    },
+    {
+      "budget": 4000,
+      "systemId": "structural-full-file-v1",
+      "requiredFileRecall": 0.7708333333333334,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "overallGoldRecall": 0.7678571249999999,
+      "goldRangePrecision": 0.14514133333333334,
+      "noiseRatio": 0.8548586666666664,
+      "payloadTokens": 2794.0416666666665
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v1",
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8181818181818182,
+      "overallGoldRecall": 0.8161375416666666,
+      "goldRangePrecision": 0.16407678260869565,
+      "noiseRatio": 0.8359232173913046,
+      "payloadTokens": 2339.7083333333335
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2",
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8181818181818182,
+      "overallGoldRecall": 0.8315145,
+      "goldRangePrecision": 0.1816875217391305,
+      "noiseRatio": 0.8183124782608696,
+      "payloadTokens": 2338.2083333333335
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-relations",
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8181818181818182,
+      "overallGoldRecall": 0.8210978333333334,
+      "goldRangePrecision": 0.17596282608695657,
+      "noiseRatio": 0.8240371739130437,
+      "payloadTokens": 2341.2083333333335
+    },
+    {
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8181818181818182,
+      "overallGoldRecall": 0.8604497083333333,
+      "goldRangePrecision": 0.16284733333333334,
+      "noiseRatio": 0.8371526666666665,
+      "payloadTokens": 2654.4583333333335
+    },
+    {
+      "budget": 8000,
+      "systemId": "lexical-full-file-v1",
+      "requiredFileRecall": 0.8194444583333333,
+      "requiredSymbolRecall": 0.8484848636363637,
+      "overallGoldRecall": 0.8260582083333334,
+      "goldRangePrecision": 0.17351258333333333,
+      "noiseRatio": 0.8264874166666667,
+      "payloadTokens": 3510.9166666666665
+    },
+    {
+      "budget": 8000,
+      "systemId": "structural-full-file-v1",
+      "requiredFileRecall": 0.75,
+      "requiredSymbolRecall": 0.7727272727272727,
+      "overallGoldRecall": 0.755952375,
+      "goldRangePrecision": 0.13800679166666668,
+      "noiseRatio": 0.8619932083333331,
+      "payloadTokens": 3794.6666666666665
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v1",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "overallGoldRecall": 0.8708664166666668,
+      "goldRangePrecision": 0.19285012499999998,
+      "noiseRatio": 0.8071498750000002,
+      "payloadTokens": 3453.375
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "overallGoldRecall": 0.8816137500000001,
+      "goldRangePrecision": 0.19675812500000003,
+      "noiseRatio": 0.803241875,
+      "payloadTokens": 3520.875
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-relations",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "overallGoldRecall": 0.8711970833333335,
+      "goldRangePrecision": 0.19465120833333338,
+      "noiseRatio": 0.8053487916666668,
+      "payloadTokens": 3516.375
+    },
+    {
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "overallGoldRecall": 0.8998015833333334,
+      "goldRangePrecision": 0.19480425,
+      "noiseRatio": 0.8051957499999999,
+      "payloadTokens": 3656.8333333333335
+    },
+    {
+      "budget": 16000,
+      "systemId": "lexical-full-file-v1",
+      "requiredFileRecall": 0.923611125,
+      "requiredSymbolRecall": 0.9166666818181818,
+      "overallGoldRecall": 0.8931878333333333,
+      "goldRangePrecision": 0.17681270833333332,
+      "noiseRatio": 0.8231872916666666,
+      "payloadTokens": 5508.458333333333
+    },
+    {
+      "budget": 16000,
+      "systemId": "structural-full-file-v1",
+      "requiredFileRecall": 0.8541666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "overallGoldRecall": 0.8419312083333333,
+      "goldRangePrecision": 0.16969383333333335,
+      "noiseRatio": 0.8303061666666665,
+      "payloadTokens": 5801.416666666667
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v1",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8636363636363636,
+      "overallGoldRecall": 0.8907076666666667,
+      "goldRangePrecision": 0.18521470833333334,
+      "noiseRatio": 0.8147852916666669,
+      "payloadTokens": 4992.625
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2",
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "overallGoldRecall": 0.9080687916666667,
+      "goldRangePrecision": 0.1956440416666667,
+      "noiseRatio": 0.8043559583333334,
+      "payloadTokens": 5417.875
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-relations",
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "overallGoldRecall": 0.897652125,
+      "goldRangePrecision": 0.17709375000000005,
+      "noiseRatio": 0.8229062500000001,
+      "payloadTokens": 5445.875
+    },
+    {
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "overallGoldRecall": 0.906746,
+      "goldRangePrecision": 0.16855895833333334,
+      "noiseRatio": 0.8314410416666664,
+      "payloadTokens": 5653.166666666667
+    },
+    {
+      "budget": 32000,
+      "systemId": "lexical-full-file-v1",
+      "requiredFileRecall": 0.9444444583333333,
+      "requiredSymbolRecall": 0.9393939545454546,
+      "overallGoldRecall": 0.93138225,
+      "goldRangePrecision": 0.17867883333333334,
+      "noiseRatio": 0.8213211666666665,
+      "payloadTokens": 9507.125
+    },
+    {
+      "budget": 32000,
+      "systemId": "structural-full-file-v1",
+      "requiredFileRecall": 0.8958333333333334,
+      "requiredSymbolRecall": 0.9090909090909091,
+      "overallGoldRecall": 0.8928571249999999,
+      "goldRangePrecision": 0.153961375,
+      "noiseRatio": 0.8460386249999998,
+      "payloadTokens": 9797.791666666666
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v1",
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.8863636363636364,
+      "overallGoldRecall": 0.9092262083333335,
+      "goldRangePrecision": 0.17303633333333335,
+      "noiseRatio": 0.8269636666666669,
+      "payloadTokens": 7551
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2",
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.9090909090909091,
+      "overallGoldRecall": 0.9219576666666667,
+      "goldRangePrecision": 0.1777069583333334,
+      "noiseRatio": 0.8222930416666667,
+      "payloadTokens": 9036.291666666666
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-relations",
+      "requiredFileRecall": 0.9375,
+      "requiredSymbolRecall": 0.9090909090909091,
+      "overallGoldRecall": 0.911541,
+      "goldRangePrecision": 0.16987525000000006,
+      "noiseRatio": 0.8301247500000001,
+      "payloadTokens": 9237.5
+    },
+    {
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "requiredFileRecall": 0.9166666666666666,
+      "requiredSymbolRecall": 0.9090909090909091,
+      "overallGoldRecall": 0.9229497083333333,
+      "goldRangePrecision": 0.161670375,
+      "noiseRatio": 0.838329625,
+      "payloadTokens": 9222.291666666666
+    }
+  ],
+  "retrieval": [
+    {
+      "systemId": "lexical-full-file-v1",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.47916662499999996,
+          "requiredSymbolRecall": 0.43712118181818177
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.7152777499999999,
+          "requiredSymbolRecall": 0.6522726818181818
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.7310606363636364
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.9305555833333333,
+          "requiredSymbolRecall": 0.7310606363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9444444583333333,
+          "requiredSymbolRecall": 0.7310606363636364
+        }
+      ]
+    },
+    {
+      "systemId": "structural-full-file-v1",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.2986110833333333,
+          "requiredSymbolRecall": 0.32575754545454544
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.49999995833333327,
+          "requiredSymbolRecall": 0.4992424090909091
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.708333375,
+          "requiredSymbolRecall": 0.6022727727272728
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.7310606363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9375,
+          "requiredSymbolRecall": 0.7537879090909091
+        }
+      ]
+    },
+    {
+      "systemId": "contextforge-v1",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.2986110833333333,
+          "requiredSymbolRecall": 0.32575754545454544
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.49999995833333327,
+          "requiredSymbolRecall": 0.4992424090909091
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.708333375,
+          "requiredSymbolRecall": 0.6022727727272728
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.7310606363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9375,
+          "requiredSymbolRecall": 0.7537879090909091
+        }
+      ]
+    },
+    {
+      "systemId": "contextforge-v2",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.34027775,
+          "requiredSymbolRecall": 0.38257572727272726
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.5694444166666667,
+          "requiredSymbolRecall": 0.6166666363636364
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.7569444583333333,
+          "requiredSymbolRecall": 0.810606090909091
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.8712121363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9166666666666666,
+          "requiredSymbolRecall": 0.8712121363636364
+        }
+      ]
+    },
+    {
+      "systemId": "contextforge-v2-relations",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.34027775,
+          "requiredSymbolRecall": 0.38257572727272726
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.5902777499999999,
+          "requiredSymbolRecall": 0.6393939090909091
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.7569444583333333,
+          "requiredSymbolRecall": 0.810606090909091
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.8712121363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9166666666666666,
+          "requiredSymbolRecall": 0.8712121363636364
+        }
+      ]
+    },
+    {
+      "systemId": "contextforge-v2-plan-pack",
+      "cutoffs": [
+        {
+          "k": 1,
+          "requiredFileRecall": 0.34027775,
+          "requiredSymbolRecall": 0.38257572727272726
+        },
+        {
+          "k": 3,
+          "requiredFileRecall": 0.5902777499999999,
+          "requiredSymbolRecall": 0.6393939090909091
+        },
+        {
+          "k": 5,
+          "requiredFileRecall": 0.7569444583333333,
+          "requiredSymbolRecall": 0.810606090909091
+        },
+        {
+          "k": 10,
+          "requiredFileRecall": 0.8958333333333334,
+          "requiredSymbolRecall": 0.8712121363636364
+        },
+        {
+          "k": 20,
+          "requiredFileRecall": 0.9166666666666666,
+          "requiredSymbolRecall": 0.8712121363636364
+        }
+      ]
+    }
+  ],
+  "regression": [
+    {
+      "systemId": "contextforge-v2",
+      "evaluated": 19,
+      "newMisses": []
+    },
+    {
+      "systemId": "contextforge-v2-relations",
+      "evaluated": 19,
+      "newMisses": []
+    },
+    {
+      "systemId": "contextforge-v2-plan-pack",
+      "evaluated": 19,
+      "newMisses": []
+    }
+  ],
+  "timing": [
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "contextforge-v1",
+      "indexMs": 664.3830000000016,
+      "retrievalMs": 426.46609999999964,
+      "packingMs": 148.98180000000139,
+      "totalMs": 581.5587000000014,
+      "packingPlanMs": null,
+      "ratio": 1
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "contextforge-v2",
+      "indexMs": 664.3830000000016,
+      "retrievalMs": 470.2430999999997,
+      "packingMs": 156.96210000000428,
+      "totalMs": 632.2852999999996,
+      "packingPlanMs": null,
+      "ratio": 1.0872252448463036
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "contextforge-v2-relations",
+      "indexMs": 664.3830000000016,
+      "retrievalMs": 678.7345000000023,
+      "packingMs": 155.3478999999934,
+      "totalMs": 828.5928000000004,
+      "packingPlanMs": null,
+      "ratio": 1.4247793043075416
+    },
+    {
+      "repositoryId": "contextforge-phase5",
+      "repositoryRevision": "77944250fe022794cb4b86b96415c8fac625f632",
+      "systemId": "contextforge-v2-plan-pack",
+      "indexMs": 664.3830000000016,
+      "retrievalMs": 654.8778999999995,
+      "packingMs": 205.0043000000005,
+      "totalMs": 859.8822,
+      "packingPlanMs": 0.1867999999994936,
+      "ratio": 1.4785819556993953
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "contextforge-v1",
+      "indexMs": 3782.5743999999977,
+      "retrievalMs": 2182.4257,
+      "packingMs": 63.644200000002456,
+      "totalMs": 2246.0699000000022,
+      "packingPlanMs": null,
+      "ratio": 1
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "contextforge-v2",
+      "indexMs": 3782.5743999999977,
+      "retrievalMs": 2305.3218999999954,
+      "packingMs": 54.11569999998028,
+      "totalMs": 2355.426299999992,
+      "packingPlanMs": null,
+      "ratio": 1.048687888119595
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "contextforge-v2-relations",
+      "indexMs": 3782.5743999999977,
+      "retrievalMs": 2240.4326,
+      "packingMs": 70.0405000000028,
+      "totalMs": 2304.6019000000088,
+      "packingPlanMs": null,
+      "ratio": 1.0260597410614898
+    },
+    {
+      "repositoryId": "medium-synthetic-1000",
+      "repositoryRevision": "sha256:e259f8867c60fde483fc294c3dd9fdf4191d3f723f11fffdd2d55e3f427f1866",
+      "systemId": "contextforge-v2-plan-pack",
+      "indexMs": 3782.5743999999977,
+      "retrievalMs": 2363.401700000002,
+      "packingMs": 74.0842999999877,
+      "totalMs": 2436.804799999998,
+      "packingPlanMs": 0.1315000000031432,
+      "ratio": 1.0849193963197654
+    }
+  ],
+  "integrity": {
+    "cases": 720,
+    "historical720ObjectsExact": true,
+    "previous600ObjectsExact": true,
+    "v1Reference360Exact": true,
+    "historicalArtifactSha256": "f0daa6f957e40b3dba5685eb58c32c19925928ca5bb3bb2b1378295a7d043412",
+    "historicalFiveSystemSha256": "f8302356fa51ea6a6a199b86b306f5d76b513c9e63678bde8b2ce7810eb19e85"
+  },
+  "hardBudget": {
+    "cases": 720,
+    "violations": 0
+  },
+  "determinism": {
+    "repetitions": 2,
+    "fullDiagnosticSha256": "7a642da215cabf165ecd249f0f1c0e3a6b61be707cb820cb3990341911f63c4e"
+  },
+  "artifactHashes": {
+    "quality": "721071ae6e10311c2ac4954fef1b68ddce680271af1e15e4a19c2b7e06248fb5",
+    "analysis": "4db645418bcaa5c197256274e4dae3542bfcd8244161293222c20891dac2358f",
+    "performance": "56723462af0c77e593caa7bf3b03ba7984b00a79a303302458776d27e7d1011b",
+    "compactDiagnostics": "0b13dac076b10c0c428fc923430f94008769773130f9ba56f9e3a9495dce738f"
+  }
+}

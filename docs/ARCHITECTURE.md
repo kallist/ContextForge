@@ -1,5 +1,13 @@
 # ContextForge V1 Architecture
 
+## V0.2 final maintained architecture
+
+V1 remains the stable public path: CLI/MCP -> shared V1 Search -> Pack V1. V0.2's internal experimental path is TaskAnalysis -> identity/lexical/structural CandidateEvidence fusion -> bounded relationship evidence -> Ranking V2 -> packing ContextPlan -> direct-context-priority-v1 -> Pack V2. Both paths reuse safe discovery, generation snapshots and the unchanged generic-v1 estimator.
+
+The selected experimental candidate is `contextforge-v2-plan-pack`; A (`contextforge-v2`) remains an acceptable precision-oriented alternative and B (`contextforge-v2-relations`) is retained for research. There is no public strategy selector. Pack V2's request-local fragment cache is bounded and final output is serialized uncached and estimated independently. Database schema 2 and writer semantics are unchanged. No PostgreSQL backend is implemented.
+
+ADR-009/010/011 are accepted as maintained **experimental architecture**, not as default promotion or proof of general quality superiority. See `V0.2_FINAL_EVALUATION.md` and `V0.2_RELEASE_REPORT.md`. The dated implementation checkpoints below remain historical; V0.2-04 Pack V2 is now implemented internally, superseding earlier statements that it was absent.
+
 ## Status
 
 **APPROVED V1 DESIGN — PHASES 0–8 IMPLEMENTED; V0.1.0 RELEASE BASELINE**

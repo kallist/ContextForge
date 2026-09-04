@@ -1,0 +1,642 @@
+{
+  "evaluationVersion": "contextforge-v0.2-final-evaluation-v1",
+  "datasetHash": "75685087e8392840b4bb61ae19cef9ccb92df66844e79e0e87a0b7c6437a0002",
+  "scope": "Candidate C required misses at all five budgets. Pre-Pack identity uses budget-independent top-64 retrieval, measured by the 8K diagnostics; other-budget drop subcauses are not inferred.",
+  "taxonomy": [
+    "RETRIEVAL",
+    "RELATIONSHIP",
+    "PACKING",
+    "MIXED",
+    "INSUFFICIENT EVIDENCE"
+  ],
+  "cases": [
+    {
+      "taskId": "self-pack-exact",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/application/build-context-pack.ts",
+          "prePackRank": 1,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/build-context-pack.ts::buildContextPack",
+          "prePackRank": 1,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-exact",
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/application/build-context-pack.ts",
+          "prePackRank": 1,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/build-context-pack.ts::buildContextPack",
+          "prePackRank": 1,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/application/build-index.ts",
+          "prePackRank": 8,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/sqlite/sqlite-index-repository.ts::SqliteIndexRepository.buildAndActivate",
+          "prePackRank": 6,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/build-index.ts::buildIndex",
+          "prePackRank": 8,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/application/build-index.ts",
+          "prePackRank": 8,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/sqlite/sqlite-index-repository.ts::SqliteIndexRepository.buildAndActivate",
+          "prePackRank": 6,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/build-index.ts::buildIndex",
+          "prePackRank": 8,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/sqlite/sqlite-index-repository.ts::SqliteIndexRepository.buildAndActivate",
+          "prePackRank": 6,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-index-activation-race",
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/sqlite/sqlite-index-repository.ts::SqliteIndexRepository.buildAndActivate",
+          "prePackRank": 6,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts::FileSystemRepositorySourceReader.readTextFile",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/search-repository.ts::searchRepository",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts::FileSystemRepositorySourceReader.readTextFile",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/search-repository.ts::searchRepository",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "GLOBAL_BUDGET",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts::FileSystemRepositorySourceReader.readTextFile",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "GLOBAL_BUDGET",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/search-repository.ts::searchRepository",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts::FileSystemRepositorySourceReader.readTextFile",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/search-repository.ts::searchRepository",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-stale-lexical-source",
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/repository-source-reader.ts::FileSystemRepositorySourceReader.readTextFile",
+          "prePackRank": 21,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/application/search-repository.ts::searchRepository",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-output-publish-race",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "src/adapters/filesystem/output-artifact-writer.ts",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "src/adapters/filesystem/output-artifact-writer.ts::FileSystemOutputArtifactWriter.writeExclusive",
+          "prePackRank": 3,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "package.json",
+          "prePackRank": 38,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "scripts/package-smoke.mjs::run",
+          "prePackRank": null,
+          "prePackEvidenceBudget": 8000,
+          "owner": "RETRIEVAL",
+          "cause": "required identity unavailable in top-64 retrieval",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "package.json",
+          "prePackRank": 38,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "scripts/package-smoke.mjs::run",
+          "prePackRank": null,
+          "prePackEvidenceBudget": 8000,
+          "owner": "RETRIEVAL",
+          "cause": "required identity unavailable in top-64 retrieval",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "package.json",
+          "prePackRank": 38,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "SAFETY_LIMIT",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "scripts/package-smoke.mjs::run",
+          "prePackRank": null,
+          "prePackEvidenceBudget": 8000,
+          "owner": "RETRIEVAL",
+          "cause": "required identity unavailable in top-64 retrieval",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "package.json",
+          "prePackRank": 38,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "scripts/package-smoke.mjs::run",
+          "prePackRank": null,
+          "prePackEvidenceBudget": 8000,
+          "owner": "RETRIEVAL",
+          "cause": "required identity unavailable in top-64 retrieval",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-package-parser-assets",
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "package.json",
+          "prePackRank": 38,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        },
+        {
+          "kind": "SYMBOL",
+          "identity": "scripts/package-smoke.mjs::run",
+          "prePackRank": null,
+          "prePackEvidenceBudget": 8000,
+          "owner": "RETRIEVAL",
+          "cause": "required identity unavailable in top-64 retrieval",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "docs/adr/ADR-006-hard-budget-context-packing.md",
+          "prePackRank": 43,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "budget": 4000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "docs/adr/ADR-006-hard-budget-context-packing.md",
+          "prePackRank": 43,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "budget": 8000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "docs/adr/ADR-006-hard-budget-context-packing.md",
+          "prePackRank": 43,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "GLOBAL_BUDGET",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "budget": 16000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "docs/adr/ADR-006-hard-budget-context-packing.md",
+          "prePackRank": 43,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "self-pack-snapshot-architecture",
+      "budget": 32000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "FILE",
+          "identity": "docs/adr/ADR-006-hard-budget-context-packing.md",
+          "prePackRank": 43,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "py-state-transition-refactor",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "SYMBOL",
+          "identity": "app/queue/store.py::JobStore.claim",
+          "prePackRank": 2,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    },
+    {
+      "taskId": "mixed-openapi-display-name",
+      "budget": 2000,
+      "systemId": "contextforge-v2-plan-pack",
+      "misses": [
+        {
+          "kind": "SYMBOL",
+          "identity": "frontend/src/api/client.ts::ProfileDto",
+          "prePackRank": 1,
+          "prePackEvidenceBudget": 8000,
+          "owner": "PACKING",
+          "cause": "required content not retained within emitted ranges",
+          "releaseBlocker": false,
+          "v03ImplementationScheduled": false
+        }
+      ]
+    }
+  ]
+}
