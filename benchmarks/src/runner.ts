@@ -7,6 +7,10 @@ import { promisify } from "node:util";
 import { TreeSitterLanguageAnalyzer } from "../../src/adapters/parser/tree-sitter-language-analyzer.js";
 import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-repository.js";
 import { buildIndex } from "../../src/application/build-index.js";
+import { buildContextPackV2 } from "../../src/application/build-context-pack-v2.js";
+import { buildContextPack } from "../../src/application/build-context-pack.js";
+import { searchRepositoryV2 } from "../../src/application/search-repository-v2.js";
+import { ContextForgeError } from "../../src/core/errors.js";
 import { FileSystemRepositoryScanner } from "../../src/adapters/filesystem/repository-scanner.js";
 import { FileSystemRepositorySourceReader } from "../../src/adapters/filesystem/repository-source-reader.js";
 import { PACKING_STRATEGY } from "../../src/core/context-pack.js";
@@ -37,11 +41,13 @@ import {
   SYSTEM_IDS,
   V0_2_02_EVALUATION_VERSION,
   V0_2_03_EVALUATION_VERSION,
+  V0_2_04_EVALUATION_VERSION,
   type BenchmarkDataset,
   type BenchmarkRepositoryDefinition,
   type PerformanceSample,
   type QualityCaseResult,
   type QualityRun,
+  type SystemSelection,
 } from "./types.js";
 import type { RetrievalV2Ablation } from "../../src/core/task-retrieval-v2.js";
 
@@ -152,7 +158,7 @@ export async function runQualityBenchmark(workspaceRoot: string, mode: "SMOKE" |
     return {
       manifest: {
         benchmarkVersion: BENCHMARK_VERSION,
-        evaluationVersion: V0_2_03_EVALUATION_VERSION,
+        evaluationVersion: V0_2_04_EVALUATION_VERSION,
         datasetVersion: DATASET_VERSION,
         datasetHash: lock.datasetHash,
         contextforgeCommit: await gitHead(workspaceRoot),
@@ -382,7 +388,7 @@ function median(values: readonly number[]): number {
   return ((ordered[middle - 1] ?? value) + value) / 2;
 }
 
-export async function runPerformanceBenchmark(workspaceRoot: string): Promise<unknown> {
+export async function runPerformanceBenchmark(workspaceRoot: string, preOptimizationRun?: typeof runBenchmarkSystem): Promise<unknown> {
   const dataset = await loadDataset(workspaceRoot);
   await validateDatasetFreeze(dataset, workspaceRoot);
   const pinned = dataset.repositories.find((item) => item.kind === "PINNED_GIT");
@@ -391,10 +397,18 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
   if (task === undefined) throw new Error("Pinned ContextForge performance task is missing.");
   const temporaryRoot = await createBenchmarkTemporaryRoot();
   const samples: PerformanceSample[] = [];
+  const preOptimizationSamples: PerformanceSample[] = [];
   try {
     for (let repetition = 1; repetition <= 3; repetition += 1) {
       const prepared = await prepareRepository({ ...pinned, repositoryId: `${pinned.repositoryId}-perf-${repetition}` }, workspaceRoot, temporaryRoot);
       for (const systemId of SYSTEM_IDS) {
+        if (preOptimizationRun !== undefined && systemId === "contextforge-v2-plan-pack") {
+          const before = await preOptimizationRun(systemId, prepared.runtime, task.taskText, 8_000);
+          preOptimizationSamples.push({ repositoryId: pinned.repositoryId, repositoryRevision: pinned.repositoryRevision,
+            taskId: task.taskId, budget: 8_000, systemId, repetition, indexMs: prepared.indexMs,
+            retrievalMs: before.performance.retrievalMs, packingMs: before.performance.packingMs, totalMs: before.performance.totalMs,
+            ...(before.performance.stages === undefined ? {} : { stages: before.performance.stages }) });
+        }
         const selection = await runBenchmarkSystem(systemId, prepared.runtime, task.taskText, 8_000);
         samples.push({
           repositoryId: pinned.repositoryId,
@@ -427,6 +441,13 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
       );
       const runtime = await createRepositoryRuntime(root);
       for (const systemId of SYSTEM_IDS) {
+        if (preOptimizationRun !== undefined && systemId === "contextforge-v2-plan-pack") {
+          const before = await preOptimizationRun(systemId, runtime, "repair Service420.runService420 dependency behavior", 8_000);
+          preOptimizationSamples.push({ repositoryId: "medium-synthetic-1000", repositoryRevision: `sha256:${materialized.sourceHash}`,
+            taskId: "medium-synthetic-service-420", budget: 8_000, systemId, repetition, indexMs: summary.performance.totalMs,
+            retrievalMs: before.performance.retrievalMs, packingMs: before.performance.packingMs, totalMs: before.performance.totalMs,
+            ...(before.performance.stages === undefined ? {} : { stages: before.performance.stages }) });
+        }
         const selection = await runBenchmarkSystem(systemId, runtime, "repair Service420.runService420 dependency behavior", 8_000);
         samples.push({
           repositoryId: "medium-synthetic-1000",
@@ -449,7 +470,7 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
   }
   return {
     benchmarkVersion: BENCHMARK_VERSION,
-    evaluationVersion: V0_2_03_EVALUATION_VERSION,
+    evaluationVersion: V0_2_04_EVALUATION_VERSION,
     datasetVersion: DATASET_VERSION,
     datasetHash: datasetHash(dataset),
     contextforgeCommit: await gitHead(workspaceRoot),
@@ -475,6 +496,8 @@ export async function runPerformanceBenchmark(workspaceRoot: string): Promise<un
       };
     })),
     samples,
+    // Comparison samples never enter quality systems, results, or their denominators.
+    ...(preOptimizationRun === undefined ? {} : { preOptimizationSamples }),
   };
 }
 
@@ -513,4 +536,60 @@ export async function writeJsonOutput(workspaceRoot: string, name: string, value
   const path = join(outputRoot, name);
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   return path;
+}
+
+/** Gold is consumed only here, after the shared application has selected context. */
+export async function runPlanPackDiagnostics(workspaceRoot: string, mode: "GATE" | "ABLATION" = "ABLATION"): Promise<unknown> {
+  const dataset = await loadDataset(workspaceRoot);
+  const lock = await validateDatasetFreeze(dataset, workspaceRoot);
+  const temporaryRoot = await createBenchmarkTemporaryRoot();
+  const tasks: unknown[] = [];
+  try {
+    const prepared = await prepareAll(dataset, workspaceRoot, temporaryRoot);
+    for (const repository of prepared) {
+      const runtime = repository.runtime;
+      for (const task of dataset.tasks.filter((item) => item.repositoryId === repository.definition.repositoryId)) {
+        const request = { repositoryPath: runtime.root, task: task.taskText, budget: 8000 };
+        const retrieval = await searchRepositoryV2(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, { ...request, limit: 64, ablation: "RELATION_FULL" }, new TreeSitterLanguageAnalyzer());
+        const variants: unknown[] = [];
+        const selectedVariants = mode === "GATE" ? ["TASK_AWARE"] as const : ["PACK_V1", "NEUTRAL", "TASK_AWARE"] as const;
+        for (const variant of selectedVariants) {
+          let pack;
+          try {
+            pack = variant === "PACK_V1"
+              ? await buildContextPack(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, request, undefined, () => Promise.resolve(retrieval))
+              : await buildContextPackV2(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, request, { search: () => Promise.resolve(retrieval), planVariant: variant });
+          } catch (error) {
+            if (!(error instanceof ContextForgeError) || error.code !== "BUDGET_TOO_SMALL") throw error;
+          }
+          const selection: SystemSelection = {
+            systemId: variant === "PACK_V1" ? "contextforge-v2-relations" : "contextforge-v2-plan-pack",
+            rankingStrategy: retrieval.result.rankingStrategy, packingStrategy: variant === "PACK_V1" ? "contextforge-pack-v1" : "contextforge-pack-v2",
+            tokenEstimator: GENERIC_TOKEN_ESTIMATOR_ID, tokenEstimatorVersion: GENERIC_TOKEN_ESTIMATOR_VERSION, budget: 8000,
+            payloadTokens: pack?.manifest.estimatedPayloadTokens ?? 0,
+            retrievalCandidates: retrieval.result.candidates.map((candidate) => ({ path: candidate.relativePath, relevantSymbols: candidate.relevantSymbols.map((symbol) => ({ path: candidate.relativePath, qualifiedName: symbol.qualifiedName })) })),
+            selectedRanges: pack?.manifest.selectedItems.map((item) => ({ path: item.relativePath, ranges: item.selectedRanges })) ?? [],
+            status: pack?.manifest.packStatus ?? "NO_CONTEXT", diagnostics: pack?.manifest.diagnostics ?? ["BUDGET_TOO_SMALL"], performance: { retrievalMs: 0, packingMs: 0, totalMs: 0 },
+          };
+          const quality = await evaluateSelection(runtime, task, lock.datasetHash, selection);
+          const required = [
+            ...task.goldFiles.filter((gold) => gold.importance === "REQUIRED").map((gold) => {
+              const rank = retrieval.result.candidates.findIndex((candidate) => candidate.relativePath === gold.path);
+              return { kind: "FILE", identity: gold.path, prePackRank: rank < 0 ? null : rank + 1, retained: quality.selectedFiles.includes(gold.path) };
+            }),
+            ...task.goldSymbols.filter((gold) => gold.importance === "REQUIRED").map((gold) => {
+              const rank = retrieval.result.candidates.findIndex((candidate) => candidate.relativePath === gold.path && candidate.relevantSymbols.some((symbol) => symbol.qualifiedName === gold.qualifiedName));
+              const indexed = runtime.snapshot.files.find((file) => file.relativePath === gold.path)?.analysis.symbols.find((symbol) => symbol.qualifiedName === gold.qualifiedName);
+              const retained = indexed !== undefined && selection.selectedRanges.some((item) => item.path === gold.path && item.ranges.some((range) => range.startLine <= indexed.startLine && range.endLine >= indexed.endLine));
+              return { kind: "SYMBOL", identity: `${gold.path}::${gold.qualifiedName}`, prePackRank: rank < 0 ? null : rank + 1, retained };
+            }),
+          ];
+          variants.push({ variant, quality, required, payloadSha256: sha256(pack?.markdown ?? ""), manifest: pack?.manifest ?? null });
+        }
+        tasks.push({ taskId: task.taskId, variants });
+      }
+      await assertCorpusUnchanged(repository.materialized);
+    }
+  } finally { await removeBenchmarkTemporaryRoot(temporaryRoot); }
+  return { evaluationVersion: V0_2_04_EVALUATION_VERSION, diagnosticMode: mode, datasetHash: lock.datasetHash, budget: 8000, taskCount: tasks.length, tasks };
 }

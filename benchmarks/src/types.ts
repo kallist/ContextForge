@@ -4,7 +4,8 @@ export const BENCHMARK_VERSION = "contextforge-benchmark-v1";
 export const DATASET_VERSION = "contextforge-dataset-v1";
 export const V0_2_02_EVALUATION_VERSION = "contextforge-v0.2-02-evaluation-v1";
 export const V0_2_03_EVALUATION_VERSION = "contextforge-v0.2-03-evaluation-v1";
-export const SYSTEM_IDS = ["lexical-full-file-v1", "structural-full-file-v1", "contextforge-v1", "contextforge-v2", "contextforge-v2-relations"] as const;
+export const V0_2_04_EVALUATION_VERSION = "contextforge-v0.2-04-evaluation-v1";
+export const SYSTEM_IDS = ["lexical-full-file-v1", "structural-full-file-v1", "contextforge-v1", "contextforge-v2", "contextforge-v2-relations", "contextforge-v2-plan-pack"] as const;
 export const QUALITY_BUDGETS = [2_000, 4_000, 8_000, 16_000, 32_000] as const;
 export const RETRIEVAL_CUTOFFS = [1, 3, 5, 10, 20] as const;
 export const MATCHED_RECALL_TARGETS = [0.8, 0.9, 1] as const;
@@ -116,6 +117,12 @@ export interface SystemSelection {
       readonly relationshipDerivationMs: number;
       readonly relationshipExpansionMs: number;
       readonly rankingMs: number;
+      readonly packingContextPlanMs?: number;
+      readonly packingRoleAssignmentMs?: number;
+      readonly packingRangeSelectionMs?: number;
+      readonly packingSelectionMs?: number;
+      readonly packingSerializationMs?: number;
+      readonly packingTokenEstimationMs?: number;
     };
   };
 }
@@ -167,7 +174,7 @@ export interface QualityCaseResult {
 export interface QualityRun {
   readonly manifest: {
     readonly benchmarkVersion: typeof BENCHMARK_VERSION;
-    readonly evaluationVersion?: typeof V0_2_02_EVALUATION_VERSION | typeof V0_2_03_EVALUATION_VERSION;
+    readonly evaluationVersion?: typeof V0_2_02_EVALUATION_VERSION | typeof V0_2_03_EVALUATION_VERSION | typeof V0_2_04_EVALUATION_VERSION;
     readonly datasetVersion: typeof DATASET_VERSION;
     readonly datasetHash: string;
     readonly contextforgeCommit: string;

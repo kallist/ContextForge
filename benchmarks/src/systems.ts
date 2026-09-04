@@ -6,6 +6,8 @@ import { FileSystemRepositorySourceReader } from "../../src/adapters/filesystem/
 import { TreeSitterLanguageAnalyzer } from "../../src/adapters/parser/tree-sitter-language-analyzer.js";
 import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-repository.js";
 import { buildContextPack, type ContextPackSearch } from "../../src/application/build-context-pack.js";
+import { buildContextPackV2 } from "../../src/application/build-context-pack-v2.js";
+import { PACK_V2_STRATEGY } from "../../src/core/packing/pack-v2.js";
 import type { RepositoryScanner, ScanResult } from "../../src/application/map-repository.js";
 import type { RepositorySourceReader } from "../../src/application/repository-source.js";
 import { searchRepository } from "../../src/application/search-repository.js";
@@ -592,6 +594,29 @@ export async function runBenchmarkSystem(
   budget: number,
 ): Promise<SystemSelection> {
   const started = performance.now();
+  if (systemId === "contextforge-v2-plan-pack") {
+    let retrieval: SearchExecutionV2 | undefined;
+    try {
+      const pack = await buildContextPackV2(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, { repositoryPath: runtime.root, task, budget }, {
+        estimator,
+        search: async (request) => {
+          retrieval = await searchRepositoryV2(runtime.scanner, runtime.sourceReader, runtime.repositoryFactory, { ...request, ablation: "RELATION_FULL" }, relationshipAnalyzer);
+          return retrieval;
+        },
+      });
+      if (retrieval === undefined) throw new Error("Pack V2 did not execute retrieval.");
+      return { systemId, rankingStrategy: retrieval.result.rankingStrategy, packingStrategy: PACK_V2_STRATEGY, tokenEstimator: estimator.id, tokenEstimatorVersion: estimator.version, budget,
+        payloadTokens: pack.manifest.estimatedPayloadTokens, retrievalCandidates: productionRetrieval(retrieval.result.candidates), selectedRanges: pack.manifest.selectedItems.map((item) => ({ path: item.relativePath, ranges: item.selectedRanges })), status: pack.manifest.packStatus, diagnostics: pack.manifest.diagnostics,
+        performance: { retrievalMs: pack.performance.searchMs, packingMs: pack.performance.totalMs - pack.performance.searchMs, totalMs: pack.performance.totalMs,
+          stages: { taskAnalysisMs: retrieval.performance.taskAnalysisMs, contextPlanMs: retrieval.performance.contextPlanMs + pack.performance.contextPlanMs, identityMs: retrieval.performance.identityMs, lexicalMs: retrieval.performance.lexicalMs, fusionMs: retrieval.performance.fusionMs, graphExpansionMs: retrieval.performance.graphExpansionMs, relationshipDerivationMs: retrieval.performance.relationshipDerivationMs, relationshipExpansionMs: retrieval.performance.relationshipExpansionMs, rankingMs: retrieval.performance.rankingMs,
+            packingContextPlanMs: pack.performance.contextPlanMs, packingRoleAssignmentMs: pack.performance.roleAssignmentMs, packingRangeSelectionMs: pack.performance.rangeSelectionMs,
+            packingSelectionMs: pack.performance.selectionMs, packingSerializationMs: pack.performance.serializationMs, packingTokenEstimationMs: pack.performance.tokenEstimationMs } },
+      };
+    } catch (error) {
+      if (!(error instanceof ContextForgeError) || error.code !== "BUDGET_TOO_SMALL" || retrieval === undefined) throw error;
+      return { systemId, rankingStrategy: retrieval.result.rankingStrategy, packingStrategy: PACK_V2_STRATEGY, tokenEstimator: estimator.id, tokenEstimatorVersion: estimator.version, budget, payloadTokens: 0, retrievalCandidates: productionRetrieval(retrieval.result.candidates), selectedRanges: [], status: "NO_CONTEXT", diagnostics: [error.code], performance: { retrievalMs: retrieval.performance.totalMs, packingMs: performance.now() - started - retrieval.performance.totalMs, totalMs: performance.now() - started } };
+    }
+  }
   if (systemId === "lexical-full-file-v1") {
     const retrievalStarted = performance.now();
     const candidates = await lexicalCandidates(runtime, task);

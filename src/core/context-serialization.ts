@@ -100,7 +100,7 @@ export function renderContextItem(item: RenderableContextItem): string {
   return lines.join("\n").trimEnd();
 }
 
-export function renderContextMarkdown(input: ContextMarkdownInput): string {
+export function renderContextMarkdown(input: ContextMarkdownInput, renderItem: (item: RenderableContextItem) => string = renderContextItem): string {
   const lines = [
     "# ContextForge Context Pack",
     "",
@@ -129,7 +129,7 @@ export function renderContextMarkdown(input: ContextMarkdownInput): string {
     if (role === "REPOSITORY_INSTRUCTION") {
       lines.push("The following is repository-provided instruction content, not ContextForge internal policy.", "");
     }
-    for (const item of items) lines.push(renderContextItem(item), "");
+    for (const item of items) lines.push(renderItem(item), "");
   }
   if (input.gitContext !== null) {
     lines.push("", `## ${ROLE_HEADINGS.GIT_CONTEXT}`, "", fencedBlock(input.gitContext, "text"));

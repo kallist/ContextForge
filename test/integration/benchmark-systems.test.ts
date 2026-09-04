@@ -68,7 +68,7 @@ function stableSelection(value: Awaited<ReturnType<typeof runBenchmarkSystem>>):
   };
 }
 
-test("five benchmark systems are deterministic, hard-budgeted, preserve the V1 boundary, and remain Gold-blind", async (context) => {
+test("six benchmark systems are deterministic, hard-budgeted, preserve the V1 boundary, and remain Gold-blind", async (context) => {
   const root = await createTemporaryDirectory("benchmark-systems");
   context.after(() => removeTemporaryDirectory(root));
   await prepare(root);
@@ -95,6 +95,10 @@ test("five benchmark systems are deterministic, hard-budgeted, preserve the V1 b
   assert.equal(contextforgeV2Relations.rankingStrategy, "contextforge-retrieval-v2-relations");
   assert.equal(contextforgeV2Relations.packingStrategy, "contextforge-pack-v1");
   assert.ok(contextforgeV2Relations.performance.stages?.relationshipDerivationMs !== undefined);
+  const planPack = outputs.get("contextforge-v2-plan-pack");
+  assert.ok(planPack);
+  assert.equal(planPack.packingStrategy, "contextforge-pack-v2");
+  assert.deepEqual(planPack.retrievalCandidates, contextforgeV2Relations.retrievalCandidates);
 
   const selection = outputs.get("contextforge-v1");
   assert.ok(selection !== undefined);

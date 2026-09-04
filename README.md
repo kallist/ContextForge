@@ -215,6 +215,7 @@ Known V0.1 limitations include the generic non-model tokenizer, weak pure-synony
 - [Retrieval V2 Design](docs/V0.2_RETRIEVAL_DESIGN.md) — TaskAnalysis, ContextPlan, hybrid-retrieval contracts, implemented V0.2-02 boundary, and deferred Pack V2 work.
 - [V0.2 Retrieval Foundation Results](docs/V0.2_RETRIEVAL_FOUNDATION_RESULTS.md) — frozen four-system V0.2-02 quality, ablation, performance, regression, and compatibility evidence.
 - [V0.2 Relationship Linking Results](docs/V0.2_RELATIONSHIP_LINKING_RESULTS.md) — frozen five-system V0.2-03 relationship, failure, ablation, performance, and limitation evidence.
+- [Plan-aware Packing Results](docs/V0.2_PLAN_AWARE_PACKING_RESULTS.md) — experimental six-system evaluation, preserved failures and performance closeout; mixed quality evidence, with public defaults remaining V1.
 - [Release Checklist](docs/RELEASE_CHECKLIST.md) — v0.1.1 technical, legal, hosted, and explicitly authorized release gates.
 - [V0.1.1 Release Notes](docs/RELEASE_NOTES_V0.1.1.md) — scoped-package correction, V0.1 behavior, evidence, trust model, and limitations.
 - [V0.1.0 Release Notes](docs/RELEASE_NOTES_V0.1.md) — historical tagged-candidate record; public npm publication did not complete.

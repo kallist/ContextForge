@@ -274,7 +274,9 @@ export function renderBenchmarkReport(run: QualityRun): string {
     return rightRequiredDelta - leftRequiredDelta || rightPrecisionDelta - leftPrecisionDelta || compareText(left.taskId, right.taskId);
   });
   const lines = [
-    "# ContextForge V0.2-03 Relationship Intelligence Results",
+    run.manifest.systems.includes("contextforge-v2-plan-pack")
+      ? "# ContextForge V0.2-04 Plan-aware Packing Results"
+      : "# ContextForge V0.2-03 Relationship Intelligence Results",
     "",
     `Benchmark: ${run.manifest.benchmarkVersion}`,
     `Evaluation: ${run.manifest.evaluationVersion ?? "legacy-v1"}`,
@@ -325,6 +327,7 @@ export function renderBenchmarkReport(run: QualityRun): string {
   const packingValue = comparison(run, "contextforge-v1", "structural-full-file-v1", 8_000);
   const retrievalV2Value = comparison(run, "contextforge-v2", "contextforge-v1", 8_000);
   const relationshipValue = comparison(run, "contextforge-v2-relations", "contextforge-v2", 8_000);
+  const planPackValue = comparison(run, "contextforge-v2-plan-pack", "contextforge-v2-relations", 8_000);
   const versusLexical = winTieLoss(run, "lexical-full-file-v1", "contextforge-v2-relations", 8_000);
   const versusV1 = winTieLoss(run, "contextforge-v1", "contextforge-v2-relations", 8_000);
   const versusV2 = winTieLoss(run, "contextforge-v2", "contextforge-v2-relations", 8_000);
@@ -334,6 +337,10 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "",
     "## Attribution at 8K",
     "",
+    ...(run.manifest.systems.includes("contextforge-v2-plan-pack") ? [
+      `Plan-aware Pack V2 vs identical relationship retrieval + Pack V1 — required-symbol recall delta: ${format(planPackValue.requiredSymbolDelta)}; precision delta: ${format(planPackValue.precisionDelta)}.`,
+      "",
+    ] : []),
     `Structural ranking vs lexical full-file — required-symbol recall delta: ${format(structuralValue.requiredSymbolDelta)}; precision delta: ${format(structuralValue.precisionDelta)}.`,
     "",
     `ContextForge packing vs structural full-file — required-symbol recall delta: ${format(packingValue.requiredSymbolDelta)}; precision delta: ${format(packingValue.precisionDelta)}.`,
@@ -387,7 +394,8 @@ export function renderBenchmarkReport(run: QualityRun): string {
     "- All systems use the same materialized snapshot, task, estimator, safety boundary, and hard serialized budget.",
     "- `lexical-full-file-v1` uses only task normalization, path/symbol/source lexical evidence, and whole files.",
     "- `structural-full-file-v1` uses production V1 structural ranking and whole files; `contextforge-v1` uses V1 retrieval and Pack V1.",
-    "- `contextforge-v2` uses the shared Retrieval V2 application path with unchanged Pack V1 and the unchanged estimator; Pack V2 is not implemented.",
+    "- `contextforge-v2` uses the shared Retrieval V2 application path with unchanged Pack V1 and the unchanged estimator.",
+    ...(run.manifest.systems.includes("contextforge-v2-plan-pack") ? ["- `contextforge-v2-plan-pack` uses the same relationship retrieval with experimental Plan-aware Pack V2; public CLI/MCP defaults remain V1."] : []),
     "- `contextforge-v2-relations` adds bounded distance-1 relationship evidence through the same Retrieval V2 fusion/ranking path; it does not claim a complete call graph, test coverage, or sound whole-program impact analysis.",
     "- This finite self/curated dataset may contain self-repository and fixture-authoring bias.",
     "- The generic estimator is not a model tokenizer; no coding agent, LLM judge, network, embedding, or corpus code execution is involved.",
