@@ -585,7 +585,8 @@ Review-driven corrections: an earlier possibility of building WASM during consum
 | Benchmark harness/results | IMPLEMENTED / FULL QUALITY AND PERFORMANCE LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | V0.2-02 TaskAnalysis, ContextPlan, CandidateEvidence/Fusion, and Retrieval V2 benchmark path | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.19.0 / PUBLIC DEFAULT UNCHANGED |
 | V0.2-03 bounded Symbol/Test/Impact Linking benchmark path | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.19.0 / PUBLIC DEFAULT UNCHANGED |
-| Full V0.2 Pack V2 | NOT IMPLEMENTED |
+| Experimental V0.2-04 Plan-aware Pack V2 application/core and benchmark path | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 / MIXED QUALITY; PERFORMANCE CLOSEOUT PASSED / PUBLIC DEFAULT UNCHANGED |
+| Full V0.2 Pack V2 product integration | NOT IMPLEMENTED |
 | MCP adapter | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Release hardening and documentation | IMPLEMENTED / LOCALLY TESTED ON WINDOWS WITH NODE 24.20.0 |
 | Hosted CI workflow | IMPLEMENTED / HOSTED TESTED (Node 24.15 minimum plus Ubuntu/Windows/macOS 24.20 matrix) |
