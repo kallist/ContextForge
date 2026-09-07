@@ -1,4 +1,6 @@
 import { performance } from "node:perf_hooks";
+import { buildContextCapsule } from "./build-context-capsule.js";
+import type { ContextCapsuleV1 } from "../core/context-capsule.js";
 import type { RepositoryScanner } from "./map-repository.js";
 import type { RepositorySourceReader } from "./repository-source.js";
 import type { ContextPackRequest } from "./build-context-pack.js";
@@ -18,7 +20,7 @@ import type { RankedFileCandidateV2 } from "../core/task-retrieval-v2.js";
 import { GenericTokenEstimator, type TokenEstimator } from "../core/token-estimation.js";
 import { createRequestFragmentRenderer } from "../core/packing/request-fragments.js";
 
-export type PackV2Search = (request: { readonly repositoryPath: string; readonly task: string; readonly limit: number }) => Promise<SearchExecutionV2>;
+export type PackV2Search = (request: { readonly repositoryPath: string; readonly task: string; readonly limit: number; readonly captureCapsule?: boolean }) => Promise<SearchExecutionV2>;
 export interface PackV2Options {
   readonly estimator?: TokenEstimator;
   readonly relationshipAnalyzer?: RelationshipSyntaxAnalyzer;
@@ -113,6 +115,7 @@ export async function buildContextPackV2(scanner: RepositoryScanner, reader: Rep
   const entries = new Map(scan.entries.map((entry) => [entry.path, entry]));
   const signals = search.result.normalizedQuery.signals.filter((signal) => !signal.lowValue).map((signal) => signal.normalized);
   const dropped: { path: string; rank: number | null; reason: PackDropReason }[] = [];
+  const sourceSafetyExclusions = request.captureCapsule === true ? new Set<number | null>() : undefined;
   const prepared: Prepared[] = [];
   let verifiedFiles = 0;
   let verifiedBytes = 0;
@@ -128,6 +131,7 @@ export async function buildContextPackV2(scanner: RepositoryScanner, reader: Rep
       return null;
     }
     if (verifiedFiles >= PACK_V2.candidateLimit || verifiedBytes + (entry.size ?? 0) > PACK_V2.maximumVerifiedBytes) {
+      sourceSafetyExclusions?.add(rank);
       dropped.push({ path, rank, reason: "SAFETY_LIMIT" }); partial = true; return null;
     }
     const readStarted = performance.now();
@@ -138,7 +142,7 @@ export async function buildContextPackV2(scanner: RepositoryScanner, reader: Rep
       dropped.push({ path, rank, reason: "STALE_SOURCE" }); partial = true; return null;
     }
     verifiedBytes += source.size;
-    if (verifiedBytes > PACK_V2.maximumVerifiedBytes) { dropped.push({ path, rank, reason: "SAFETY_LIMIT" }); partial = true; return null; }
+    if (verifiedBytes > PACK_V2.maximumVerifiedBytes) { sourceSafetyExclusions?.add(rank); dropped.push({ path, rank, reason: "SAFETY_LIMIT" }); partial = true; return null; }
     return { file, lines: logicalLines(source.source) };
   };
   let instruction: RenderableContextItem | null = null;
@@ -217,7 +221,7 @@ export async function buildContextPackV2(scanner: RepositoryScanner, reader: Rep
   });
   if (instruction !== null) selectedItems.unshift({ identity: instruction.identity, relativePath: instruction.relativePath, role: instruction.role, secondaryRoles: [], candidateRank: null, candidateScore: null, candidateOrigin: null, graphDistance: null, selectionReasons: instruction.selectionReasons, relevantSymbols: [], selectedRanges: instruction.ranges, wholeFile: !instruction.partial, estimatedTokens: estimator.estimate(renderContextItem(instruction)), contentStatus: instruction.partial ? "PARTIAL" : "VERIFIED_GENERATION" });
   dropped.push(...selection.drops.map((drop) => ({ ...drop, rank: prepared.find((entry) => entry.path === drop.path)?.rank ?? null })));
-  return {
+  const execution = {
     markdown,
     manifest: { schemaVersion: "2.0", task: request.task, repository: search.result.repository, generation: snapshot.generation, indexStatus: search.result.indexStatus, packStatus: partial ? "PARTIAL" as const : "COMPLETE" as const, rankingStrategy: search.result.rankingStrategy, packingStrategy: PACK_V2_STRATEGY, tokenEstimator: estimator.id, tokenEstimatorVersion: estimator.version, requestedBudget: request.budget, estimatedPayloadTokens, unusedBudget: request.budget - estimatedPayloadTokens, selectedItems, droppedCandidates: dropped.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)), diagnostics: [...search.result.diagnostics, ...(partial ? ["PACK_PARTIAL"] : [])], plan,
       planDiagnostics: {
@@ -237,4 +241,7 @@ export async function buildContextPackV2(scanner: RepositoryScanner, reader: Rep
     },
     performance: { searchMs, contextPlanMs, roleAssignmentMs, sourceVerificationMs, rangeSelectionMs, selectionMs, serializationMs, tokenEstimationMs, verifiedFiles, verifiedBytes, fragmentCache: { ...fragments.counters }, totalMs: performance.now() - started },
   };
+  if (sourceSafetyExclusions === undefined) return execution as typeof execution & { readonly capsule?: ContextCapsuleV1 };
+  const capsule = buildContextCapsule(snapshot, scan, search.result, execution.manifest, markdown, dropped, { search: search.result, relationships: search.context.capsuleRelationships ?? search.result.relationships, plan, policy: PACK_V2_POLICY, events: selection.events, candidates: execution.manifest.planDiagnostics.candidates, roles: execution.manifest.planDiagnostics.roles, sourceSafetyExclusions });
+  return { ...execution, capsule, performance: { ...execution.performance, totalMs: performance.now() - started } };
 }

@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { buildContextCapsule } from "./build-context-capsule.js";
 
 import type { RepositoryScanner, ScanResult } from "./map-repository.js";
 import type { RepositorySourceReader } from "./repository-source.js";
@@ -32,12 +33,21 @@ import type { CandidateOrigin, SearchIndexStatus } from "../core/task-retrieval.
 import { GenericTokenEstimator, type TokenEstimator } from "../core/token-estimation.js";
 
 export interface ContextPackRequest {
+  readonly captureCapsule?: boolean;
   readonly repositoryPath: string;
   readonly task: string;
   readonly budget: number;
 }
 
 interface PackCandidateEvidence {
+  readonly id?: string;
+  readonly querySignal?: string | null;
+  readonly confidence?: number;
+  readonly derivation?: "STRUCTURAL" | "HEURISTIC" | "VERIFIED_SOURCE";
+  readonly taskSignalId?: string | null;
+  readonly sourceCandidate?: string | null;
+  readonly relationshipId?: string | null;
+  readonly location?: { readonly startLine: number; readonly endLine: number } | null;
   readonly kind: string;
   readonly family: string;
   readonly weight: number;
@@ -51,7 +61,7 @@ interface PackRankedCandidate {
   readonly origin: CandidateOrigin;
   readonly directEvidence: readonly PackCandidateEvidence[];
   readonly expansionEvidence: readonly PackCandidateEvidence[];
-  readonly scoreContributions: readonly { readonly kind: string; readonly family: string; readonly value: number; readonly reason: string }[];
+  readonly scoreContributions: readonly { readonly kind: string; readonly family: string; readonly value: number; readonly reason: string; readonly evidenceId?: string | null }[];
   readonly rawScore: number;
   readonly graphDistance: number | null;
   readonly relevantSymbols: readonly {
@@ -512,6 +522,7 @@ export async function buildContextPack(
     .map((signal) => signal.normalized);
   const plans: CandidatePlan[] = [];
   const dropped: DroppedCandidate[] = [];
+  const capsuleDrops: DroppedCandidate[] | undefined = request.captureCapsule === true ? [] : undefined;
   const droppedCounts = new Map<DropReason, number>(DROP_REASONS.map((reason) => [reason, 0]));
   const diagnostics = new Set<string>(search.result.diagnostics);
   let verifiedFiles = 0;
@@ -520,6 +531,7 @@ export async function buildContextPack(
   let verificationLimited = false;
 
   const recordDrop = (candidate: PackRankedCandidate | null, rank: number | null, path: string, reason: DropReason): void => {
+    capsuleDrops?.push({ relativePath: path, candidateRank: rank, score: candidate?.rawScore ?? null, dropReason: reason });
     droppedCounts.set(reason, (droppedCounts.get(reason) ?? 0) + 1);
     if (dropped.length < PACK_V1.maximumDroppedCandidates) {
       dropped.push({ relativePath: path, candidateRank: rank, score: candidate?.rawScore ?? null, dropReason: reason });
@@ -844,6 +856,7 @@ export async function buildContextPack(
   };
   const planningMs = performance.now() - planningStarted;
   return {
+    ...(capsuleDrops === undefined ? {} : { capsule: buildContextCapsule(snapshot, scan, search.result, manifest, markdown, capsuleDrops.map((d) => ({ path: d.relativePath, rank: d.candidateRank, reason: d.dropReason }))) }),
     markdown,
     manifest,
     performance: {

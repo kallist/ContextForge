@@ -183,6 +183,12 @@ Source lexical matching does not store source or source-derived term rows in SQL
 
 ## Token budget and Context Packing
 
+V0.3 development adds opt-in Context Capsules: deterministic provenance and exact
+Markdown payload identity. Use `pack ... --capsule capsule.json`, then inspect recorded
+decisions offline with `contextforge explain capsule.json`. See [Context Capsule](docs/CONTEXT_CAPSULE.md)
+and [Explain contract](docs/EXPLAIN_CONTRACT.md). Source bodies are not duplicated;
+Replay, Workbench, and Human Override are not implemented. This is not a V0.3 release.
+
 `contextforge pack "<coding task>" [repository] --budget <tokens>` invokes the same `contextforge-structural-v1` Search use case, then applies `contextforge-pack-v1`. The default stdout artifact is Markdown and the budget covers that complete serialized payload, including task text, headings, paths, reasons, and dynamically sized code fences. `--json` emits the deterministic source-free manifest; manifest bytes are audit metadata and are not included in the Markdown budget. `--out <path>` publishes either artifact atomically and refuses to overwrite an existing file.
 
 The built-in `contextforge-generic-v1` estimator (version `1.0`) is deterministic, local, and deliberately conservative for code and multilingual text. It is not a model tokenizer, so the hard guarantee is relative to the estimator and version named in the manifest. If the format envelope plus one useful primary unit cannot fit, Pack returns `BUDGET_TOO_SMALL` instead of emitting malformed or misleading context.

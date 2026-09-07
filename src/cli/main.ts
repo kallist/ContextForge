@@ -3,6 +3,9 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { readCapsule } from "../adapters/filesystem/capsule-reader.js";
+import { explainContext, explainQuerySchema, renderExplain } from "../core/explain-context.js";
+import { validateCapsule } from "../core/context-capsule.js";
 
 import { FileSystemOutputArtifactWriter } from "../adapters/filesystem/output-artifact-writer.js";
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
@@ -36,7 +39,8 @@ Usage:
   contextforge inspect <relative-path> [repository] [--json]
   contextforge graph <relative-path> [repository] [--json]
   contextforge search <task> [repository] [--limit <n>] [--json]
-  contextforge pack <task> [repository] --budget <tokens> [--json] [--out <path>]
+  contextforge pack <task> [repository] --budget <tokens> [--json] [--out <path>] [--capsule <path>]
+  contextforge explain <capsule> [--query <type>] [--subject <id-or-path>] [--json]
   contextforge mcp [--repository <path>]
   contextforge --help
   contextforge --version
@@ -48,6 +52,7 @@ Commands:
   graph     Inspect one file's structural relationships and Git signals (no ranking).
   search    Retrieve and explain task-relevant ranked candidates from the active index.
   pack      Compile ranked repository context into a deterministic hard-budget payload.
+  explain   Inspect recorded compiler decisions offline from a Context Capsule.
   mcp       Serve status, index, search, and pack tools over local MCP stdio.
 
 Options:
@@ -55,6 +60,9 @@ Options:
   --limit   Limit search output (default ${STRUCTURAL_V1.cli.defaultLimit}, maximum ${STRUCTURAL_V1.cli.maximumLimit}).
   --budget  Required positive token-estimate limit for the final Pack Markdown payload.
   --out     Write the selected Markdown or JSON artifact without overwriting an existing path.
+  --capsule Export source-free provenance; payloadHash always identifies Pack Markdown.
+  --query   SUMMARY (default), WHY_SELECTED, WHY_DROPPED, WHY_EXCLUDED, BUDGET, STRATEGY.
+  --subject Candidate ID, repository-relative path or symbol for an Explain WHY query.
   --repository Bind the MCP server to one repository (default: current directory).
   --help    Show this help.
   --version Show the package version.
@@ -92,6 +100,9 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
         out: { type: "string" },
         repository: { type: "string" },
         version: { type: "boolean" },
+        capsule: { type: "string" },
+        query: { type: "string" },
+        subject: { type: "string" },
       },
     });
   } catch (error) {
@@ -110,6 +121,16 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
   }
   const [command, first, second, ...extra] = parsed.positionals;
   if (extra.length > 0) throw usageError("Too many positional arguments.");
+  if (command !== "pack" && parsed.values.capsule !== undefined) throw usageError("The --capsule option is only valid for pack.");
+  if (command !== "explain" && (parsed.values.query !== undefined || parsed.values.subject !== undefined)) throw usageError("The --query and --subject options are only valid for explain.");
+  if (command === "explain") {
+    if (first === undefined || second !== undefined || parsed.values.limit !== undefined || parsed.values.budget !== undefined || parsed.values.out !== undefined || parsed.values.repository !== undefined) throw usageError("Explain requires one Capsule path and Explain options only.");
+    const query = explainQuerySchema.safeParse({ type: parsed.values.query ?? "SUMMARY", ...(parsed.values.subject === undefined ? {} : { subject: parsed.values.subject }) });
+    if (!query.success) throw usageError("Invalid Explain query or missing subject.");
+    const result = explainContext(await readCapsule(resolve(workingDirectory, first)), query.data);
+    process.stdout.write(parsed.values.json === true ? `${JSON.stringify(result, null, 2)}\n` : renderExplain(result));
+    return 0;
+  }
   const scanner = new FileSystemRepositoryScanner();
   const repositoryFactory = (rootRealPath: string): SqliteIndexRepository => new SqliteIndexRepository(rootRealPath);
   if (command !== "mcp" && parsed.values.repository !== undefined) {
@@ -173,10 +194,15 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     if (parsed.values.budget === undefined) throw usageError("The pack command requires --budget <tokens>.");
     const budget = Number(parsed.values.budget);
     validateTokenBudget(budget);
-    const execution = await (await createContextForgeApplication(second ?? workingDirectory)).pack({ task: first, budget });
+    if (parsed.values.capsule !== undefined && parsed.values.out !== undefined && resolve(workingDirectory, parsed.values.capsule) === resolve(workingDirectory, parsed.values.out)) throw usageError("Context and Capsule output paths must differ.");
+    const execution = await (await createContextForgeApplication(second ?? workingDirectory)).pack({ task: first, budget, ...(parsed.values.capsule === undefined ? {} : { captureCapsule: true }) });
     const output = parsed.values.json === true
       ? `${JSON.stringify(execution.manifest, null, 2)}\n`
       : execution.markdown;
+    if (parsed.values.capsule !== undefined) {
+      const capsule = validateCapsule(execution.capsule);
+      await new FileSystemOutputArtifactWriter().writeExclusive(resolve(workingDirectory, parsed.values.capsule), `${JSON.stringify(capsule, null, 2)}\n`);
+    }
     if (parsed.values.out === undefined) process.stdout.write(output);
     else await new FileSystemOutputArtifactWriter().writeExclusive(resolve(workingDirectory, parsed.values.out), output);
     for (const diagnostic of execution.manifest.diagnostics) {
