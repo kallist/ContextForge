@@ -8,6 +8,14 @@ This document defines what ContextForge should do and why. It consolidates the p
 
 ## Product Vision
 
+V0.3 extends the compiler with an inspectable local control loop: Capsule history,
+offline inspection and reproduction verification, semantic comparison, captured-fact
+coverage/lint, localhost Studio, semantic human controls and immutable what-if
+recompilation. All preserve source privacy, generation safety and the final declared
+token-estimate budget. The [V0.3 product guide](V0.3_PRODUCT_GUIDE.md) defines current
+operation semantics, boundaries and limits. This extension does not promote V2,
+promise coding-agent success or begin the future Review/Impact product.
+
 ContextForge is a local-first context compiler for coding agents. Given a repository, a coding task, and a token budget, it produces a task-aware Context Pack containing the smallest useful subset of repository information needed to understand and complete that task.
 
 Its central promise is:

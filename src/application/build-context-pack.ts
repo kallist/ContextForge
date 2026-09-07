@@ -1,5 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { buildContextCapsule } from "./build-context-capsule.js";
+import { normalizeControls, type ControlProvenance } from "../core/context-controls.js";
+import { hashCapsuleCore } from "../core/context-capsule.js";
 
 import type { RepositoryScanner, ScanResult } from "./map-repository.js";
 import type { RepositorySourceReader } from "./repository-source.js";
@@ -33,6 +35,7 @@ import type { CandidateOrigin, SearchIndexStatus } from "../core/task-retrieval.
 import { GenericTokenEstimator, type TokenEstimator } from "../core/token-estimation.js";
 
 export interface ContextPackRequest {
+  readonly controlProvenance?: ControlProvenance;
   readonly captureCapsule?: boolean;
   readonly repositoryPath: string;
   readonly task: string;
@@ -496,6 +499,7 @@ export async function buildContextPack(
 ): Promise<ContextPackExecution> {
   const totalStarted = performance.now();
   validateTokenBudget(request.budget);
+  const controls = normalizeControls(request.controlProvenance?.controls ?? []);
   const timers: PhaseTimers = {
     roleAssignmentMs: 0,
     sourceVerificationMs: 0,
@@ -512,6 +516,14 @@ export async function buildContextPack(
   });
   const planningStarted = performance.now();
   const { scan, snapshot } = search.context;
+  const candidatePaths = new Set(search.result.candidates.map((c) => c.relativePath));
+  candidatePaths.add("AGENTS.md");
+  for (const control of controls) {
+    const found = control.kind === "FOCUS"
+      ? [...candidatePaths].some((path) => path === control.path || path.startsWith(`${control.path}/`))
+      : candidatePaths.has(control.path);
+    if (!found) throw new ContextForgeError("CONTROL_CONFLICT", "A control target is outside the current bounded machine proposal.");
+  }
   if (snapshot.generation !== search.result.generation) {
     throw new ContextForgeError("PACK_FAILED", "Search and packing generation identities do not match.");
   }
@@ -594,6 +606,10 @@ export async function buildContextPack(
       recordDrop(candidate, rank, candidate.relativePath, "DUPLICATE");
       continue;
     }
+    if (controls.some((c) => c.kind === "EXCLUDE" && c.path === candidate.relativePath)) {
+      recordDrop(candidate, rank, candidate.relativePath, "LOWER_PRIORITY");
+      continue;
+    }
     const file = fileByPath.get(candidate.relativePath);
     if (file === undefined || file.contentStatus !== "text" || file.contentHash === null) {
       recordDrop(candidate, rank, candidate.relativePath, "UNSUPPORTED_CONTENT");
@@ -621,7 +637,11 @@ export async function buildContextPack(
       selectionReasons: selectionReasons(candidate),
     };
     timers.roleAssignmentMs += performance.now() - roleStarted;
-    const representations = buildRepresentations(base, signalValues, estimator, timers);
+    const range = controls.find((c) => c.kind === "RANGE" && c.path === candidate.relativePath);
+    if (range?.kind === "RANGE" && range.endLine > lines.length) throw new ContextForgeError("CONTROL_CONFLICT", "Requested range exceeds the verified source line count.");
+    const representations = range?.kind === "RANGE"
+      ? uniqueRepresentations([makeRepresentation(base, [{ startLine: range.startLine, endLine: range.endLine, reasons: ["HUMAN_RANGE"] }], range.startLine === 1 && range.endLine === lines.length, estimator, timers)])
+      : buildRepresentations(base, signalValues, estimator, timers);
     if (representations.length === 0) {
       recordDrop(candidate, rank, candidate.relativePath, "NO_USEFUL_RANGE");
       continue;
@@ -631,10 +651,20 @@ export async function buildContextPack(
 
   if (verificationLimited) diagnostics.add("SOURCE_VERIFICATION_LIMIT");
   if (staleSource) diagnostics.add("STALE_SELECTED_SOURCE");
+  const mandatory = new Set(controls.filter((c) => c.kind === "PIN" || c.kind === "RANGE").map((c) => c.path));
+  for (const path of mandatory) {
+    const plan = plans.find((p) => p.file.relativePath === path);
+    if (plan === undefined) throw new ContextForgeError("CONTROL_CONFLICT", "Pinned or ranged source is unavailable or unsafe. Reindex and inspect the proposal.");
+    plan.selectedLevel = 0;
+  }
   const candidates = plans.filter((plan) => plan.candidate !== null);
+  if (controls.length > 0) {
+    const priority = (p: CandidatePlan): number => mandatory.has(p.file.relativePath) ? 0 : controls.some((c) => (c.kind === "PREFER" && c.path === p.file.relativePath) || (c.kind === "FOCUS" && (p.file.relativePath === c.path || p.file.relativePath.startsWith(`${c.path}/`)))) ? 1 : 2;
+    candidates.sort((a, b) => priority(a) - priority(b) || (a.rank ?? 0) - (b.rank ?? 0));
+  }
   const protectedPlan = candidates[0];
   if (protectedPlan === undefined) {
-    throw new ContextForgeError("PACK_FAILED", "No generation-verified useful candidate is available for this task. Reindex or make the task more specific.");
+    throw new ContextForgeError(controls.length > 0 ? "CONTROL_CONFLICT" : "PACK_FAILED", "No generation-verified useful candidate is available for this task. Reindex or make the task more specific.");
   }
   protectedPlan.selectedLevel = 0;
 
@@ -669,7 +699,7 @@ export async function buildContextPack(
   const minimumRequiredEstimate = estimator.estimate(minimumMarkdown);
   if (minimumRequiredEstimate > request.budget) {
     throw new ContextForgeError(
-      "BUDGET_TOO_SMALL",
+      mandatory.size > 0 ? "CONTROL_CONFLICT" : "BUDGET_TOO_SMALL",
       `Budget ${request.budget} cannot fit the required envelope and one useful context unit; minimum estimate is ${minimumRequiredEstimate} using ${estimator.id}.`,
     );
   }
@@ -763,6 +793,7 @@ export async function buildContextPack(
       const reducible = reductionOrder(plans, protectedPlan).find((plan) => {
         if (plan === protectedPlan && plan.selectedLevel === 0) return false;
         if (plan === instructionPlan && plan.selectedLevel === 0) return false;
+        if (mandatory.has(plan.file.relativePath) && plan.selectedLevel === 0) return false;
         return true;
       });
       if (reducible === undefined) break;
@@ -788,7 +819,7 @@ export async function buildContextPack(
   const reductionMs = performance.now() - reductionStarted;
   if (finalEstimate > request.budget) {
     throw new ContextForgeError(
-      "BUDGET_TOO_SMALL",
+      mandatory.size > 0 ? "CONTROL_CONFLICT" : "BUDGET_TOO_SMALL",
       `Budget ${request.budget} cannot fit the minimum useful pack; minimum estimate is ${minimumRequiredEstimate} using ${estimator.id}.`,
     );
   }
@@ -855,8 +886,18 @@ export async function buildContextPack(
     diagnostics: [...diagnostics].sort(compareText),
   };
   const planningMs = performance.now() - planningStarted;
+  const capsule = capsuleDrops === undefined ? undefined : buildContextCapsule(snapshot, scan, search.result, manifest, markdown, capsuleDrops.map((d) => ({ path: d.relativePath, rank: d.candidateRank, reason: d.dropReason })));
+  if (capsule !== undefined && request.controlProvenance !== undefined) {
+    capsule.deterministic.overrides = [{ ...request.controlProvenance, controls }];
+    for (const decision of capsule.deterministic.decisions) {
+      const candidate = capsule.deterministic.candidates.find((c) => c.id === decision.candidateRef);
+      const path = capsule.deterministic.files.find((f) => f.id === candidate?.fileRef)?.path;
+      if (decision.stage !== "SAFETY" && controls.some((c) => c.path === path || (c.kind === "FOCUS" && path?.startsWith(`${c.path}/`)))) decision.decisionSource = "HUMAN_CONTROL";
+    }
+    capsule.capsuleHash = hashCapsuleCore(capsule.deterministic);
+  }
   return {
-    ...(capsuleDrops === undefined ? {} : { capsule: buildContextCapsule(snapshot, scan, search.result, manifest, markdown, capsuleDrops.map((d) => ({ path: d.relativePath, rank: d.candidateRank, reason: d.dropReason }))) }),
+    ...(capsule === undefined ? {} : { capsule }),
     markdown,
     manifest,
     performance: {

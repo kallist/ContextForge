@@ -1,9 +1,9 @@
-# Context Capsule (V0.3 development)
+# Context Capsule
 
 `contextforge-capsule-v1` is a source-free, opt-in compilation provenance contract.
 It records ContextForge's own observations. It does not explain a model's behavior,
 prove that a host delivered the payload, or reconstruct source without the repository.
-Public Pack remains V1 and the package version remains 0.2.0.
+Public Pack remains V1. V0.3 lifecycle behavior is defined in [the product guide](V0.3_PRODUCT_GUIDE.md).
 
 ```text
 contextforge pack "fix Ledger.saveValue" . --budget 8000 --capsule capsule.json
@@ -69,7 +69,10 @@ The deterministic section contains:
   V2 role counts. Multi-role token contributions overlap. This is **not Gold coverage**.
 - `diagnostics`: bounded compiler codes and existing aggregate scan exclusion counts.
   Ignored directory descendants are not enumerated or guessed.
-- `overrides`: empty reserved array. No override behavior.
+- `overrides`: empty for an uncontrolled compilation; otherwise one versioned
+  `contextforge-controls-v1` record with parent Capsule hash and normalized controls.
+  Affected non-safety decisions identify `HUMAN_CONTROL`; safety decisions remain
+  compiler-owned. Old exported empty-override Capsules retain their exact hashes.
 - `payloadHash`: SHA-256 of exact final Markdown UTF-8 bytes, without reformatting.
 
 Existing reasons remain unchanged: V1 includes `SECTION_LIMIT`, `BUDGET_EXHAUSTED`,

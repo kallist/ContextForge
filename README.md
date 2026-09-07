@@ -1,6 +1,43 @@
 # ContextForge
 
-**Status: ContextForge v0.2.0 — stable V1 CLI/MCP with internal experimental V2 intelligence**
+**ContextForge v0.3 — compile, explain, retain, verify and control agent context locally.**
+
+> Machine proposes. Human controls. ContextForge compiles.
+
+An agent can receive too much code, miss useful context, or leave you guessing what
+it actually saw. ContextForge gives the compilation a record: a **Context Capsule**
+with source hashes, selected/dropped decisions, evidence and an exact payload hash.
+Save it, compare alternatives, and verify whether current sources reproduce it.
+
+```sh
+contextforge studio --repository ./your-repository
+```
+
+Open the private localhost URL. Enter a task and hard token-estimate budget, inspect
+the proposal, PIN or EXCLUDE a candidate, then **Recompile & compare**. A new Capsule
+records your control; the original remains immutable. History stores compressed
+metadata, never a source archive. No cloud account or model call is required.
+
+For a CLI-first workflow:
+
+```sh
+contextforge index ./repo
+contextforge pack "fix ledger retries" ./repo --budget 2000 --capsule a.json --out a.md
+contextforge explain a.json --query WHY_SELECTED --subject src/ledger.ts
+contextforge history save a.json --store ./repo/.contextforge/history
+contextforge replay a.json --verify --repository ./repo
+contextforge coverage a.json
+contextforge diff a.json b.json
+```
+
+Replay verifies current sources; it cannot recover historical bytes from metadata.
+Coverage reports captured opportunities and losses, not a completeness percentage.
+The [V0.3 product guide](docs/V0.3_PRODUCT_GUIDE.md) covers controls, what-if CLI usage,
+Studio, history, replay statuses, privacy and failure behavior. See the
+[release notes](docs/RELEASE_NOTES_V0.3.0.md) for the complete product scope.
+
+**Public compiler default: `contextforge-v1`.** Experimental V2 remains internal
+with mixed evidence. **Agent success is not measured.**
 
 ContextForge is a local-first, task-aware context compiler for coding agents. It is intended to answer one practical question: for a specific coding task, which repository context should an agent actually receive?
 
@@ -22,7 +59,7 @@ The product goal is to preserve the context needed to complete a task while redu
 
 ContextForge now safely discovers and indexes a repository, derives a generation-bound graph, retrieves explainable task candidates, and compiles selected current source into deterministic Markdown under a hard declared token-estimate budget. Packing reuses the Phase 4 ranking truth, prefers complete symbols and small whole files, allocates first-class instruction/code/dependency/test/documentation/configuration sections, verifies source hashes against one active generation, and records selections and bounded exclusions in a source-free manifest. Phase 6 adds a frozen, offline benchmark; Phase 7 exposes the same Index, Search, and Pack application behavior through a local MCP stdio adapter.
 
-Remote MCP/HTTP, remote providers, model-specific tokenizers, nested-directory `AGENTS.md` scope, and a web UI remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
+V0.3 adds a localhost Studio and shared lifecycle application contracts. Remote MCP/HTTP, remote providers, model-specific tokenizers and nested-directory `AGENTS.md` scope remain **NOT IMPLEMENTED**. V1 retrieval and packing are transparent lexical/structural heuristics; embeddings, LLM reranking, synonym understanding, and Chinese-to-English semantic translation are not implied.
 
 ## Requirements
 
@@ -44,7 +81,7 @@ npm install -g @kallist/contextforge
 contextforge --version
 ```
 
-To verify this exact release, install `@kallist/contextforge@0.2.0`. The executable remains `contextforge`. Publication and verification status are recorded in the [V0.2 release report](docs/V0.2_RELEASE_REPORT.md).
+The V0.3 package version is `@kallist/contextforge@0.3.0`; the executable remains `contextforge`. Historical V0.2 publication evidence remains in the [V0.2 release report](docs/V0.2_RELEASE_REPORT.md). A source checkout or local tarball is not proof of public publication.
 
 Index a repository and produce task-aware context:
 

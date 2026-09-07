@@ -1,13 +1,14 @@
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
-const temporaryRoot = await mkdtemp(join(tmpdir(), "contextforge-package-smoke-"));
+const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "contextforge-package-smoke-")));
 const installRoot = join(temporaryRoot, "install");
 const fixtureRoot = join(temporaryRoot, "fixture repo");
 const installedPackageRoot = join(installRoot, "node_modules", "@kallist", "contextforge");
@@ -56,7 +57,7 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
   );
   try {
     await client.connect(transport);
-    if (client.getServerVersion()?.version !== "0.2.0") throw new Error("Installed MCP server version differs from the release.");
+    if (client.getServerVersion()?.version !== "0.3.0") throw new Error("Installed MCP server version differs from the release.");
     if (client.getNegotiatedProtocolVersion() !== "2026-07-28") {
       throw new Error("Installed MCP server did not negotiate the expected modern protocol revision.");
     }
@@ -94,6 +95,24 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
   if (stderr.join("") !== "") throw new Error(`Installed MCP server emitted stderr: ${stderr.join("")}`);
 }
 
+async function runStudioFlow(cli, repository) {
+  const child = spawn(process.execPath, [cli, "studio", "--repository", repository], { cwd: installRoot, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const exited = once(child, "exit");
+  try {
+    const url = await new Promise((resolve, reject) => {
+      let output = "";
+      const timer = setTimeout(() => reject(new Error("Installed Studio startup timed out")), 15_000);
+      child.once("error", (error) => { clearTimeout(timer); reject(error); });
+      child.once("exit", () => { clearTimeout(timer); reject(new Error("Installed Studio exited before startup")); });
+      child.stdout.on("data", (chunk) => { output += chunk; const match = output.match(/http:\/\/127\.0\.0\.1:\d+\/#([a-f0-9]{64})/u); if (match) { clearTimeout(timer); resolve(match[0]); } });
+    });
+    const address = new URL(url);
+    for (const path of ["/", "/studio.js", "/studio.css"]) if ((await fetch(address.origin + path)).status !== 200) throw new Error("Installed Studio asset missing");
+    const response = await fetch(address.origin + "/api", { method: "POST", headers: { Origin: address.origin, Authorization: `Bearer ${address.hash.slice(1)}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "history" }) });
+    if (!response.ok || (await response.json()).entries.length < 1) throw new Error("Installed Studio did not reopen CLI history");
+  } finally { child.kill(); await exited; }
+}
+
 try {
   await mkdir(installRoot, { recursive: true });
   await mkdir(join(fixtureRoot, "src"), { recursive: true });
@@ -112,8 +131,8 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
-  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.2.0") {
-    throw new Error("npm pack did not report the expected scoped v0.2.0 package identity.");
+  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.3.0") {
+    throw new Error("npm pack did not report the expected scoped v0.3.0 package identity.");
   }
   if (
     packed[0]?.files?.some(({ path }) =>
@@ -132,12 +151,12 @@ try {
   const tarballPath = join(temporaryRoot, packageFile);
 
   const installArguments = publicRegistry
-    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.2.0"]
+    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.3.0"]
     : ["install", "--no-audit", "--no-fund", tarballPath];
   run(process.execPath, [npmCliPath, ...installArguments], installRoot);
   const installedLock = JSON.parse(await readFile(join(installRoot, "package-lock.json"), "utf8"));
   const installedArtifact = installedLock.packages?.["node_modules/@kallist/contextforge"];
-  if (publicRegistry && (installedArtifact?.version !== "0.2.0" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
+  if (publicRegistry && (installedArtifact?.version !== "0.3.0" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
     throw new Error("Public smoke did not resolve the exact version from the public npm registry.");
   }
   const help = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
@@ -225,11 +244,25 @@ try {
   }
 
   const installedCliPath = join(installedPackageRoot, "dist", "cli", "main.js");
+  const capsuleFile = join(temporaryRoot, "capsule.json");
+  const lifecycle = (args) => run(process.execPath, [installedCliPath, ...args], installRoot);
+  lifecycle(["pack", "Smoke.run", fixtureRoot, "--budget", "2000", "--capsule", capsuleFile]);
+  const historyPath = join(fixtureRoot, ".contextforge", "history");
+  const saved = JSON.parse(lifecycle(["history", "save", capsuleFile, "--store", historyPath]));
+  if (JSON.parse(lifecycle(["replay", saved.id, "--store", historyPath, "--verify", "--repository", fixtureRoot])).status !== "EXACT_MATCH") throw new Error("Installed replay failed");
+  if (!JSON.parse(lifecycle(["diff", capsuleFile, capsuleFile, "--json"])).identical) throw new Error("Installed semantic diff failed");
+  if (JSON.parse(lifecycle(["coverage", capsuleFile])).schemaVersion !== "contextforge-coverage-v1") throw new Error("Installed coverage failed");
+  if (JSON.parse(lifecycle(["explain", capsuleFile, "--json"])).status !== "OK") throw new Error("Installed Explain failed");
+  const controlsFile = join(temporaryRoot, "controls.json"); await writeFile(controlsFile, "[]");
+  const recompiled = JSON.parse(lifecycle(["recompile", capsuleFile, "--repository", fixtureRoot, "--store", historyPath, "--controls", controlsFile, "--budget", "3000"]));
+  if (recompiled.capsule.capsuleHash === saved.id || recompiled.diff.identical) throw new Error("Installed what-if did not create a distinct Capsule");
+  await runStudioFlow(installedCliPath, fixtureRoot);
+  if (process.env.CONTEXTFORGE_STUDIO_BROWSER === "1") process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/studio-e2e.mjs"), installedPackageRoot], repositoryRoot));
   await runMcpFlow(installedCliPath, fixtureRoot);
 
   const packageDocument = JSON.parse(await readFile(join(installedPackageRoot, "package.json"), "utf8"));
-  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.2.0") {
-    throw new Error("Installed package identity differs from the reviewed scoped v0.2.0 identity.");
+  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.3.0") {
+    throw new Error("Installed package identity differs from the reviewed scoped v0.3.0 identity.");
   }
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
@@ -243,10 +276,11 @@ try {
     throw new Error("Installed package contains development, benchmark, script, or secret-path files.");
   }
   const suspiciousPattern = /C:\\+Users\\+|C:\/Users\/|\/Users\/[^/]+\/|\/home\/[^/]+\/|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|\.codex[\\/]+worktrees|Acodex work/u;
-  for (const relativePath of installedFiles.filter((path) => /\.(?:js|map|json|md|d\.ts)$/u.test(path))) {
+  for (const relativePath of installedFiles.filter((path) => /\.(?:js|map|json|md|html|css|d\.ts)$/u.test(path))) {
     const content = await readFile(join(installedPackageRoot, ...relativePath.split("/")), "utf8");
     if (suspiciousPattern.test(content)) throw new Error(`Installed package contains suspicious private metadata in ${relativePath}.`);
   }
+  for (const asset of ["index.html", "studio.js", "studio.css"]) await access(join(installedPackageRoot, "dist/adapters/studio/assets", asset));
   const parserAssetRoot = join(
     installedPackageRoot,
     "dist",

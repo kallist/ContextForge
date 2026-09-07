@@ -102,6 +102,7 @@ function rangeOptions(item: RenderableContextItem, file: IndexedFile, candidate:
 export async function buildContextPackV2(scanner: RepositoryScanner, reader: RepositorySourceReader, factory: IndexRepositoryFactory, request: ContextPackRequest, options: PackV2Options = {}) {
   const started = performance.now();
   validateTokenBudget(request.budget);
+  if (request.controlProvenance !== undefined) throw new ContextForgeError("CONTROL_CONFLICT", "Human controls are supported by the public V1 compiler; experimental Pack V2 does not implement them.");
   const estimator = options.estimator ?? new GenericTokenEstimator();
   const searchStarted = performance.now();
   const search = await (options.search ?? ((input) => searchRepositoryV2(scanner, reader, factory, { ...input, ablation: "RELATION_FULL" }, options.relationshipAnalyzer)))({ ...request, limit: PACK_V2.candidateLimit });

@@ -51,3 +51,11 @@ ContextForge v0.1.0 was a technically completed and tagged release candidate. Pu
 
 - Retrieval is lexical/structural, the estimator is generic rather than model-specific, and TypeScript alias and advanced Python import resolution remain incomplete.
 - HTTP/remote MCP, OAuth, multi-root servers, file watching, auto-indexing, embeddings, LLM reranking/compression, and a Web UI are not implemented.
+# 0.3.0 — 2026-09-07
+
+- Local Studio exposes the complete compile, inspect, control, compare and verify loop.
+- Compressed, source-light Capsule history adds immutable deduplication and bounded management.
+- Replay distinguishes offline inspection, exact verification and explicit mismatch states.
+- Semantic Diff and factual Coverage/Lint expose captured context changes and tradeoffs.
+- PIN, EXCLUDE, PREFER, FOCUS and RANGE drive V1 recompilation under existing source and hard-budget rules.
+- Public V1 defaults remain stable; V2 remains internal/experimental. No agent-success improvement is claimed.
