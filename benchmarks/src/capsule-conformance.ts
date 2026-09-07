@@ -13,7 +13,8 @@ import { buildContextPackV2 } from "../../src/application/build-context-pack-v2.
 import { searchRepository } from "../../src/application/search-repository.js";
 import { searchRepositoryV2 } from "../../src/application/search-repository-v2.js";
 import { canonicalSerialize, capsuleSchema, sha256, validateCapsule } from "../../src/core/context-capsule.js";
-import { createCapsuleExplainer } from "../../src/core/explain-context.js";
+import { createCapsuleExplainer, renderExplain } from "../../src/core/explain-context.js";
+import { auditCapsulePrivacy } from "./capsule-privacy-audit.js";
 import { ContextForgeError } from "../../src/core/errors.js";
 import { loadDataset, validateDatasetFreeze } from "./dataset.js";
 import { createBenchmarkTemporaryRoot, materializeRepository, removeBenchmarkTemporaryRoot, assertCorpusUnchanged } from "./materialize.js";
@@ -75,11 +76,15 @@ try {
           const shape = capsuleSchema.safeParse(on.pack.capsule);
           assert.ok(shape.success, JSON.stringify(shape.error?.issues));
           const capsule = validateCapsule(on.pack.capsule), c = capsule.deterministic;
+          auditCapsulePrivacy(capsule);
           assert.equal(c.payloadHash, sha256(off.pack.markdown));
           const explain = createCapsuleExplainer(capsule);
-          for (const s of c.selected) assert.equal(explain({ type: "WHY_SELECTED", subject: s.candidateRef }).status, "OK");
-          for (const d of c.dropped) assert.equal(explain({ type: "WHY_DROPPED", subject: d }).status, "OK");
-          for (const d of c.excluded) assert.equal(explain({ type: "WHY_EXCLUDED", subject: d }).status, "OK");
+          for (const [type, subjects] of [["SUMMARY", [undefined]], ["WHY_SELECTED", c.selected.map((s) => s.candidateRef)], ["WHY_DROPPED", c.dropped], ["WHY_EXCLUDED", c.excluded]] as const) for (const subject of subjects) {
+            const result = explain(subject === undefined ? { type } : { type, subject });
+            assert.equal(result.status, "OK");
+            auditCapsulePrivacy(result);
+            auditCapsulePrivacy(renderExplain(result));
+          }
           const repeated = await compile(materialized.root, task.taskText, budget, v2, true);
           assert.equal(canonicalSerialize(repeated.pack.capsule?.deterministic), canonicalSerialize(c));
           assert.equal(repeated.pack.capsule?.capsuleHash, capsule.capsuleHash);

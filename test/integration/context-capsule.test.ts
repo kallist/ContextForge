@@ -79,7 +79,7 @@ for (const v2 of [false, true]) test(`Capsule ${v2 ? "V2" : "V1"}: same compilat
   assert.notEqual(capsule.capsuleHash, (await compile(root, v2, true, 4000, "review Ledger saveValue")).capsule?.capsuleHash);
   const privateTask = "fix Ledger saveValue C:\\Users\\private-user\\repo";
   const redacted = validateCapsule((await compile(root, v2, true, 4000, privateTask)).capsule);
-  assert.equal(redacted.deterministic.task.text, null);
+  assert.equal(redacted.deterministic.task.text, "fix Ledger saveValue <ABSOLUTE_PATH>");
   assert.deepEqual(redacted.deterministic.task.normalized, []);
   assert.equal(redacted.deterministic.task.taskHash, sha256(privateTask));
   assert.ok(!JSON.stringify(redacted).includes("private-user"));

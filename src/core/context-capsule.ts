@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { ContextForgeError } from "./errors.js";
 import { isNormalizedRepositoryPath } from "./repository-graph.js";
+import { CAPSULE_TEXT_LIMIT, hasAbsolutePath } from "./capsule-privacy.js";
 
 export const CAPSULE_SCHEMA = "contextforge-capsule-v1";
 export const EXPLAIN_SCHEMA = "contextforge-explain-v1";
@@ -33,8 +34,10 @@ export function capsulePath(value: string): string {
   return normalized;
 }
 
-const text = z.string().max(16_384);
-const id = z.string().min(1).max(4096);
+const privacy = (value: string): boolean => !hasAbsolutePath(value);
+const privacyMessage = "Capsule privacy violation: absolute filesystem path in protected text.";
+const text = z.string().max(CAPSULE_TEXT_LIMIT).refine(privacy, privacyMessage);
+const id = z.string().min(1).max(4096).refine(privacy, privacyMessage);
 const hash = z.string().regex(/^[a-f0-9]{64}$/u);
 const code = z.string().min(1).max(128).regex(/^[A-Za-z0-9_.:-]+$/u);
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -55,8 +58,8 @@ export const capsuleCoreSchema = z.strictObject({
   symbols: z.array(z.strictObject({ id, fileRef: id, name: text, qualifiedName: text, kind: code, parentId: id.nullable(), startLine: count.min(1), endLine: count.min(1), startColumn: count.min(1), endColumn: count.min(1) })).max(8192),
   ranges: z.array(z.strictObject({ id, fileRef: id, sourceHash: hash.nullable(), startLine: count.min(1), endLine: count.min(1), symbolRefs: refs, reasons: z.array(code).max(32) })).max(4096),
   candidates: z.array(z.strictObject({ id, fileRef: id, kind: z.enum(["FILE", "INSTRUCTION"]), rank: count.min(1).nullable(), score: finite.nullable(), origin: code.nullable(), graphDistance: count.nullable(), symbolRefs: refs, rangeRefs: refs, evidenceRefs: refs, relationshipRefs: refs, planRoles: z.array(code).max(8), facet: code.nullable(), directness: code.nullable(), disposition, decisionRefs: refs })).max(128),
-  evidence: z.array(z.strictObject({ id, stage: z.enum(["RETRIEVAL", "RANKING", "PACKING"]), code, family: code, weight: finite, derivation: z.enum(["STRUCTURAL", "HEURISTIC", "VERIFIED_SOURCE", "RECORDED", "POLICY"]), confidence: finite.nullable(), taskSignalId: id.nullable(), querySignal: text.nullable(), sourceCandidate: id.nullable(), location: position.nullable(), relationshipRef: id.nullable() })).max(16_384),
-  relationships: z.array(z.strictObject({ id, type: code, sourceFileRef: id, targetFileRef: id, sourceSymbolId: id.nullable(), targetSymbolId: id.nullable(), classification: z.enum(["STRUCTURAL_FACT", "HEURISTIC"]), confidence: z.union([code, finite]), distance: count, derivation: z.string().max(1024), provenance: code, generation: count.min(1), location: position.nullable() })).max(4096),
+  evidence: z.array(z.strictObject({ id, stage: z.enum(["RETRIEVAL", "RANKING", "PACKING"]), code, family: code, weight: finite, derivation: z.enum(["STRUCTURAL", "HEURISTIC", "VERIFIED_SOURCE", "RECORDED", "POLICY"]), confidence: finite.nullable(), taskSignalId: id.nullable(), querySignal: text.nullable(), sourceCandidate: path.nullable(), location: position.nullable(), relationshipRef: id.nullable() })).max(16_384),
+  relationships: z.array(z.strictObject({ id, type: code, sourceFileRef: id, targetFileRef: id, sourceSymbolId: id.nullable(), targetSymbolId: id.nullable(), classification: z.enum(["STRUCTURAL_FACT", "HEURISTIC"]), confidence: z.union([code, finite]), distance: count, derivation: z.string().max(1024).refine(privacy, privacyMessage), provenance: code, generation: count.min(1), location: position.nullable() })).max(4096),
   decisions: z.array(z.strictObject({ id, candidateRef: id, stage: z.enum(["PACKING", "SAFETY"]), reason, disposition, decisionSource: z.literal("COMPILER"), evidenceRefs: refs, requestedBudget: count, finalPayloadTokens: count })).max(256),
   selected: z.array(z.strictObject({ candidateRef: id, finalOrder: count, role: code, secondaryRoles: z.array(code).max(8), rangeRefs: refs, symbolRefs: refs, estimatedTokens: count, wholeFile: z.boolean(), evidenceRefs: refs, decisionRefs: refs })).max(128),
   dropped: refs,
@@ -109,7 +112,10 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
     throw new ContextForgeError("UNSUPPORTED_SCHEMA", "Unsupported Context Capsule schema; expected contextforge-capsule-v1.");
   }
   const parsed = capsuleSchema.safeParse(value);
-  if (!parsed.success) invalid();
+  if (!parsed.success) {
+    if (parsed.error.issues.some((issue) => issue.message === privacyMessage)) throw new ContextForgeError("INVALID_CAPSULE", privacyMessage);
+    invalid();
+  }
   const capsule = parsed.data;
   const c = capsule.deterministic;
   const unique = <T extends { id: string }>(items: readonly T[]): Map<string, T> => {

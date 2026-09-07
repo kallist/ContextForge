@@ -8,6 +8,6 @@ import { canonicalSerialize } from "../../src/core/context-capsule.js";
 
 const scanner = new FileSystemRepositoryScanner(), reader = new FileSystemRepositorySourceReader();
 const factory = (root: string) => new SqliteIndexRepository(root);
-const request = { repositoryPath: process.argv[2] ?? ".", task: "fix Ledger saveValue", budget: 2000, captureCapsule: true };
+const request = { repositoryPath: process.argv[2] ?? ".", task: process.argv[4] ?? "fix Ledger saveValue", budget: 2000, captureCapsule: true };
 const result = process.argv[3] === "v2" ? await buildContextPackV2(scanner, reader, factory, request, { relationshipAnalyzer: new TreeSitterLanguageAnalyzer() }) : await buildContextPack(scanner, reader, factory, request);
 process.stdout.write(canonicalSerialize({ deterministic: result.capsule?.deterministic, capsuleHash: result.capsule?.capsuleHash }));

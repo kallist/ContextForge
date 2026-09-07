@@ -2,6 +2,23 @@
 
 Status: PROPOSED
 
+## Pre-merge privacy correction (V0.3-01R)
+
+Finalization found an absolute POSIX task path after `=` surviving export in V1 and V2.
+The initial READY claim was withdrawn. A central platform-independent lexical policy
+now sanitizes persisted free-form task, symbol and evidence text with a fixed
+`<ABSOLUTE_PATH>` placeholder; the validator rejects recognized external violations.
+Normalized/query signals are omitted when the task was redacted, avoiding path-fragment
+leakage. Explain sanitizes its own subject echo and never reconstructs raw input.
+Structured repository-relative paths retain their established validation and identity.
+
+Exact input identity remains SHA-256 of the original raw task. The compiler receives that
+original task unchanged. Sanitized display metadata can change capsuleHash, but never
+payloadHash or Context bytes. The policy is lexical, preserves ordinary relative paths
+and HTTP(S) URL tokens, and is not a general secret detector. Its field audit and bounds
+are recorded in the Capsule contract. This pre-release correction retains schema V1 and
+this ADR's PROPOSED status; it does not add Replay, storage or other later-phase behavior.
+
 ## Decision
 
 Add an opt-in, source-free compilation manifest at the application boundary.

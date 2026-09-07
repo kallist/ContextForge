@@ -5,6 +5,15 @@ read repository source, query a model, or access the network. The source reposit
 can be unavailable. `ExplainQueryV1` has `type` and an optional `subject` (required for
 WHY queries). The CLI supports `--json`; human output derives from the same result.
 
+V0.3-01R enforces the shared Capsule path privacy policy on persisted free-form facts.
+An externally supplied Capsule with recognized absolute filesystem paths in protected
+text is rejected with `INVALID_CAPSULE`; the reader does not silently redact it or
+repair its identity. Explain uses only the persisted sanitized task/symbol/evidence
+representation. It cannot recover original paths from hashes. Its query/subject echo
+also uses the same `<ABSOLUTE_PATH>` redactor in structured JSON; the human renderer
+uses the resulting safe facts. Lookup itself remains in memory over the original query.
+See the field audit and lexical boundaries in [the Capsule contract](CONTEXT_CAPSULE.md).
+
 | Query | Recorded answer |
 |---|---|
 | SUMMARY | Task, generation, hashes, strategies, candidate/disposition counts, budget, coverage |

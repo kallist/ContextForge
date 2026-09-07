@@ -10,6 +10,7 @@ import type { PackContextPlan, CandidateRoles } from "../core/packing/context-pl
 import type { PackSelectionEvent } from "../core/packing/pack-v2.js";
 import { RELATIONSHIP_INTELLIGENCE_V2_VERSION } from "../core/relationship-intelligence-v2.js";
 import { ContextForgeError } from "../core/errors.js";
+import { redactAbsolutePaths } from "../core/capsule-privacy.js";
 
 interface PackObservation {
   readonly task: string;
@@ -36,18 +37,14 @@ export interface CapsuleV2Observation {
 const FINAL_ROLES = ["REPOSITORY_INSTRUCTION", "PRIMARY_CODE", "TEST", "DEPENDENCY", "DOCUMENTATION", "CONFIGURATION"];
 const EXCLUSIONS = new Set(["STALE_SOURCE", "UNSUPPORTED_CONTENT", "SOURCE_VERIFICATION_LIMIT"]);
 
-/** Omit machine path-bearing task strings, while retaining identity of the raw request. */
-function taskText(value: string): string | null {
-  return /(?:[a-z]:[\\/]|\\\\|(?:^|[\s"'`(])\/)/iu.test(value) ? null : value;
-}
-
 /** Consumes one compilation's existing structures. No IO and no selection decisions. */
 export function buildContextCapsule(
   snapshot: RepositoryIndexSnapshot, scan: ScanResult, search: ContextPackSearchExecution["result"],
   pack: PackObservation, markdown: string, drops: readonly DropObservation[], v2?: CapsuleV2Observation,
 ): ContextCapsuleV1 {
   const started = performance.now();
-  const safeTask = taskText(pack.task);
+  const safeTask = redactAbsolutePaths(pack.task);
+  const taskRedacted = safeTask !== pack.task;
   const indexed = new Map(snapshot.files.map((file) => [file.relativePath, file]));
   const files = new Map<string, CapsuleCore["files"][number]>();
   const symbols = new Map<string, CapsuleCore["symbols"][number]>();
@@ -65,7 +62,7 @@ export function buildContextCapsule(
   const symbolRef = (path: string, identity: string): string | null => {
     const symbol = indexed.get(path)?.analysis.symbols.find((item) => item.id === identity);
     if (symbol === undefined) return null;
-    symbols.set(symbol.id, { id: symbol.id, fileRef: fileRef(path), name: symbol.name, qualifiedName: symbol.qualifiedName, kind: symbol.kind, parentId: symbol.parentSymbolId, startLine: symbol.startLine, endLine: symbol.endLine, startColumn: symbol.startColumn, endColumn: symbol.endColumn });
+    symbols.set(symbol.id, { id: symbol.id, fileRef: fileRef(path), name: redactAbsolutePaths(symbol.name), qualifiedName: redactAbsolutePaths(symbol.qualifiedName), kind: symbol.kind, parentId: symbol.parentSymbolId, startLine: symbol.startLine, endLine: symbol.endLine, startColumn: symbol.startColumn, endColumn: symbol.endColumn });
     return symbol.id;
   };
   const relationById = new Map([...(v2?.search.relationships ?? []), ...(v2?.relationships ?? [])].map((r) => [r.id, r]));
@@ -79,7 +76,7 @@ export function buildContextCapsule(
       relationships.set(edge.id, { id: edge.id, type: edge.kind, sourceFileRef: fileRef(edge.sourcePath), targetFileRef: fileRef(edge.targetPath), sourceSymbolId: null, targetSymbolId: null, classification: edge.derivation === "structural" ? "STRUCTURAL_FACT" : "HEURISTIC", confidence: edge.confidence, distance: 1, derivation: edge.derivation, provenance: "GENERATION_GRAPH", generation: snapshot.generation, location: null });
       return edge.id;
     }
-    relationships.set(r.id, { id: r.id, type: r.type, sourceFileRef: fileRef(r.source.file), targetFileRef: fileRef(r.target.file), sourceSymbolId: r.source.symbolId === null ? null : symbolRef(r.source.file, r.source.symbolId), targetSymbolId: r.target.symbolId === null ? null : symbolRef(r.target.file, r.target.symbolId), classification: r.classification, confidence: r.confidence, distance: r.distance, derivation: r.derivation, provenance: r.provenance.kind, generation: r.provenance.generation, location: r.provenance.location });
+    relationships.set(r.id, { id: r.id, type: r.type, sourceFileRef: fileRef(r.source.file), targetFileRef: fileRef(r.target.file), sourceSymbolId: r.source.symbolId === null ? null : symbolRef(r.source.file, r.source.symbolId), targetSymbolId: r.target.symbolId === null ? null : symbolRef(r.target.file, r.target.symbolId), classification: r.classification, confidence: r.confidence, distance: r.distance, derivation: redactAbsolutePaths(r.derivation, 1024), provenance: r.provenance.kind, generation: r.provenance.generation, location: r.provenance.location });
     return r.id;
   };
   const recordEvidence = (entry: Omit<CapsuleCore["evidence"][number], "id">, subject: string, observation: unknown = null): string => {
@@ -97,7 +94,7 @@ export function buildContextCapsule(
       if (relation !== null) rRefs.push(relation);
       eRefs.push(recordEvidence({ stage: "RETRIEVAL", code: item.kind, family: item.family, weight: item.weight,
         derivation: item.derivation ?? (item.kind === "SOURCE_LEXICAL" ? "VERIFIED_SOURCE" : ["TEST_RELATION", "DOCUMENT_RELATION"].includes(item.kind) ? "HEURISTIC" : "RECORDED"),
-        confidence: item.confidence ?? null, taskSignalId: item.taskSignalId ?? null, querySignal: safeTask === null ? null : taskText(item.querySignal ?? v2?.search.taskAnalysis.signals.find((s) => s.id === item.taskSignalId)?.normalized ?? "") || null, sourceCandidate: item.sourceCandidate ?? null, location: item.location ?? null, relationshipRef: relation }, id, item.id ?? sha256(item.detail)));
+        confidence: item.confidence ?? null, taskSignalId: item.taskSignalId ?? null, querySignal: taskRedacted ? null : redactAbsolutePaths(item.querySignal ?? v2?.search.taskAnalysis.signals.find((s) => s.id === item.taskSignalId)?.normalized ?? "") || null, sourceCandidate: item.sourceCandidate ?? null, location: item.location ?? null, relationshipRef: relation }, id, item.id ?? sha256(item.detail)));
     }
     // Preserve contribution multiplicity: equal weights/codes can describe distinct hits.
     for (const [ordinal, item] of (candidate?.scoreContributions ?? []).entries()) eRefs.push(recordEvidence({ stage: "RANKING", code: item.kind, family: item.family, weight: item.value, derivation: "RECORDED", confidence: null, taskSignalId: null, querySignal: null, sourceCandidate: null, location: null, relationshipRef: null }, id, [item.evidenceId ?? sha256(item.reason), ordinal]));
@@ -133,7 +130,7 @@ export function buildContextCapsule(
   const byId = <T extends { id: string }>(map: Map<string, T>): T[] => [...map.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const deterministic: CapsuleCore = {
     repository: { gitCommit: git?.head ?? null, gitDirty: git?.status === "available" ? git.files.some((f) => f.workingTreeStatus !== "clean") : null, gitScope: "INDEXED_SAFE_FILES", activeGeneration: snapshot.generation, indexGeneration: snapshot.generation, indexSchema: INDEX_SCHEMA_VERSION, analysisVersion: snapshot.analysisVersion },
-    task: { taskHash: sha256(pack.task), representation: "RAW_UTF8", text: safeTask, normalized: safeTask === null ? [] : search.normalizedQuery.signals.map((s) => taskText(s.normalized)).filter((s): s is string => s !== null), analysis: v2 === undefined ? null : { strategy: v2.search.taskAnalysis.strategy, action: v2.search.taskAnalysis.action, mode: v2.search.taskAnalysis.mode, concepts: [...v2.search.taskAnalysis.concepts], risks: v2.search.taskAnalysis.riskSignals.map((s) => s.kind) } },
+    task: { taskHash: sha256(pack.task), representation: "RAW_UTF8", text: safeTask, normalized: taskRedacted ? [] : search.normalizedQuery.signals.map((s) => redactAbsolutePaths(s.normalized)), analysis: v2 === undefined ? null : { strategy: v2.search.taskAnalysis.strategy, action: v2.search.taskAnalysis.action, mode: v2.search.taskAnalysis.mode, concepts: [...v2.search.taskAnalysis.concepts], risks: v2.search.taskAnalysis.riskSignals.map((s) => s.kind) } },
     strategies: { retrieval: search.rankingStrategy, ranking: search.rankingStrategy, relationship: v2 === undefined ? null : RELATIONSHIP_INTELLIGENCE_V2_VERSION, planner: v2?.plan.strategy ?? null, pack: pack.packingStrategy, policy: v2?.policy ?? null, estimator: pack.tokenEstimator, estimatorVersion: pack.tokenEstimatorVersion, retrievalConfiguration: v2?.search.ablation ?? null, planVariant: v2?.plan.variant ?? null },
     budget: { requested: pack.requestedBudget, estimatedTokens: pack.estimatedPayloadTokens, unused: pack.requestedBudget - pack.estimatedPayloadTokens, utilization: pack.estimatedPayloadTokens / pack.requestedBudget, itemContribution: contribution, envelopeAndOtherContribution: pack.estimatedPayloadTokens - contribution, budgetDrops: decisions.filter((d) => ["GLOBAL_BUDGET", "BUDGET_EXHAUSTED"].includes(d.reason)).length, safetyDrops: decisions.filter((d) => ["SAFETY_LIMIT", "SOURCE_VERIFICATION_LIMIT"].includes(d.reason)).length },
     files: byId(files), symbols: byId(symbols), ranges: byId(ranges), candidates, evidence: byId(evidence), relationships: byId(relationships), decisions, selected, dropped, excluded: candidates.filter((c) => c.disposition === "EXCLUDED").map((c) => c.id),

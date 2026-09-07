@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { EXPLAIN_SCHEMA, validateCapsule, type CapsuleCore, type ContextCapsuleV1 } from "./context-capsule.js";
 import { ContextForgeError } from "./errors.js";
+import { redactAbsolutePaths } from "./capsule-privacy.js";
 
 export const explainQuerySchema = z.strictObject({
   type: z.enum(["SUMMARY", "WHY_SELECTED", "WHY_DROPPED", "WHY_EXCLUDED", "BUDGET", "STRATEGY"]),
@@ -51,8 +52,9 @@ function explainValidated(capsule: ContextCapsuleV1, input: ExplainQueryV1): Exp
   const parsed = explainQuerySchema.safeParse(input);
   if (!parsed.success) throw new ContextForgeError("USAGE", "Invalid Explain query or missing subject.");
   const query = parsed.data, c = capsule.deterministic;
+  const safeQuery = query.subject === undefined ? query : { ...query, subject: redactAbsolutePaths(query.subject, 4096) };
   const facts: ExplainResultV1["facts"] = { capsuleHash: capsule.capsuleHash, payloadHash: c.payloadHash };
-  const base = { schemaVersion: EXPLAIN_SCHEMA, query, subject: query.subject ?? null, facts, evidenceRefs: [], decisionRefs: [], limitations: ["RECORDED_COMPILER_DECISIONS_ONLY", "BOUNDED_CANDIDATE_SET", ...(c.plan === null ? ["PLANNER_NOT_RUN", "RELATIONSHIP_STAGE_NOT_RUN"] : [])] } as const;
+  const base = { schemaVersion: EXPLAIN_SCHEMA, query: safeQuery, subject: safeQuery.subject ?? null, facts, evidenceRefs: [], decisionRefs: [], limitations: ["RECORDED_COMPILER_DECISIONS_ONLY", "BOUNDED_CANDIDATE_SET", ...(c.plan === null ? ["PLANNER_NOT_RUN", "RELATIONSHIP_STAGE_NOT_RUN"] : [])] } as const;
   if (query.type === "SUMMARY") return { ...base, status: "OK", facts: { ...facts, repository: c.repository, task: c.task, budget: c.budget, strategies: c.strategies, coverage: c.coverage, counts: { candidates: c.candidates.length, selected: c.selected.length, dropped: c.dropped.length, excluded: c.excluded.length, files: c.files.length, symbols: c.symbols.length, ranges: c.ranges.length } } };
   if (query.type === "BUDGET") return { ...base, status: "OK", facts: { ...facts, budget: c.budget, strategies: c.strategies, coverage: c.coverage, packingEvents: c.packingEvents }, limitations: [...base.limitations, "ITEM_ESTIMATES_EXCLUDE_SHARED_ENVELOPE", "ROLE_CONTRIBUTIONS_MAY_OVERLAP"] };
   if (query.type === "STRATEGY") return { ...base, status: "OK", facts: { ...facts, strategies: c.strategies } };

@@ -31,14 +31,15 @@ The deterministic section contains:
   interpretation. No Git means null commit/dirty. No fresh Git scan or repository digest.
 - `task`: SHA-256 of **raw UTF-8 task text**, its representation identifier, task text,
   normalized signals and the V2 analysis strategy/action/mode/concepts/risks where run.
-  Task text containing absolute-path syntax is omitted together with normalized/task-match
-  strings, preventing derived username/path components from leaking. The raw task hash
-  remains unchanged by redaction.
+  Task text uses the sanitized display representation described below. If it changes,
+  normalized/task-match strings are omitted, preventing derived username/path components
+  from leaking. `representation=RAW_UTF8` describes taskHash input, not display text.
+  The raw task hash remains unchanged by redaction.
 - `strategies`: actual retrieval/ranking, relationship, packing planner, pack, policy,
   estimator/version, retrieval ablation and plan variant. V1 planner and relationship
   stage are null. The existing V1 file graph still contributes ranking evidence.
 - `files`, `symbols`, `ranges`: normalized relative paths and indexed source hashes,
-  original symbol IDs/qualified names/parent identities, selected line ranges/reasons.
+  original symbol IDs/parent identities, sanitized names, selected line ranges/reasons.
   Symbol parent IDs are upstream index identities; parents need not themselves be
   relevant symbols. Symbol coordinates use the index's one-based lines and UTF-8 byte
   columns. Selected ranges use one-based inclusive lines. Symbols are recorded relevant
@@ -105,6 +106,54 @@ payload hash, even when other logical identities match. Hashes detect identity/c
 not authenticity or a signature from a trusted producer.
 
 ## Privacy, limits and future work
+
+### V0.3-01R path privacy correction
+
+Finalization of the first implementation reproduced a leak from `path=` followed by
+an absolute POSIX path in task text. The READY claim was withdrawn and the PR remained
+Draft. The correction is at the Capsule/Explain representation boundary; raw task input
+still drives TaskAnalysis, retrieval, ranking and packing. There is no schema/version,
+database, public-default or compiler-algorithm change.
+
+`src/core/capsule-privacy.ts` defines the single deterministic policy. A linear lexical
+scan replaces **every recognized absolute path** with `<ABSOLUTE_PATH>`, without retaining
+the username, basename, raw backup or a list of path hashes. It recognizes POSIX `/...`,
+Windows drive paths using either slash, UNC paths and local `file:` URLs on every OS.
+Start-of-text and punctuation boundaries include whitespace, `=`, `:`, parentheses,
+brackets, braces, quotes and commas; detection is not whitespace-only. Quoted paths
+include spaces up to the matching quote. Unquoted paths end at a text delimiter.
+If repeated short paths would expand a sanitized field beyond its existing maximum,
+the entire display field becomes one placeholder; compiler input and its hash remain
+unchanged. This avoids a new output/schema failure for a previously valid task.
+All slash-prefixed path-shaped lexemes at those boundaries are treated conservatively
+as paths; this does not infer intent from arbitrary prose or resolve filesystem paths.
+It does not decode obfuscated text. HTTP(S) URL tokens are opaque web addresses and
+remain unchanged, as do `src/foo.ts`, `../relative/path`, `./local/path`, `a/b`, `a / b`
+and existing placeholders. Machine-specific data deliberately embedded in a web URL
+is not classified as filesystem syntax by this lexical policy.
+
+The producer sanitizes human-readable text; the validator **rejects**, rather than
+silently repairs, externally supplied privacy violations, even with a recomputed hash.
+Its error identifies a privacy violation without printing the offending input. All
+existing 8 MiB input, string, shape and reference bounds remain. A recognized path in
+task display changes deterministic metadata/capsuleHash legitimately; taskHash still
+hashes the exact raw task, and payloadHash still hashes the unchanged compiled Markdown.
+
+| String family | Classification and treatment |
+|---|---|
+| Task display, normalized signals, evidence query text | Free-form: central redaction; omit derived signals if the raw task was redacted |
+| Symbol names/qualified names, relationship derivation | Source-derived text: central redaction; original hashed IDs remain |
+| `files.path`, evidence `sourceCandidate` | Structured repository-relative paths: preserved, checked by repository path policy |
+| Entity/reference IDs, source/task/payload hashes | Generated identities: preserved; schema/central privacy validation rejects invalid external strings |
+| Strategy/version, enums, reason/diagnostic/limitation codes | Bounded compiler codes; no raw error details or source snippets copied; slash-bearing invalid codes rejected |
+| Analysis version, runtime creation text | Generated labels/timestamp; protected text validation also rejects external path injection |
+| Runtime OS/Node labels | Bounded codes outside identity; no cwd, hostname, PID or username field |
+| Explain query/subject echo | Same redactor for output; original subject is used only for in-memory lookup |
+| Repository display labels, arbitrary logs/errors/details | Not copied into Capsule; privacy errors contain no raw task/path |
+
+Explain cannot recover redacted text from taskHash or source hashes. Metadata remains
+private even after path redaction: task prose, relative filenames and symbol names may
+be sensitive. This is not a general secret detector or anonymizer.
 
 Export can contain user task text, relative paths, symbol names and compilation metadata.
 It contains no file contents, selected source strings, complete Markdown, arbitrary logs,
