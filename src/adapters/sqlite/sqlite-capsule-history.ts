@@ -50,10 +50,13 @@ export class SqliteCapsuleHistory implements CapsuleHistory {
     let db: DatabaseSync | undefined;
     try {
       db = new DatabaseSync(safeStorePath(directory));
+      // Even schema inspection needs a read lock during another process's first commit.
+      // Configure the connection before its first read; this does not mutate the store.
+      db.exec("PRAGMA busy_timeout=750;");
       db.enableDefensive(true);
       const version = db.prepare("PRAGMA user_version").get()?.user_version;
       if (version !== 0 && version !== 1) throw new ContextForgeError("UNSUPPORTED_SCHEMA", "Unsupported local history format. Expected history schema 1.");
-      db.exec("PRAGMA busy_timeout=750; PRAGMA trusted_schema=OFF; PRAGMA max_page_count=131072;");
+      db.exec("PRAGMA trusted_schema=OFF; PRAGMA max_page_count=131072;");
       if (version === 0) {
         db.exec("BEGIN IMMEDIATE");
         try {
