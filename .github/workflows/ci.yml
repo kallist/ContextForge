@@ -72,3 +72,20 @@ jobs:
       - run: npm run benchmark
       - run: node scripts/release-evidence-check.mjs
       - run: node .benchmark-dist/benchmarks/src/capsule-conformance.js conformance
+
+  studio-browser:
+    name: Studio browser and installed package / Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run studio:e2e
+      - run: npm run package:smoke
+        env:
+          CONTEXTFORGE_STUDIO_BROWSER: "1"

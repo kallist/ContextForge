@@ -5,6 +5,7 @@ coverage/
 .test-dist/
 .benchmark-dist/
 .benchmark-output/
+.studio-output/
 .npm-cache-temp/
 .portable-node/
 *.tsbuildinfo

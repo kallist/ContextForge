@@ -1,6 +1,6 @@
 {
   "name": "@kallist/contextforge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local-first, task-aware context compiler for coding agents",
   "license": "MIT",
   "repository": {
@@ -30,14 +30,16 @@
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json && node scripts/copy-parser-assets.mjs dist/adapters/parser/assets",
-    "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/copy-parser-assets.mjs .test-dist/src/adapters/parser/assets",
+    "build": "node scripts/clean.mjs dist && tsc -p tsconfig.build.json && node scripts/copy-parser-assets.mjs dist/adapters/parser/assets && node scripts/copy-studio-assets.mjs dist/adapters/studio/assets",
+    "build:test": "node scripts/clean.mjs .test-dist && tsc -p tsconfig.test.json && node scripts/copy-parser-assets.mjs .test-dist/src/adapters/parser/assets && node scripts/copy-studio-assets.mjs .test-dist/src/adapters/studio/assets",
     "build:benchmark": "node scripts/clean.mjs .benchmark-dist && tsc -p tsconfig.benchmark.json && node scripts/copy-parser-assets.mjs .benchmark-dist/src/adapters/parser/assets",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build && npm run build:test",
     "test": "node --test \".test-dist/test/**/*.test.js\"",
     "smoke": "node dist/cli/main.js --help",
+    "studio:e2e": "node scripts/studio-e2e.mjs",
+    "demo": "npm run build && node scripts/studio-demo.mjs",
     "package:smoke": "node scripts/package-smoke.mjs",
     "release:hardening": "node scripts/release-hardening.mjs",
     "release:check": "node scripts/release-check.mjs",
@@ -66,6 +68,7 @@
     "@types/node": "^24.13.3",
     "eslint": "^10.0.0",
     "globals": "^17.11.0",
+    "playwright": "1.63.0",
     "tree-sitter-wasm": "1.1.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0"

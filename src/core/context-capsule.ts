@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ContextForgeError } from "./errors.js";
 import { isNormalizedRepositoryPath } from "./repository-graph.js";
 import { CAPSULE_TEXT_LIMIT, hasAbsolutePath } from "./capsule-privacy.js";
+import { controlProvenanceSchema, normalizeControls } from "./context-controls.js";
 
 export const CAPSULE_SCHEMA = "contextforge-capsule-v1";
 export const EXPLAIN_SCHEMA = "contextforge-explain-v1";
@@ -60,7 +61,7 @@ export const capsuleCoreSchema = z.strictObject({
   candidates: z.array(z.strictObject({ id, fileRef: id, kind: z.enum(["FILE", "INSTRUCTION"]), rank: count.min(1).nullable(), score: finite.nullable(), origin: code.nullable(), graphDistance: count.nullable(), symbolRefs: refs, rangeRefs: refs, evidenceRefs: refs, relationshipRefs: refs, planRoles: z.array(code).max(8), facet: code.nullable(), directness: code.nullable(), disposition, decisionRefs: refs })).max(128),
   evidence: z.array(z.strictObject({ id, stage: z.enum(["RETRIEVAL", "RANKING", "PACKING"]), code, family: code, weight: finite, derivation: z.enum(["STRUCTURAL", "HEURISTIC", "VERIFIED_SOURCE", "RECORDED", "POLICY"]), confidence: finite.nullable(), taskSignalId: id.nullable(), querySignal: text.nullable(), sourceCandidate: path.nullable(), location: position.nullable(), relationshipRef: id.nullable() })).max(16_384),
   relationships: z.array(z.strictObject({ id, type: code, sourceFileRef: id, targetFileRef: id, sourceSymbolId: id.nullable(), targetSymbolId: id.nullable(), classification: z.enum(["STRUCTURAL_FACT", "HEURISTIC"]), confidence: z.union([code, finite]), distance: count, derivation: z.string().max(1024).refine(privacy, privacyMessage), provenance: code, generation: count.min(1), location: position.nullable() })).max(4096),
-  decisions: z.array(z.strictObject({ id, candidateRef: id, stage: z.enum(["PACKING", "SAFETY"]), reason, disposition, decisionSource: z.literal("COMPILER"), evidenceRefs: refs, requestedBudget: count, finalPayloadTokens: count })).max(256),
+  decisions: z.array(z.strictObject({ id, candidateRef: id, stage: z.enum(["PACKING", "SAFETY"]), reason, disposition, decisionSource: z.enum(["COMPILER", "HUMAN_CONTROL"]), evidenceRefs: refs, requestedBudget: count, finalPayloadTokens: count })).max(256),
   selected: z.array(z.strictObject({ candidateRef: id, finalOrder: count, role: code, secondaryRoles: z.array(code).max(8), rangeRefs: refs, symbolRefs: refs, estimatedTokens: count, wholeFile: z.boolean(), evidenceRefs: refs, decisionRefs: refs })).max(128),
   dropped: refs,
   excluded: refs,
@@ -68,7 +69,7 @@ export const capsuleCoreSchema = z.strictObject({
   packingEvents: z.array(z.strictObject({ candidateRef: id, phase: code, role: code.nullable(), facet: code, directness: code, rank: count, compactOptionTokens: count, tokens: count, cumulativeTokens: count })).max(2048),
   coverage: z.strictObject({ selectedExplained: count, selectedTotal: count, droppedExplained: count, droppedTotal: count, planRoles: z.array(z.strictObject({ role: code, available: count, selected: count, estimatedTokens: count, borrowedItems: count })).max(8) }),
   diagnostics: z.strictObject({ codes: z.array(code).max(256), scanExclusions: z.array(z.strictObject({ reason: code, count })).max(32), candidateCount: count, evidenceCount: count }),
-  overrides: z.array(z.never()).max(0),
+  overrides: z.array(controlProvenanceSchema).max(1),
   payloadHash: hash,
 });
 
@@ -118,6 +119,10 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
   }
   const capsule = parsed.data;
   const c = capsule.deterministic;
+  for (const override of c.overrides) {
+    if (canonicalSerialize(normalizeControls(override.controls)) !== canonicalSerialize(override.controls)) invalid();
+    if (override.parentCapsuleHash === capsule.capsuleHash) invalid();
+  }
   const unique = <T extends { id: string }>(items: readonly T[]): Map<string, T> => {
     const map = new Map(items.map((item) => [item.id, item]));
     if (map.size !== items.length) invalid();
@@ -152,6 +157,10 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
     checkRefs(d.evidenceRefs, evidence);
     const excluded = ["STALE_SOURCE", "UNSUPPORTED_CONTENT", "SOURCE_VERIFICATION_LIMIT"].includes(d.reason);
     if ((d.reason === "SELECTED") !== (d.disposition === "SELECTED") || (excluded && d.disposition !== "EXCLUDED") || (d.stage === "SAFETY") !== (d.disposition === "EXCLUDED") || d.requestedBudget !== c.budget.requested || d.finalPayloadTokens !== c.budget.estimatedTokens) invalid();
+    if (d.decisionSource === "HUMAN_CONTROL") {
+      const file = files.get(candidates.get(d.candidateRef)?.fileRef ?? "");
+      if (d.stage === "SAFETY" || file === undefined || !c.overrides[0]?.controls.some((control) => control.path === file.path || (control.kind === "FOCUS" && file.path.startsWith(`${control.path}/`)))) invalid();
+    }
   }
   for (const [index, s] of c.selected.entries()) {
     if (s.finalOrder !== index || candidates.get(s.candidateRef)?.disposition !== "SELECTED") invalid();
@@ -171,6 +180,14 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
     if (!expected || !item.decisionRefs.some((ref) => decisions.get(ref)?.disposition === item.disposition)) invalid();
   }
   if (c.dropped.some((ref) => candidates.get(ref)?.disposition !== "DROPPED") || c.excluded.some((ref) => candidates.get(ref)?.disposition !== "EXCLUDED")) invalid();
+  for (const control of c.overrides[0]?.controls ?? []) {
+    const file = c.files.find((f) => f.path === control.path);
+    const matches = c.candidates.filter((candidate) => candidate.fileRef === file?.id);
+    const selections = c.selected.filter((selection) => matches.some((candidate) => candidate.id === selection.candidateRef));
+    if (control.kind === "EXCLUDE" && selections.length > 0) invalid();
+    if ((control.kind === "PIN" || control.kind === "RANGE") && selections.length === 0) invalid();
+    if (control.kind === "RANGE" && !selections.some((selection) => selection.rangeRefs.length === 1 && ranges.get(selection.rangeRefs[0] ?? "")?.startLine === control.startLine && ranges.get(selection.rangeRefs[0] ?? "")?.endLine === control.endLine)) invalid();
+  }
   if (c.packingEvents.some((e) => !candidates.has(e.candidateRef))) invalid();
   if (c.budget.estimatedTokens > c.budget.requested || c.budget.unused !== c.budget.requested - c.budget.estimatedTokens || c.repository.activeGeneration !== c.repository.indexGeneration) invalid();
   if (c.diagnostics.candidateCount !== c.candidates.length || c.diagnostics.evidenceCount !== c.evidence.length) invalid();

@@ -1,6 +1,6 @@
 # ADR-012: Context Capsule and deterministic Explain
 
-Status: PROPOSED
+Status: ACCEPTED (V0.3 technical validation; publication is a separate release gate)
 
 ## Pre-merge privacy correction (V0.3-01R)
 
@@ -17,7 +17,11 @@ original task unchanged. Sanitized display metadata can change capsuleHash, but 
 payloadHash or Context bytes. The policy is lexical, preserves ordinary relative paths
 and HTTP(S) URL tokens, and is not a general secret detector. Its field audit and bounds
 are recorded in the Capsule contract. This pre-release correction retains schema V1 and
-this ADR's PROPOSED status; it does not add Replay, storage or other later-phase behavior.
+this ADR's then-PROPOSED status; it did not add Replay, storage or other later-phase behavior.
+
+V0.3 finalization accepts the corrected Capsule/Explain contract after the unchanged
+720-case historical regression and 240-case Capsule conformance gate passed. The
+initial privacy failure and withdrawn READY claim above remain part of the record.
 
 ## Decision
 

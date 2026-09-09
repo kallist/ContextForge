@@ -30,6 +30,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ["src/adapters/studio/assets/*.js"],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     files: ["test/**/*.ts"],
     rules: {
       "@typescript-eslint/no-floating-promises": "off",

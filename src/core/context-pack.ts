@@ -14,6 +14,7 @@ export type ContextRole =
   | "GIT_CONTEXT";
 
 export type RangeReason =
+  | "HUMAN_RANGE"
   | "SYMBOL_RANGE"
   | "PARENT_CONTEXT"
   | "SURROUNDING_CONTEXT"

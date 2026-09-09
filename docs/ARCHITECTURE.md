@@ -1,5 +1,25 @@
 # ContextForge V1 Architecture
 
+## V0.3 context lifecycle
+
+CLI and the loopback Studio adapter share lifecycle use cases over the existing
+composition root. Pure Core modules define semantic Diff, captured-fact Coverage/Lint
+and normalized controls. A separate SQLite history adapter stores compressed,
+content-addressed Capsule rows and lazy summaries; compiler index schema 2 is unchanged.
+
+Replay verifies recorded safe sources and recompiles inputs through the real V1 or
+maintained default V2 path. V1 human controls reserve or prioritize existing safe
+candidate representations while preserving machine rank and output order. A generation
+change or impossible required context is a typed conflict. V2 controls are rejected.
+Uncontrolled compiler defaults and frozen benchmark definitions are unchanged.
+
+Studio has no duplicate selection logic or arbitrary filesystem API. It binds a single
+startup repository, uses a random local capability, validates Host/Origin, bounds requests
+and renders untrusted strings with text nodes. Payloads are ephemeral; path-bearing
+payloads use the explicit CLI output boundary. See [ADR-013](adr/ADR-013-context-lifecycle-and-local-studio.md)
+and [the product guide](V0.3_PRODUCT_GUIDE.md). Historical phase descriptions below are
+dated checkpoints and are superseded by this maintained implementation summary.
+
 ## V0.2 final maintained architecture
 
 V1 remains the stable public path: CLI/MCP -> shared V1 Search -> Pack V1. V0.2's internal experimental path is TaskAnalysis -> identity/lexical/structural CandidateEvidence fusion -> bounded relationship evidence -> Ranking V2 -> packing ContextPlan -> direct-context-priority-v1 -> Pack V2. Both paths reuse safe discovery, generation snapshots and the unchanged generic-v1 estimator.

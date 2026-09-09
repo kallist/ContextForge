@@ -1,4 +1,9 @@
 export type ContextForgeErrorCode =
+  | "CONTROL_CONFLICT"
+  | "STRATEGY_UNAVAILABLE"
+  | "HISTORY_ERROR"
+  | "HISTORY_MISSING"
+  | "HISTORY_LIMIT"
   | "INVALID_CAPSULE"
   | "USAGE"
   | "PATH"
@@ -22,6 +27,11 @@ export type ContextForgeErrorCode =
   | "OUTPUT_WRITE_FAILED";
 
 const EXIT_CODES: Record<ContextForgeErrorCode, number> = {
+  CONTROL_CONFLICT: 15,
+  STRATEGY_UNAVAILABLE: 19,
+  HISTORY_ERROR: 16,
+  HISTORY_MISSING: 17,
+  HISTORY_LIMIT: 18,
   INVALID_CAPSULE: 14,
   USAGE: 2,
   PATH: 2,
