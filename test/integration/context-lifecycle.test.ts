@@ -178,11 +178,13 @@ test("history: concurrent real processes deduplicate without lost writes or part
   const { capsule, temp } = await setup(t), directory = join(temp, "concurrent-history"), file = join(temp, "capsule.json");
   await writeFile(file, JSON.stringify(capsule));
   const children = Array.from({ length: 2 }, () => spawn(process.execPath, [join(process.cwd(), ".test-dist/test/helpers/history-process.js"), directory, file], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true }));
+  const errors = children.map(() => "");
+  children.forEach((child, index) => child.stderr.on("data", (chunk: Buffer) => { errors[index] += chunk.toString(); }));
   const exits = children.map((child) => once(child, "exit"));
   try {
     await Promise.all(children.map(async (child) => { const [chunk] = await once(child.stdout, "data") as [Buffer]; assert.equal(chunk.toString(), "READY\n"); }));
     for (const child of children) child.stdin.end("SAVE\n");
-    for (const result of await Promise.all(exits)) assert.equal(result[0], 0);
+    for (const [index, result] of (await Promise.all(exits)).entries()) assert.equal(result[0], 0, errors[index]);
     const store = new SqliteCapsuleHistory(directory);
     try { assert.equal(store.stats().count, 1); assert.equal(store.get(capsule.capsuleHash).capsuleHash, capsule.capsuleHash); } finally { store.close(); }
   } finally { for (const child of children) if (child.exitCode === null) child.kill(); await Promise.all(exits); }
