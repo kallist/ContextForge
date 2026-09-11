@@ -1,5 +1,13 @@
 # ContextForge V1 Architecture
 
+## V0.4 Review Context
+
+Git adapter → change/range/symbol model → one-hop impact proposal → existing safe
+hard-budget Pack V1 → Review Capsule v2 → lifecycle/Studio. Normal search and pack
+remain V1. Review-specific composition is additive; frozen public composition and
+historical algorithm files are unchanged. See [ADR-014](adr/ADR-014-review-context.md)
+for input semantics, limits, compatibility and the rename-index correction.
+
 ## V0.3 context lifecycle
 
 CLI and the loopback Studio adapter share lifecycle use cases over the existing

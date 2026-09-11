@@ -1,4 +1,5 @@
 import { canonicalSerialize, validateCapsule, type CapsuleCore } from "./context-capsule.js";
+import { reviewCoverage } from "./review-coverage.js";
 
 const equal = (a: unknown, b: unknown): boolean => canonicalSerialize(a) === canonicalSerialize(b);
 type Candidate = CapsuleCore["candidates"][number];
@@ -29,9 +30,16 @@ export function diffContexts(left: unknown, right: unknown) {
     const changes = before === null ? ["ADDED"] : after === null ? ["REMOVED"] : (Object.keys(before) as (keyof typeof before)[]).filter((key) => !equal(before[key], after[key]));
     return [{ id, path: (bi === undefined ? ac : bc).files.find((f) => f.id === (bi ?? ai)?.fileRef)?.path ?? "", changes, before, after }];
   });
-  return { schemaVersion: "contextforge-diff-v1" as const, before: a.capsuleHash, after: b.capsuleHash, identical: a.capsuleHash === b.capsuleHash, compilation, candidates, limitations: ["RECORDED_CANDIDATES_ONLY", "CORRELATION_IS_NOT_CAUSATION"] };
+  const review = ac.review === undefined && bc.review === undefined ? null : {
+    changeSetChanged: !equal(ac.review?.changeHash ?? null, bc.review?.changeHash ?? null),
+    symbolsChanged: !equal(ac.review?.changes.flatMap((f) => f.symbols) ?? [], bc.review?.changes.flatMap((f) => f.symbols) ?? []),
+    relationshipsAdded: (bc.review?.impact ?? []).filter((r) => !ac.review?.impact.some((old) => old.id === r.id)),
+    relationshipsRemoved: (ac.review?.impact ?? []).filter((r) => !bc.review?.impact.some((next) => next.id === r.id)),
+    coverageBefore: reviewCoverage(ac), coverageAfter: reviewCoverage(bc),
+  };
+  return { schemaVersion: "contextforge-diff-v1" as const, before: a.capsuleHash, after: b.capsuleHash, identical: a.capsuleHash === b.capsuleHash, compilation, candidates, review, limitations: ["RECORDED_CANDIDATES_ONLY", "CORRELATION_IS_NOT_CAUSATION"] };
 }
 export type ContextDiff = ReturnType<typeof diffContexts>;
 export function renderContextDiff(diff: ContextDiff): string {
-  return [`Context Diff: ${diff.identical ? "IDENTICAL" : "CHANGED"}`, ...diff.compilation.map((c) => `Compilation: ${c.dimension} changed`), ...diff.candidates.map((c) => `${JSON.stringify(c.path)}: ${c.before?.disposition ?? "ABSENT"} -> ${c.after?.disposition ?? "ABSENT"}; ${c.changes.join(", ")}`)].join("\n") + "\n";
+  return [`Context Diff: ${diff.identical ? "IDENTICAL" : "CHANGED"}`, ...(diff.review === null ? [] : [`Review: change set ${diff.review.changeSetChanged ? "CHANGED" : "SAME"}; symbols ${diff.review.symbolsChanged ? "CHANGED" : "SAME"}; relationships +${diff.review.relationshipsAdded.length} -${diff.review.relationshipsRemoved.length}`]), ...diff.compilation.map((c) => `Compilation: ${c.dimension} changed`), ...diff.candidates.map((c) => `${JSON.stringify(c.path)}: ${c.before?.disposition ?? "ABSENT"} -> ${c.after?.disposition ?? "ABSENT"}; ${c.changes.join(", ")}`)].join("\n") + "\n";
 }

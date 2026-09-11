@@ -7,6 +7,7 @@ import { readCapsule } from "../adapters/filesystem/capsule-reader.js";
 import { explainContext, explainQuerySchema, renderExplain } from "../core/explain-context.js";
 import { validateCapsule } from "../core/context-capsule.js";
 import { LIFECYCLE_HELP, runLifecycle } from "./lifecycle.js";
+import { REVIEW_HELP, runReview } from "./review.js";
 
 import { FileSystemOutputArtifactWriter } from "../adapters/filesystem/output-artifact-writer.js";
 import { FileSystemRepositoryScanner } from "../adapters/filesystem/repository-scanner.js";
@@ -82,6 +83,8 @@ function usageError(message: string): ContextForgeError {
 }
 
 export async function run(argv: readonly string[], workingDirectory = process.cwd()): Promise<number> {
+  const review = await runReview(argv, workingDirectory);
+  if (review !== null) return review;
   const lifecycle = await runLifecycle(argv, workingDirectory);
   if (lifecycle !== null) return lifecycle;
   const separatedBudgetIndex = argv.indexOf("--budget");
@@ -114,7 +117,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
   }
 
   if (parsed.values.help === true) {
-    process.stdout.write(HELP + LIFECYCLE_HELP);
+    process.stdout.write(HELP + LIFECYCLE_HELP + REVIEW_HELP);
     return 0;
   }
   const version = await packageVersion();

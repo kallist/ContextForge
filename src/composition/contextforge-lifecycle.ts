@@ -5,6 +5,7 @@ import { SqliteIndexRepository } from "../adapters/sqlite/sqlite-index-repositor
 import { buildContextPackV2 } from "../application/build-context-pack-v2.js";
 import { verifyRecordedSources, type LifecycleCompiler } from "../application/context-lifecycle.js";
 import { ContextForgeError } from "../core/errors.js";
+import { compileReview, indexReview } from "./contextforge-review.js";
 import { createContextForgeApplication, type BoundContextForgeApplication } from "./contextforge-application.js";
 
 /** Add lifecycle capabilities without modifying the frozen public CLI/MCP composition. */
@@ -15,8 +16,10 @@ export async function createContextForgeLifecycle(repositoryPath: string): Promi
   const factory = (root: string) => new SqliteIndexRepository(root);
   return {
     ...app,
+    index: () => indexReview(app.rootRealPath),
     verifySources: (capsule) => verifyRecordedSources(scanner, reader, factory, app.rootRealPath, capsule),
     compile: (request, reference) => {
+      if (reference?.deterministic.review !== undefined) return compileReview(app.rootRealPath, { budget: request.budget, base: reference.deterministic.review.base, ...(request.controlProvenance === undefined ? {} : { controlProvenance: request.controlProvenance }) });
       const strategy = reference?.deterministic.strategies.pack ?? "contextforge-pack-v1";
       if (strategy === "contextforge-pack-v1") return app.pack(request);
       if (strategy === "contextforge-pack-v2" && request.controlProvenance === undefined) return buildContextPackV2(scanner, reader, factory, { ...request, repositoryPath: app.rootRealPath }, { relationshipAnalyzer: analyzer });

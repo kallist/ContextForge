@@ -4,6 +4,15 @@ All notable changes to ContextForge will be recorded here.
 
 ## Unreleased
 
+## 0.4.0 — Review Context
+
+- Local Git change-seeded Review Context with changed ranges/symbols and bounded
+  structural/heuristic impact evidence.
+- Review Capsule v2, lifecycle integration, Coverage/Lint, controls, Diff and Replay.
+- Dedicated local Review Workspace, desktop browser and installed-package gates.
+- Separate frozen Review scenario evaluation with explicit retention losses.
+- Normal V1 defaults, database schemas and historical compiler evidence preserved.
+
 ## 0.2.0 - 2026-09-04
 
 ### Added / experimental
