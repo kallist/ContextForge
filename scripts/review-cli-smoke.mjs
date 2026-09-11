@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { reviewFixture } from "./review-fixture.mjs";
-const packageRoot = resolve(process.argv[2] ?? "."), temp = await mkdtemp(join(tmpdir(), "contextforge-review-cli-"));
+const packageRoot = resolve(process.argv[2] ?? "."), temp = await realpath(await mkdtemp(join(tmpdir(), "contextforge-review-cli-")));
 const repository = join(temp, "repo"), capsuleFile = join(temp, "review.json"), payloadFile = join(temp, "review.md");
 try {
   await mkdir(repository); await reviewFixture(repository);

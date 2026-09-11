@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,7 +11,7 @@ const { createContextForgeLifecycle } = await load("composition/contextforge-lif
 const { SqliteCapsuleHistory } = await load("adapters/sqlite/sqlite-capsule-history.js");
 const { startStudio } = await load("adapters/studio/studio-server.js");
 const { hashCapsuleCore, sha256, canonicalSerialize } = await load("core/context-capsule.js");
-const root = await mkdtemp(join(tmpdir(), "contextforge-review-browser-"));
+const root = await realpath(await mkdtemp(join(tmpdir(), "contextforge-review-browser-")));
 let browser, studio, history;
 try {
   await reviewFixture(root);

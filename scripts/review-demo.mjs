@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reviewFixture } from "./review-fixture.mjs";
@@ -6,7 +6,7 @@ import { createContextForgeLifecycle } from "../dist/composition/contextforge-li
 import { compileReview } from "../dist/composition/contextforge-review.js";
 import { SqliteCapsuleHistory } from "../dist/adapters/sqlite/sqlite-capsule-history.js";
 import { startStudio } from "../dist/adapters/studio/studio-server.js";
-const root = await mkdtemp(join(tmpdir(), "contextforge-review-demo-"));
+const root = await realpath(await mkdtemp(join(tmpdir(), "contextforge-review-demo-")));
 let history, studio;
 try {
   await reviewFixture(root);
