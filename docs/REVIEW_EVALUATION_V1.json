@@ -1,0 +1,146 @@
+{
+  "version": "contextforge-review-evaluation-v1",
+  "datasetHash": "8f590ecda78f7458cb05c58db5483025e693a989d95559340e1458ec4d80e660",
+  "fixtureHash": "9ad9d1bfc524298fc04114f7bdadaa9201a8d28f8e55375731e0603dc887bb19",
+  "records": [
+    {
+      "scenario": "callers",
+      "budget": 1000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 0.2222222222222222,
+      "tokens": 823,
+      "deterministic": true,
+      "capsuleHash": "f88df456f0d010903feb799f156fc6ad08958374640ca3bd98e6e61d5bb7d0b5",
+      "missed": [],
+      "noise": [],
+      "dropped": [
+        "src/caller1.ts",
+        "src/caller2.ts",
+        "src/caller3.ts",
+        "src/caller4.ts",
+        "src/caller5.ts",
+        "src/caller6.ts",
+        "src/caller7.ts"
+      ],
+      "knownUnresolved": "src/plugin.ts",
+      "performance": {
+        "analysisMs": 561.6081000000001,
+        "totalMs": 895.5040000000001
+      }
+    },
+    {
+      "scenario": "callers",
+      "budget": 3000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 0.5555555555555556,
+      "tokens": 1606,
+      "deterministic": true,
+      "capsuleHash": "6ab430d7bdba8a19b179fadf67223e64bd173153f55efcfb42216e3810c45b90",
+      "missed": [],
+      "noise": [],
+      "dropped": [
+        "src/caller4.ts",
+        "src/caller5.ts",
+        "src/caller6.ts",
+        "src/caller7.ts"
+      ],
+      "knownUnresolved": "src/plugin.ts",
+      "performance": {
+        "analysisMs": 534.4677000000001,
+        "totalMs": 847.5703000000003
+      }
+    },
+    {
+      "scenario": "interface",
+      "budget": 1000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 1,
+      "tokens": 542,
+      "deterministic": true,
+      "capsuleHash": "c02c14c5d789515f9d0be53b45aa5e87700f6d7025301aba21f9125c2e7960b2",
+      "missed": [],
+      "noise": [],
+      "dropped": [],
+      "knownUnresolved": null,
+      "performance": {
+        "analysisMs": 523.7155999999995,
+        "totalMs": 798.7509
+      }
+    },
+    {
+      "scenario": "interface",
+      "budget": 3000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 1,
+      "tokens": 542,
+      "deterministic": true,
+      "capsuleHash": "e3834c5fc0379337354ae017c79610bd3ad7ff1e6928185081c2e11818a0919f",
+      "missed": [],
+      "noise": [],
+      "dropped": [],
+      "knownUnresolved": null,
+      "performance": {
+        "analysisMs": 515.8294999999998,
+        "totalMs": 793.4832999999999
+      }
+    },
+    {
+      "scenario": "python",
+      "budget": 1000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 1,
+      "tokens": 522,
+      "deterministic": true,
+      "capsuleHash": "0d0639a00ebab08d9021f7ab1698a12d32f91e9c63f44d29e287d3d64368973c",
+      "missed": [],
+      "noise": [],
+      "dropped": [],
+      "knownUnresolved": null,
+      "performance": {
+        "analysisMs": 536.9193999999989,
+        "totalMs": 809.8922000000002
+      }
+    },
+    {
+      "scenario": "python",
+      "budget": 3000,
+      "changedFile": true,
+      "changedSymbol": true,
+      "impactRecall": 1,
+      "impactPrecision": 1,
+      "retention": 1,
+      "tokens": 522,
+      "deterministic": true,
+      "capsuleHash": "10ce26bc05fcadf0160f49d228468b81d1a282fe0497668f3da6c89f3fd2b5a4",
+      "missed": [],
+      "noise": [],
+      "dropped": [],
+      "knownUnresolved": null,
+      "performance": {
+        "analysisMs": 521.3974999999991,
+        "totalMs": 801.6136000000006
+      }
+    }
+  ],
+  "limitations": [
+    "Small synthetic scenario suite; same author as implementation",
+    "No runtime completeness",
+    "Dynamic plugin path deliberately unresolved; not included in static recall denominator",
+    "CODING/REVIEW AGENT SUCCESS NOT MEASURED"
+  ]
+}

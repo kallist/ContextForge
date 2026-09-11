@@ -61,6 +61,7 @@ export async function recompileContext(compiler: LifecycleCompiler, input: unkno
   if (sources.changed.length > 0 || sources.generation !== parent.deterministic.repository.activeGeneration) throw new ContextForgeError("CONTROL_CONFLICT", "The proposal source or generation changed. Compile a fresh proposal before applying controls.");
   const execution = await compiler.compile({ task, budget: request.budget ?? parent.deterministic.budget.requested, captureCapsule: true, controlProvenance: { version: "contextforge-controls-v1", parentCapsuleHash: parent.capsuleHash, controls } }, parent);
   const capsule = validateCapsule(execution.capsule);
+  if (parent.deterministic.review?.changeHash !== capsule.deterministic.review?.changeHash) throw new ContextForgeError("CONTROL_CONFLICT", "The change set changed. Compile a fresh Review proposal before applying controls.");
   if (canonicalSerialize(capsule.deterministic.strategies) !== canonicalSerialize(parent.deterministic.strategies)) throw new ContextForgeError("STRATEGY_UNAVAILABLE", "Recompilation cannot substitute a different recorded strategy configuration.");
   if (capsule.deterministic.repository.activeGeneration !== parent.deterministic.repository.activeGeneration) throw new ContextForgeError("CONTROL_CONFLICT", "The active generation changed during recompilation. Open a fresh proposal.");
   return { execution, capsule, diff: diffContexts(parent, capsule), coverage: contextCoverage(capsule) };

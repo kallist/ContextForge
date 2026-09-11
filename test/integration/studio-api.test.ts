@@ -24,7 +24,7 @@ test("Studio real API: compile, explain, control, diff, verify, durable reopen a
     req.on("error", reject); req.end(JSON.stringify({ action: "history" }));
   });
   try {
-    const page = await fetch(studio.origin); assert.equal(page.status, 200); assert.ok((await page.text()).includes("Human controls"));
+    const page = await fetch(studio.origin); assert.equal(page.status, 200); assert.ok((await page.text()).includes("Review the change"));
     assert.ok(page.headers.get("content-security-policy")?.includes("frame-ancestors 'none'"));
     assert.equal((await fetch(`${studio.origin}/studio.js`)).status, 200);
     assert.equal((await fetch(`${studio.origin}/../package.json`)).status, 404);

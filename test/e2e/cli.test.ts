@@ -19,7 +19,7 @@ test("compiled CLI exposes help and version", () => {
   assert.match(help.stdout, /contextforge map/u);
   const version = runCli(["--version"]);
   assert.equal(version.status, 0, version.stderr);
-  assert.match(version.stdout, /^0\.3\.0\n$/u);
+  assert.match(version.stdout, /^0\.4\.0\n$/u);
 });
 
 test("compiled CLI maps a repository in text and JSON modes", async (context) => {

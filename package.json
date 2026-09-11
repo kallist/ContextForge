@@ -1,6 +1,6 @@
 {
   "name": "@kallist/contextforge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Local-first, task-aware context compiler for coding agents",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,9 @@
     "test": "node --test \".test-dist/test/**/*.test.js\"",
     "smoke": "node dist/cli/main.js --help",
     "studio:e2e": "node scripts/studio-e2e.mjs",
+    "review:e2e": "node scripts/review-e2e.mjs",
+    "review:benchmark": "node scripts/review-benchmark.mjs",
+    "review:demo": "npm run build && node scripts/review-demo.mjs",
     "demo": "npm run build && node scripts/studio-demo.mjs",
     "package:smoke": "node scripts/package-smoke.mjs",
     "release:hardening": "node scripts/release-hardening.mjs",

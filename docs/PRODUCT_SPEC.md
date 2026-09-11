@@ -13,8 +13,10 @@ offline inspection and reproduction verification, semantic comparison, captured-
 coverage/lint, localhost Studio, semantic human controls and immutable what-if
 recompilation. All preserve source privacy, generation safety and the final declared
 token-estimate budget. The [V0.3 product guide](V0.3_PRODUCT_GUIDE.md) defines current
-operation semantics, boundaries and limits. This extension does not promote V2,
-promise coding-agent success or begin the future Review/Impact product.
+operation semantics, boundaries and limits. This extension does not promote V2 or
+promise coding-agent success. V0.4 adds the bounded, local change-aware
+[Review Context product](V0.4_PRODUCT_GUIDE.md); its syntax/relationship evidence
+does not establish runtime impact or review quality.
 
 ContextForge is a local-first context compiler for coding agents. Given a repository, a coding task, and a token budget, it produces a task-aware Context Pack containing the smallest useful subset of repository information needed to understand and complete that task.
 

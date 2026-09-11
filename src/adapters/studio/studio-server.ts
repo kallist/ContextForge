@@ -13,10 +13,12 @@ import { explainContext, explainQuerySchema } from "../../core/explain-context.j
 import { ContextForgeError } from "../../core/errors.js";
 import { hasAbsolutePath } from "../../core/capsule-privacy.js";
 import { MAX_CAPSULE_BYTES, validateCapsule } from "../../core/context-capsule.js";
+import { compileReview } from "../../composition/contextforge-review.js";
 
 const id = z.string().regex(/^[a-f0-9]{64}$/u);
 const task = z.string().min(1).max(16_384), budget = z.number().int().min(1).max(1_000_000);
 const requestSchema = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("review"), base: z.string().min(1).max(200), budget, refreshIndex: z.boolean() }),
   z.strictObject({ action: z.literal("history"), offset: z.number().int().min(0).max(2000).optional() }),
   z.strictObject({ action: z.literal("open"), id }),
   z.strictObject({ action: z.literal("import"), capsule: z.unknown() }),
@@ -84,6 +86,12 @@ export async function startStudio(application: BoundContextForgeApplication & Li
         if (!parsed.success) throw new ContextForgeError("USAGE", "Invalid or unsupported Studio request.");
         const q = parsed.data;
         switch (q.action) {
+          case "review": {
+            if (q.refreshIndex) await application.index();
+            const execution = await compileReview(application.rootRealPath, { base: q.base, budget: q.budget });
+            history.save(execution.capsule); remember(execution.capsule.capsuleHash, execution.markdown);
+            json(response, 200, open(execution.capsule.capsuleHash)); break;
+          }
           case "history": json(response, 200, { entries: history.list(30, q.offset ?? 0), stats: history.stats() }); break;
           case "open": json(response, 200, open(q.id)); break;
           case "import": { const capsule = validateCapsule(q.capsule); history.save(capsule); json(response, 200, open(capsule.capsuleHash)); break; }

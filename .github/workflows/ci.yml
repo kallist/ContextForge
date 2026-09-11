@@ -86,6 +86,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run studio:e2e
+      - run: npm run review:e2e
+      - run: npm run review:benchmark
       - run: npm run package:smoke
         env:
           CONTEXTFORGE_STUDIO_BROWSER: "1"

@@ -1,22 +1,37 @@
 # ContextForge
 
-**ContextForge v0.3 — compile, explain, retain, verify and control agent context locally.**
+**ContextForge v0.4 — review the change with the context that matters.**
 
-> Machine proposes. Human controls. ContextForge compiles.
+> Code changes. ContextForge traces surrounding context. You decide what the agent sees.
 
-An agent can receive too much code, miss useful context, or leave you guessing what
-it actually saw. ContextForge gives the compilation a record: a **Context Capsule**
-with source hashes, selected/dropped decisions, evidence and an exact payload hash.
-Save it, compare alternatives, and verify whether current sources reproduce it.
+A diff shows changed lines. It does not show everything a reviewer should inspect
+around them. **Review Context** starts from a local Git change, identifies supported
+changed symbols, traces bounded structural relationships and compiles surrounding
+source under a hard token-estimate budget. Inspect facts and heuristics, PIN useful
+context, and compare or replay the resulting immutable **Context Capsule**.
 
 ```sh
 contextforge studio --repository ./your-repository
 ```
 
-Open the private localhost URL. Enter a task and hard token-estimate budget, inspect
-the proposal, PIN or EXCLUDE a candidate, then **Recompile & compare**. A new Capsule
-records your control; the original remains immutable. History stores compressed
-metadata, never a source archive. No cloud account or model call is required.
+Open the private localhost URL. Choose a base commit and budget, then **Build Review
+Context**. Inspect changed symbols and impact evidence, PIN a dropped candidate,
+and **Recompile & compare**. History stores compressed metadata, never a source
+archive. Existing coding-task compilation remains available. No account or model
+call is required. ContextForge compiles context; it does not judge code correctness.
+
+![Review Workspace](docs/images/review-overview.png)
+
+```sh
+contextforge review ./repo --base main --budget 8000 --refresh-index \
+  --capsule review.json --out review.md
+contextforge replay review.json --verify --repository ./repo
+```
+
+The base is compared with the **tracked working tree**; stage new files first.
+Deleted files are metadata only. Review uses Capsule v2; ordinary compilation keeps
+v1. See the [Review guide](docs/V0.4_PRODUCT_GUIDE.md) and
+[measured scenario results](docs/V0.4_REVIEW_EVALUATION.md) for precise boundaries.
 
 For a CLI-first workflow:
 
@@ -81,7 +96,7 @@ npm install -g @kallist/contextforge
 contextforge --version
 ```
 
-The V0.3 package version is `@kallist/contextforge@0.3.0`; the executable remains `contextforge`. Historical V0.2 publication evidence remains in the [V0.2 release report](docs/V0.2_RELEASE_REPORT.md). A source checkout or local tarball is not proof of public publication.
+The V0.4 package target is `@kallist/contextforge@0.4.0`; the executable remains `contextforge`. Historical V0.2 publication evidence remains in the [V0.2 release report](docs/V0.2_RELEASE_REPORT.md). A source checkout or local tarball is not proof of public publication.
 
 Index a repository and produce task-aware context:
 

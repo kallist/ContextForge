@@ -4,6 +4,7 @@ import { ContextForgeError } from "./errors.js";
 import { isNormalizedRepositoryPath } from "./repository-graph.js";
 import { CAPSULE_TEXT_LIMIT, hasAbsolutePath } from "./capsule-privacy.js";
 import { controlProvenanceSchema, normalizeControls } from "./context-controls.js";
+import { reviewSchema } from "./review-model.js";
 
 export const CAPSULE_SCHEMA = "contextforge-capsule-v1";
 export const EXPLAIN_SCHEMA = "contextforge-explain-v1";
@@ -51,6 +52,7 @@ const disposition = z.enum(["SELECTED", "DROPPED", "EXCLUDED"]);
 const reason = z.enum(["SELECTED", "REQUIRED_INSTRUCTION", "BUDGET_EXHAUSTED", "LOWER_PRIORITY", "DUPLICATE", "STALE_SOURCE", "SECTION_LIMIT", "UNSUPPORTED_CONTENT", "NO_USEFUL_RANGE", "SOURCE_VERIFICATION_LIMIT", "GLOBAL_BUDGET", "SAFETY_LIMIT", "REDUNDANT_RANGE"]);
 
 export const capsuleCoreSchema = z.strictObject({
+  review: reviewSchema.optional(),
   repository: z.strictObject({ gitCommit: z.string().regex(/^[a-f0-9]{40,64}$/u).nullable(), gitDirty: z.boolean().nullable(), gitScope: z.literal("INDEXED_SAFE_FILES"), activeGeneration: count.min(1), indexGeneration: count.min(1), indexSchema: count, analysisVersion: text }),
   task: z.strictObject({ taskHash: hash, representation: z.literal("RAW_UTF8"), text: text.nullable(), normalized: z.array(text).max(1024), analysis: z.strictObject({ strategy, action: code, mode: code, concepts: z.array(code).max(32), risks: z.array(code).max(32) }).nullable() }),
   strategies: z.strictObject({ retrieval: strategy, ranking: strategy, relationship: strategy.nullable(), planner: strategy.nullable(), pack: strategy, policy: strategy.nullable(), estimator: strategy, estimatorVersion: code, retrievalConfiguration: code.nullable(), planVariant: code.nullable() }),
@@ -73,12 +75,12 @@ export const capsuleCoreSchema = z.strictObject({
   payloadHash: hash,
 });
 
-export const capsuleSchema = z.strictObject({ schemaVersion: z.literal(CAPSULE_SCHEMA), explainVersion: z.literal(EXPLAIN_SCHEMA), deterministic: capsuleCoreSchema, runtime: z.strictObject({ createdAt: text, assemblyMs: finite.nonnegative(), canonicalizationHashMs: finite.nonnegative(), os: code.optional(), node: code.optional() }), capsuleHash: hash });
+export const capsuleSchema = z.strictObject({ schemaVersion: z.enum([CAPSULE_SCHEMA, "contextforge-capsule-v2"]), explainVersion: z.literal(EXPLAIN_SCHEMA), deterministic: capsuleCoreSchema, runtime: z.strictObject({ createdAt: text, assemblyMs: finite.nonnegative(), canonicalizationHashMs: finite.nonnegative(), os: code.optional(), node: code.optional() }), capsuleHash: hash });
 export type CapsuleCore = z.infer<typeof capsuleCoreSchema>;
 export type ContextCapsuleV1 = z.infer<typeof capsuleSchema>;
 
 export function hashCapsuleCore(core: CapsuleCore): string {
-  return sha256(canonicalSerialize({ schemaVersion: CAPSULE_SCHEMA, explainVersion: EXPLAIN_SCHEMA, deterministic: core }));
+  return sha256(canonicalSerialize({ schemaVersion: core.review === undefined ? CAPSULE_SCHEMA : "contextforge-capsule-v2", explainVersion: EXPLAIN_SCHEMA, deterministic: core }));
 }
 
 function invalid(): never {
@@ -109,7 +111,7 @@ function preflight(value: unknown): void {
 /** Pure bounded validation. It neither opens source paths nor loads an index. */
 export function validateCapsule(value: unknown): ContextCapsuleV1 {
   preflight(value);
-  if (typeof value === "object" && value !== null && "schemaVersion" in value && value.schemaVersion !== CAPSULE_SCHEMA) {
+  if (typeof value === "object" && value !== null && "schemaVersion" in value && value.schemaVersion !== CAPSULE_SCHEMA && value.schemaVersion !== "contextforge-capsule-v2") {
     throw new ContextForgeError("UNSUPPORTED_SCHEMA", "Unsupported Context Capsule schema; expected contextforge-capsule-v1.");
   }
   const parsed = capsuleSchema.safeParse(value);
@@ -119,6 +121,12 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
   }
   const capsule = parsed.data;
   const c = capsule.deterministic;
+  if ((capsule.schemaVersion === "contextforge-capsule-v2") !== (c.review !== undefined)) invalid();
+  if (c.review !== undefined) {
+    const r = c.review;
+    if (r.changeHash !== sha256(canonicalSerialize({ base: r.base, head: r.head, changes: r.changes, excludedChanges: r.excludedChanges }))) invalid();
+    if (new Set(r.changes.map((f) => f.path)).size !== r.changes.length) invalid();
+  }
   for (const override of c.overrides) {
     if (canonicalSerialize(normalizeControls(override.controls)) !== canonicalSerialize(override.controls)) invalid();
     if (override.parentCapsuleHash === capsule.capsuleHash) invalid();

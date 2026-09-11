@@ -1,4 +1,5 @@
 import { validateCapsule } from "./context-capsule.js";
+import { reviewCoverage } from "./review-coverage.js";
 
 export interface ContextLint {
   code: "AVAILABLE_ROLE_NOT_SELECTED" | "TOP_CANDIDATE_BUDGET_LOSS" | "SOURCE_UNAVAILABLE";
@@ -21,6 +22,7 @@ export function contextCoverage(input: unknown) {
   if (c.excluded.length > 0) lints.push({ code: "SOURCE_UNAVAILABLE", severity: "WARNING", entities: c.excluded, evidence: { code: "SAFETY_EXCLUSION", refs: c.decisions.filter((d) => d.stage === "SAFETY").map((d) => d.id) }, explanation: "Recorded source safety exclusions limited this compilation. Reindexing may resolve stale sources; controls cannot bypass them." });
   const selectedEvidence = new Set(c.selected.flatMap((s) => s.evidenceRefs));
   return { schemaVersion: "contextforge-coverage-v1" as const, capsuleHash: capsule.capsuleHash,
+    review: reviewCoverage(c),
     candidates: { available: c.candidates.length, selected: c.selected.length, dropped: c.dropped.length, excluded: c.excluded.length },
     evidence: { captured: c.evidence.length, referencedBySelection: selectedEvidence.size },
     roles, planner: c.plan === null ? "NOT_RUN" : "RECORDED", budgetLoss: budgetLoss.map((d) => d.candidateRef),

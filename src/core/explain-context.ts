@@ -32,6 +32,7 @@ export interface ExplainResultV1 {
     readonly ranges?: CapsuleCore["ranges"];
     readonly symbols?: CapsuleCore["symbols"];
     readonly packingEvents?: CapsuleCore["packingEvents"];
+    readonly review?: CapsuleCore["review"];
   };
   readonly evidenceRefs: readonly string[];
   readonly decisionRefs: readonly string[];
@@ -53,8 +54,8 @@ function explainValidated(capsule: ContextCapsuleV1, input: ExplainQueryV1): Exp
   if (!parsed.success) throw new ContextForgeError("USAGE", "Invalid Explain query or missing subject.");
   const query = parsed.data, c = capsule.deterministic;
   const safeQuery = query.subject === undefined ? query : { ...query, subject: redactAbsolutePaths(query.subject, 4096) };
-  const facts: ExplainResultV1["facts"] = { capsuleHash: capsule.capsuleHash, payloadHash: c.payloadHash };
-  const base = { schemaVersion: EXPLAIN_SCHEMA, query: safeQuery, subject: safeQuery.subject ?? null, facts, evidenceRefs: [], decisionRefs: [], limitations: ["RECORDED_COMPILER_DECISIONS_ONLY", "BOUNDED_CANDIDATE_SET", ...(c.plan === null ? ["PLANNER_NOT_RUN", "RELATIONSHIP_STAGE_NOT_RUN"] : [])] } as const;
+  const facts: ExplainResultV1["facts"] = { capsuleHash: capsule.capsuleHash, payloadHash: c.payloadHash, ...(c.review === undefined ? {} : { review: c.review }) };
+  const base = { schemaVersion: EXPLAIN_SCHEMA, query: safeQuery, subject: safeQuery.subject ?? null, facts, evidenceRefs: [], decisionRefs: [], limitations: ["RECORDED_COMPILER_DECISIONS_ONLY", "BOUNDED_CANDIDATE_SET", ...(c.plan === null && c.review === undefined ? ["PLANNER_NOT_RUN", "RELATIONSHIP_STAGE_NOT_RUN"] : [])] } as const;
   if (query.type === "SUMMARY") return { ...base, status: "OK", facts: { ...facts, repository: c.repository, task: c.task, budget: c.budget, strategies: c.strategies, coverage: c.coverage, counts: { candidates: c.candidates.length, selected: c.selected.length, dropped: c.dropped.length, excluded: c.excluded.length, files: c.files.length, symbols: c.symbols.length, ranges: c.ranges.length } } };
   if (query.type === "BUDGET") return { ...base, status: "OK", facts: { ...facts, budget: c.budget, strategies: c.strategies, coverage: c.coverage, packingEvents: c.packingEvents }, limitations: [...base.limitations, "ITEM_ESTIMATES_EXCLUDE_SHARED_ENVELOPE", "ROLE_CONTRIBUTIONS_MAY_OVERLAP"] };
   if (query.type === "STRATEGY") return { ...base, status: "OK", facts: { ...facts, strategies: c.strategies } };

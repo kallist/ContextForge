@@ -30,7 +30,7 @@ async function refreshHistory(more = false) {
   for (const entry of entries) {
     const button = node("button", undefined, "history-entry"); button.dataset.id = entry.id;
     button.classList.toggle("selected", opened?.capsule.capsuleHash === entry.id);
-    button.append(node("span", entry.task || "Redacted task"), node("small", `${entry.id.slice(0, 10)} · ${entry.tokens.toLocaleString()} / ${entry.budget.toLocaleString()} tokens`));
+    button.append(node("span", entry.task?.startsWith("Review tracked changes ") ? "Review Context · tracked changes" : entry.task || "Redacted task"), node("small", `${entry.id.slice(0, 10)} · ${entry.tokens.toLocaleString()} / ${entry.budget.toLocaleString()} tokens`));
     button.addEventListener("click", () => work("Opening recorded Capsule…", async () => { display(await api({ action: "open", id: entry.id })); showStatus("Saved metadata opened. Verify replay to recover context from current sources."); }));
     $("history").append(button);
     if (entry.id !== opened?.capsule.capsuleHash) { const option = node("option", `${entry.id.slice(0, 10)} · ${entry.task || "Task"}`); option.value = entry.id; $("compare").append(option); }
@@ -53,8 +53,8 @@ function display(data) {
   $("payload-note").textContent = data.payload ? `Exact ephemeral payload · SHA-256 ${c.payloadHash}` : data.payloadStatus;
   $("copy").disabled = !data.payload;
   $("explain").replaceChildren(); $("replay-result").replaceChildren();
-  renderCandidates(); renderCoverage(data.coverage);
-  if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab("proposal"); }
+  renderCandidates(); renderCoverage(data.coverage); renderReview();
+  if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab(c.review ? "review" : "proposal"); }
 }
 function renderCandidates() {
   if (!opened) return;
@@ -73,6 +73,7 @@ function renderCandidates() {
       if (result.facts.ranges?.length) fact(target, "RANGES", result.facts.ranges.map((r) => `L${r.startLine}–${r.endLine}`).join(", "));
       if (result.facts.symbols?.length) fact(target, "SYMBOLS", result.facts.symbols.map((s) => s.qualifiedName).join(", "));
       for (const e of (result.facts.evidence || []).slice(0, 40)) fact(target, `${e.stage} · ${e.derivation}`, `${e.code} · ${e.family}${e.querySignal ? ` · ${e.querySignal}` : ""}`);
+      for (const r of (result.facts.review?.impact || []).filter((r) => r.from === file.path || r.to === file.path).slice(0, 20)) fact(target, `${r.type} · ${r.classification}`, `${r.from} → ${r.to}`);
       if ((result.facts.evidence?.length || 0) > 40) fact(target, "BOUNDED DISPLAY", "First 40 evidence records shown. Export Capsule for full captured details.");
       showStatus(`Explain: ${result.status}. These are compiler facts, not a model's reasoning.`);
     }));
@@ -109,7 +110,13 @@ function renderCoverage(coverage) {
   if (!coverage.lints.length) lints.append(node("p", "No recorded condition triggered the current lint rules. This does not prove context completeness."));
 }
 function renderDiff(diff) {
+  if (diff.review) showStatus(`Review comparison: ${diff.review.changeSetChanged ? "change set changed" : "same change set"}; ${diff.review.relationshipsAdded.length} relationships added, ${diff.review.relationshipsRemoved.length} removed.`);
   const target = $("changes"); target.replaceChildren(node("p", `${diff.before.slice(0, 12)} → ${diff.after.slice(0, 12)} · ${diff.identical ? "Identical compilation" : "Changed compilation"}`));
+  if (diff.review) {
+    fact(target, "REVIEW CHANGE SET", diff.review.changeSetChanged ? "Changed" : "Same recorded change");
+    fact(target, "SYMBOL / IMPACT TRANSITIONS", `Symbols ${diff.review.symbolsChanged ? "changed" : "unchanged"}; ${diff.review.relationshipsAdded.length} relationships added, ${diff.review.relationshipsRemoved.length} removed`);
+    for (const [label, coverage] of [["BEFORE", diff.review.coverageBefore], ["AFTER", diff.review.coverageAfter]]) if (coverage) fact(target, `${label} · CHANGED SYMBOLS REPRESENTED`, `${coverage.changedSymbols.represented} / ${coverage.changedSymbols.available}`);
+  }
   for (const item of diff.compilation) fact(target, "COMPILATION CHANGE", item.dimension);
   for (const item of diff.candidates) {
     const card = node("article", undefined, "card");
@@ -129,4 +136,53 @@ $("more").addEventListener("click", () => work("Loading history summaries…", (
 $("copy").addEventListener("click", () => work("Copying exact context…", async () => { if (opened?.payload) { await navigator.clipboard.writeText(opened.payload); showStatus("Exact compiled context copied."); } }));
 $("delete").addEventListener("click", () => work("Deleting selected history metadata…", async () => { if (!opened || !window.confirm("Delete this Capsule from local history? This does not securely erase disk pages.")) return; await api({ action: "delete", id: opened.capsule.capsuleHash }); opened = null; $("workspace").hidden = true; await refreshHistory(); showStatus("Capsule removed from local history."); }));
 $("import").addEventListener("change", () => work("Validating imported Capsule…", async () => { const file = $("import").files[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) throw new Error("Capsule exceeds the 8 MiB import limit."); display(await api({ action: "import", capsule: JSON.parse(await file.text()) })); await refreshHistory(); showStatus("Capsule validated and saved. Source bodies were not imported."); }));
-void work("Opening local history…", async () => { await refreshHistory(); showStatus("Ready. Compile your first context or open a saved Capsule."); });
+function renderReview() {
+  const c = opened.capsule.deterministic, review = c.review;
+  $("review-tab").hidden = !review;
+  if (!review) return;
+  $("review-ref").textContent = `${review.base.slice(0, 8)} → working tree`;
+  const fileMap = new Map(c.files.map((f) => [f.id, f.path]));
+  const candidate = (path) => c.candidates.find((i) => fileMap.get(i.fileRef) === path);
+  $("review-files").replaceChildren();
+  const labels = { FILE_IMPORTS_FILE: "Imports / dependents", TEST_RELATES_TO_FILE: "Associated tests", DOCUMENT_RELATES_TO_FILE: "Related documentation", SYMBOL_REFERENCES_SYMBOL: "Direct symbol references", TEST_REFERENCES_SYMBOL: "Direct test references", SYMBOL_IMPLEMENTS_SYMBOL: "Interface / implementation" };
+  function inspect(change) {
+    const target = $("review-detail"); target.replaceChildren(node("p", change.status, "eyebrow"), node("h3", change.path, "mono"));
+    if (change.previousPath) target.append(node("p", `Renamed from ${change.previousPath}`, "muted"));
+    for (const s of change.symbols) {
+      const symbol = node("div", undefined, "symbol-row"); symbol.append(node("span", s.change, `tag ${s.change}`), node("strong", s.name), node("small", `${s.kind} · L${s.startLine}–${s.endLine}`)); target.append(symbol);
+    }
+    if (!change.symbols.length) target.append(node("p", change.availability === "VERIFIED" ? "File-level change. No supported changed symbol was captured." : "Deleted file: metadata only. Historical source is not recovered.", "muted"));
+    target.append(node("h4", "Changed ranges"));
+    for (const range of change.ranges.slice(0, 30)) { const row = node("div", undefined, "range-row"); row.append(node("span", `− L${range.before.startLine} · ${range.before.count} lines`, "removed-lines"), node("span", `+ L${range.after.startLine} · ${range.after.count} lines`, "added-lines")); target.append(row); }
+    if (change.ranges.length > 30) target.append(node("p", "First 30 ranges shown. Capsule retains all bounded ranges.", "muted"));
+    const item = candidate(change.path);
+    if (item) { target.append(node("p", `Context decision: ${item.disposition}`, "muted")); const button = node("button", "Inspect selection & controls →"); button.addEventListener("click", () => tab("proposal")); target.append(button); }
+    $("review-impact").replaceChildren();
+    const links = review.impact.filter((r) => r.from === change.path || r.to === change.path);
+    for (const relation of links.slice(0, 40)) {
+      const path = relation.from === change.path ? relation.to : relation.from;
+      const item = candidate(path), card = node("article", undefined, "impact-card");
+      card.append(node("small", labels[relation.type] || relation.type, "relation-label"), node("h4", path, "mono"), node("p", `${relation.from} → ${relation.to}`, "relation-chain"), node("span", relation.classification === "HEURISTIC" ? "Heuristic association" : "Structural fact", `provenance ${relation.classification}`), node("span", item?.disposition || "NOT AVAILABLE", `tag ${item?.disposition || ""}`));
+      if (item) { const pin = node("button", "PIN"); pin.setAttribute("aria-label", `Pin ${path}`); pin.addEventListener("click", () => { controls = controls.filter((control) => control.path !== path); controls.push({ kind: "PIN", path }); renderControls(); renderCandidates(); showStatus(`Pinned ${path}. Recompile to create a new Capsule.`); }); card.append(pin); }
+      $("review-impact").append(card);
+    }
+    if (!links.length) $("review-impact").append(node("p", "No supported one-hop relationship captured. This does not prove there is no impact.", "muted"));
+    if (links.length > 40) $("review-impact").append(node("p", "First 40 relations shown; export the Capsule for all recorded evidence.", "muted"));
+    for (const button of $("review-files").children) button.classList.toggle("selected", button.dataset.path === change.path);
+  }
+  for (const change of review.changes) { const button = node("button", undefined, "change-file"); button.dataset.path = change.path; button.append(node("span", change.status.slice(0, 1), `change-letter ${change.status}`), node("span", change.path), node("small", `${change.symbols.length} symbols`)); button.addEventListener("click", () => inspect(change)); $("review-files").append(button); }
+  if (review.changes[0]) inspect(review.changes[0]);
+  const coverage = opened.coverage.review;
+  $("review-summary").replaceChildren();
+  fact($("review-summary"), "CHANGE SURFACE", `${review.changes.length} files · ${review.changes.reduce((n, f) => n + f.symbols.length, 0)} symbol changes`);
+  fact($("review-summary"), "BOUNDARY", `One hop · ${review.excludedChanges} excluded changes · tracked files only`);
+  if (coverage) {
+    fact($("review-summary"), "CURRENT SYMBOLS REPRESENTED", `${coverage.changedSymbols.represented} / ${coverage.changedSymbols.available}`);
+    for (const lint of coverage.lints) { const card = node("article", undefined, "card"); card.append(node("small", `${lint.severity} · ${lint.code}`), node("p", lint.explanation), node("p", lint.entities.join(", "), "mono muted")); $("lints").append(card); }
+  }
+}
+$("review-compile").addEventListener("click", () => work("Analyzing tracked changes, verifying sources and compiling Review Context…", async () => {
+  display(await api({ action: "review", base: $("review-base").value, budget: Number($("review-budget").value), refreshIndex: true }));
+  await refreshHistory(); showStatus("Review Context saved. Follow the impact evidence, then shape the proposal.");
+}));
+void work("Opening local history…", async () => { await refreshHistory(); showStatus("Ready. Build Review Context, compile a coding task, or open a saved Capsule."); });

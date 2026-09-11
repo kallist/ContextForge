@@ -1,0 +1,20 @@
+{
+  "version": "contextforge-review-evaluation-v1",
+  "frozen": "2026-09-10",
+  "budgets": [1000, 3000],
+  "scenarios": [
+    { "id": "callers", "changed": "src/ledger.ts", "symbol": "ledger", "related": ["src/caller0.ts", "src/caller1.ts", "src/caller2.ts", "src/caller3.ts", "src/caller4.ts", "src/caller5.ts", "src/caller6.ts", "src/caller7.ts", "test/ledger.test.ts"], "unresolvedRuntimeRelationship": "src/plugin.ts" },
+    { "id": "interface", "changed": "src/contract.ts", "symbol": "Store", "related": ["src/store.ts"], "unresolvedRuntimeRelationship": null },
+    { "id": "python", "changed": "src/ledger.py", "symbol": "ledger", "related": ["src/python_caller.py"], "unresolvedRuntimeRelationship": null }
+  ],
+  "metrics": {
+    "changedFile": "Expected changed file captured (boolean)",
+    "changedSymbol": "Expected named changed symbol captured (boolean)",
+    "impactRecall": "Expected direct related paths captured / annotated related paths",
+    "impactPrecision": "Annotated captured related paths / all unique captured nonchanged related paths",
+    "retention": "Annotated related paths selected / annotated related paths",
+    "budget": "Final generic-v1 estimated payload tokens <= requested budget",
+    "determinism": "Two consecutive runs have equal payload and Capsule hashes"
+  },
+  "limitations": ["Small synthetic scenario suite; same author as implementation", "No runtime completeness", "Dynamic plugin path deliberately unresolved; not included in static recall denominator", "CODING/REVIEW AGENT SUCCESS NOT MEASURED"]
+}
