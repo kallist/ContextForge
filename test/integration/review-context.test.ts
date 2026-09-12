@@ -125,6 +125,7 @@ test("Review: a pure tracked delete produces deterministic metadata-only Capsule
   const app = await createContextForgeLifecycle(root);
   await app.index();
   await rm(join(root, "src", "service.ts"));
+  await assert.rejects(compileReview(root, { budget: 1 }), { code: "BUDGET_TOO_SMALL" });
 
   const staleGeneration = await compileReview(root, { budget: 1000 });
   assert.equal(validateCapsule(staleGeneration.capsule).schemaVersion, "contextforge-capsule-v2");
