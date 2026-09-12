@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { rm, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -13,6 +13,8 @@ import { FileSystemRepositorySourceReader } from "../../src/adapters/filesystem/
 import { TreeSitterLanguageAnalyzer } from "../../src/adapters/parser/tree-sitter-language-analyzer.js";
 import { SqliteIndexRepository } from "../../src/adapters/sqlite/sqlite-index-repository.js";
 import { buildIndex } from "../../src/application/build-index.js";
+import { createContextForgeApplication } from "../../src/composition/contextforge-application.js";
+import { indexReview } from "../../src/composition/contextforge-review.js";
 import { createTemporaryDirectory, removeTemporaryDirectory, writeFixture } from "../helpers/fixtures.js";
 
 function git(root: string, args: readonly string[]): Promise<string> {
@@ -105,4 +107,74 @@ test("a deleted previously indexed file remains a generation-bound Git signal wi
     active?.graph?.git.files.find((file) => file.relativePath === "src/deleted.ts")?.workingTreeStatus,
     "deleted",
   );
+});
+
+test("rename signals are generation-bound and a clean round trip does not retain the obsolete path", async (context) => {
+  const root = await createTemporaryDirectory("git-rename-round-trip");
+  context.after(() => removeTemporaryDirectory(root));
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.email", "contextforge@example.invalid"]);
+  await git(root, ["config", "user.name", "ContextForge Tests"]);
+  await writeFixture(root, ".gitignore", ".contextforge/\n");
+  await writeFixture(root, "src/A.ts", "export const value = 1;\n");
+  await git(root, ["add", "--", ".gitignore", "src/A.ts"]);
+  await git(root, ["commit", "-m", "initial"]);
+
+  const app = await createContextForgeApplication(root);
+  assert.equal((await app.index()).generation, 1);
+  await git(root, ["mv", "--", "src/A.ts", "src/B.ts"]);
+  const renamed = await new ReadOnlyGitSignalsReader().inspect(root, [".gitignore", "src/A.ts", "src/B.ts"]);
+  assert.equal(renamed.status, "available");
+  if (renamed.status !== "available") return;
+  assert.equal(renamed.files.find((file) => file.relativePath === "src/A.ts")?.workingTreeStatus, "deleted");
+  assert.equal(renamed.files.find((file) => file.relativePath === "src/B.ts")?.workingTreeStatus, "renamed");
+  assert.equal((await indexReview(root)).generation, 2);
+
+  await git(root, ["mv", "--", "src/B.ts", "src/A.ts"]);
+  assert.equal(await git(root, ["status", "--porcelain=v1"]), "");
+  assert.equal(await readFile(join(root, "src", "A.ts"), "utf8"), "export const value = 1;\n");
+
+  await assert.doesNotReject(async () => {
+    assert.equal((await app.index()).generation, 3);
+  });
+  assert.equal((await app.status()).indexStatus, "CURRENT");
+  const restarted = await createContextForgeApplication(root);
+  assert.equal((await restarted.status()).indexStatus, "CURRENT");
+  assert.equal((await restarted.index()).generation, 4);
+
+  const active = await new SqliteIndexRepository(root).loadActive();
+  assert.deepEqual(active?.files.map((file) => file.relativePath), [".gitignore", "src/A.ts"]);
+  assert.deepEqual(active?.graph?.git.files.map((file) => file.relativePath), [".gitignore", "src/A.ts"]);
+});
+
+test("public indexing refreshes imports across multiple rename generations without stale path leakage", async (context) => {
+  const root = await createTemporaryDirectory("git-rename-generations");
+  context.after(() => removeTemporaryDirectory(root));
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.email", "contextforge@example.invalid"]);
+  await git(root, ["config", "user.name", "ContextForge Tests"]);
+  await writeFixture(root, ".gitignore", ".contextforge/\n");
+  await writeFixture(root, "src/A.ts", "export const value = 1;\n");
+  await writeFixture(root, "src/consumer.ts", "import { value } from './A.js';\nexport const result = value;\n");
+  await git(root, ["add", "--", ".gitignore", "src/A.ts", "src/consumer.ts"]);
+  await git(root, ["commit", "-m", "initial"]);
+  const app = await createContextForgeApplication(root);
+  assert.equal((await app.index()).generation, 1);
+
+  for (const [from, to, generation] of [["A", "B", 2], ["B", "C", 3]] as const) {
+    await git(root, ["mv", "--", `src/${from}.ts`, `src/${to}.ts`]);
+    await writeFile(join(root, "src", "consumer.ts"), `import { value } from './${to}.js';\nexport const result = value;\n`, "utf8");
+    assert.equal((await app.index()).generation, generation);
+    const active = await new SqliteIndexRepository(root).loadActive();
+    assert.equal(active?.graph?.resolvedImports.find((record) => record.sourcePath === "src/consumer.ts")?.targetPath, `src/${to}.ts`);
+  }
+
+  await git(root, ["mv", "--", "src/C.ts", "src/A.ts"]);
+  await writeFile(join(root, "src", "consumer.ts"), "import { value } from './A.js';\nexport const result = value;\n", "utf8");
+  assert.equal(await git(root, ["status", "--porcelain=v1"]), "");
+  assert.equal((await app.index()).generation, 4);
+  assert.equal((await app.status()).indexStatus, "CURRENT");
+  const active = await new SqliteIndexRepository(root).loadActive();
+  assert.equal(active?.graph?.resolvedImports.find((record) => record.sourcePath === "src/consumer.ts")?.targetPath, "src/A.ts");
+  assert.equal(active?.graph?.git.files.some((file) => file.relativePath === "src/B.ts" || file.relativePath === "src/C.ts"), false);
 });

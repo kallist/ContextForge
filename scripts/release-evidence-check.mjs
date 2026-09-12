@@ -9,7 +9,7 @@ const evidence = "benchmarks/analysis/v0.2/final/";
 const read = async (path) => JSON.parse(await readFile(resolve(root, path), "utf8"));
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const inventory = await read(evidence + "integrity-manifest.json");
-// These application/adapter contracts now carry observational Capsule metadata.
+// These application/adapter contracts have later observational or correctness changes.
 // Retain their immutable V0.2 bytes at the recorded evaluation commit, while the
 // current compiler must reproduce every historical case below. All ranking,
 // selection-policy, estimator, database, Gold and historical artifacts stay frozen.
@@ -17,6 +17,7 @@ const observationalFiles = new Set([
   "src/application/build-context-pack.ts", "src/application/build-context-pack-v2.ts",
   "src/application/search-repository-v2.ts", "src/cli/main.ts",
   "src/core/context-pack.ts", "src/core/errors.ts",
+  "src/adapters/git/git-signals-reader.ts",
 ]);
 for (const item of [...inventory.invariantFiles, ...inventory.evidenceFiles]) {
   assert.ok(!item.path.includes("..") && !/^[A-Za-z]:|^[/\\]/u.test(item.path), "Unsafe evidence inventory path");

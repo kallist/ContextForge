@@ -64,7 +64,7 @@ export async function buildReviewContext(scanner: RepositoryScanner, reader: Rep
   for (const path of chosen) syntax.push(await analyzer.analyzeRelationships({ relativePath: path, source: sources.get(path) ?? "" }));
   const derivation = deriveSymbolRelationshipsV2(snapshot.files.filter((f) => chosen.includes(f.relativePath)), syntax, snapshot.graph?.resolvedImports ?? [], snapshot.generation);
   const impact = new Map<string, ReviewModel["impact"][number]>();
-  for (const edge of adjacent.filter((e) => chosen.includes(e.sourcePath) && chosen.includes(e.targetPath))) impact.set(edge.id, { id: edge.id, from: edge.sourcePath, to: edge.targetPath, type: edge.kind, classification: edge.derivation === "structural" ? "STRUCTURAL_FACT" : "HEURISTIC", sourceSymbol: null, targetSymbol: null });
+  for (const edge of adjacent.filter((e) => chosen.includes(e.sourcePath) || chosen.includes(e.targetPath))) impact.set(edge.id, { id: edge.id, from: edge.sourcePath, to: edge.targetPath, type: edge.kind, classification: edge.derivation === "structural" ? "STRUCTURAL_FACT" : "HEURISTIC", sourceSymbol: null, targetSymbol: null });
   for (const r of derivation.relationships.filter((r) => changed.has(r.source.file) || changed.has(r.target.file))) impact.set(r.id, { id: r.id, from: r.source.file, to: r.target.file, type: r.type, classification: r.classification, sourceSymbol: r.source.symbolId, targetSymbol: r.target.symbolId });
   review.impact = [...impact.values()].sort((a, b) => compare(a.id, b.id)).slice(0, 1024);
   if (impact.size > 1024) review.diagnostics.push("IMPACT_RELATION_LIMIT");
@@ -81,7 +81,8 @@ export async function buildReviewContext(scanner: RepositoryScanner, reader: Rep
       }),
     }, context: { scan, snapshot }, performance: { totalMs: analysisMs },
   };
-  const execution = await buildContextPack(scanner, reader, factory, { ...request, task, captureCapsule: true }, undefined, () => Promise.resolve(search));
+  const metadataOnlyDelete = review.changes.length > 0 && review.changes.every((change) => change.status === "DELETED" && change.availability === "DELETED_METADATA_ONLY");
+  const execution = await buildContextPack(scanner, reader, factory, { ...request, task, captureCapsule: true }, undefined, () => Promise.resolve(search), { allowEmptySelection: metadataOnlyDelete });
   // Recheck consumed sources and Git range identity before publishing an immutable result.
   const after = await scanner.scan(request.repositoryPath);
   const afterEntries = new Map(after.entries.map((e) => [e.path, e]));
@@ -91,7 +92,8 @@ export async function buildReviewContext(scanner: RepositoryScanner, reader: Rep
   }
   if ((await git.resolve("HEAD")) !== head || (await git.changes(base)).identity !== raw.identity) throw new ContextForgeError("CONTROL_CONFLICT", "Git changed during review analysis.");
   for (const c of review.changes.filter((c) => c.availability === "VERIFIED")) if (canonicalSerialize(await git.ranges(base, c.path, c.previousPath)) !== canonicalSerialize(c.ranges)) throw new ContextForgeError("CONTROL_CONFLICT", "Git ranges changed during review analysis.");
-  const capsule = validateCapsule(execution.capsule);
+  const capsule = execution.capsule;
+  if (capsule === undefined) throw new ContextForgeError("INVALID_CAPSULE", "Review compilation did not capture a Context Capsule.");
   capsule.schemaVersion = "contextforge-capsule-v2";
   capsule.deterministic.review = review;
   capsule.capsuleHash = hashCapsuleCore(capsule.deterministic);

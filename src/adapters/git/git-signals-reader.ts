@@ -69,7 +69,11 @@ function parseStatus(output: string, approved: ReadonlySet<string>): Map<string,
     const code = record.slice(0, 2);
     const relativePath = record.slice(3).replaceAll("\\", "/");
     if (approved.has(relativePath)) result.set(relativePath, workingTreeStatus(code));
-    if ((code.includes("R") || code.includes("C")) && records[index + 1] !== undefined) index += 1;
+    if ((code.includes("R") || code.includes("C")) && records[index + 1] !== undefined) {
+      const previousPath = records[index + 1]?.replaceAll("\\", "/") ?? "";
+      if (code.includes("R") && approved.has(previousPath)) result.set(previousPath, "deleted");
+      index += 1;
+    }
   }
   return result;
 }
@@ -171,7 +175,13 @@ export class ReadOnlyGitSignalsReader implements GitSignalsReader {
         .filter((path) => approved.has(path)),
     );
     const history = parseHistory(historyOutput ?? "", approved);
+    // `approved` includes the previous index generation so an actual deletion can
+    // survive scanning. Do not turn a path that exists only in that old generation
+    // into a timeless synthetic `clean` signal. Rename sources are recorded above
+    // as this generation's explicit deletion side.
+    const signaled = new Set([...tracked, ...dirty.keys()]);
     const files: GitFileSignal[] = [...approved]
+      .filter((relativePath) => signaled.has(relativePath))
       .sort(compareText)
       .map((relativePath) => {
         const recent = history.get(relativePath);

@@ -4,6 +4,11 @@ All notable changes to ContextForge will be recorded here.
 
 ## Unreleased
 
+- Fix tracked DELETE Review so a strictly validated, hard-budget metadata-only
+  Capsule can be produced without fabricating historical source.
+- Fix generation-bound Git rename signals so rename round trips cannot leave an
+  obsolete path that blocks later durable index activation.
+
 ## 0.4.0 — Review Context
 
 - Local Git change-seeded Review Context with changed ranges/symbols and bounded
