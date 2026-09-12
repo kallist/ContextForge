@@ -14,7 +14,7 @@ const { hashCapsuleCore, sha256, canonicalSerialize } = await load("core/context
 const root = await realpath(await mkdtemp(join(tmpdir(), "contextforge-review-browser-")));
 let browser, studio, history;
 try {
-  await reviewFixture(root);
+  const { git } = await reviewFixture(root);
   const app = await createContextForgeLifecycle(root);
   history = new SqliteCapsuleHistory(join(root, ".contextforge/history"));
   studio = await startStudio(app, history);
@@ -62,6 +62,20 @@ try {
   const response = await fetch(studio.origin + "/api", { method: "POST", headers: { Origin: studio.origin, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "review", base: "HEAD; echo injected", budget: 1000, refreshIndex: false }) });
   assert.equal(response.status, 400);
   assert.ok(!(await response.text()).includes(root));
+
+  git("add", "--", "src/ledger.ts");
+  git("-c", "user.name=ContextForge fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Accept modified ledger baseline");
+  await rm(join(root, "src/plugin.ts"));
+  await page.getByRole("button", { name: "Build Review Context →", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Review Context saved" }).waitFor();
+  const deleteDetail = await page.locator("#review-detail").textContent();
+  assert.ok(deleteDetail.includes("DELETE"));
+  assert.ok(deleteDetail.includes("src/plugin.ts"));
+  await page.getByRole("button", { name: "Exact context", exact: true }).click();
+  assert.ok(!(await page.locator("#payload").textContent()).includes("export function plugin"));
+  await page.getByRole("button", { name: "Coverage & lint", exact: true }).click();
+  assert.ok((await page.locator("#lints").textContent()).includes("HISTORICAL_SOURCE_UNAVAILABLE"));
+  assert.ok(!(await page.locator("body").textContent()).includes(root));
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ version: "contextforge-review-browser-v1", passed: 1, failed: 0, skipped: 0, package: process.argv[2] ? "INSTALLED_PACKAGE" : "WORKTREE", browser: await browser.version(), viewports: [1024, 1280, 1512, 1920], journey: ["git-change", "impact", "budget-loss", "pin", "immutable-recompile", "semantic-diff", "exact-replay", "source-xss", "stored-metadata-xss", "ref-injection", "privacy"] }));
+  console.log(JSON.stringify({ version: "contextforge-review-browser-v1", passed: 1, failed: 0, skipped: 0, package: process.argv[2] ? "INSTALLED_PACKAGE" : "WORKTREE", browser: await browser.version(), viewports: [1024, 1280, 1512, 1920], journey: ["git-change", "impact", "budget-loss", "pin", "immutable-recompile", "semantic-diff", "exact-replay", "source-xss", "stored-metadata-xss", "ref-injection", "delete-review", "delete-no-fake-source", "delete-coverage-lint", "privacy"] }));
 } finally { await browser?.close(); await studio?.close(); history?.close(); await rm(root, { recursive: true, force: true }); }

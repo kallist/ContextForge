@@ -6,7 +6,7 @@ import { mkdir, readFile, realpath, rename, rm } from "node:fs/promises";
 import { createContextForgeLifecycle } from "../../src/composition/contextforge-lifecycle.js";
 import { compileReview } from "../../src/composition/contextforge-review.js";
 import { ReviewGitReader } from "../../src/adapters/git/review-git-reader.js";
-import { canonicalSerialize, validateCapsule } from "../../src/core/context-capsule.js";
+import { canonicalSerialize, hashCapsuleCore, validateCapsule } from "../../src/core/context-capsule.js";
 import { contextCoverage } from "../../src/core/context-coverage.js";
 import { recompileContext, verifyReplay } from "../../src/application/context-lifecycle.js";
 import { GenericTokenEstimator } from "../../src/core/token-estimation.js";
@@ -111,4 +111,106 @@ test("Review: read-only analysis never executes repository-configured clean/proc
   const result = await compileReview(root, { budget: 2000 });
   assert.ok(result.review.changes.some((f) => f.path === "src/ledger.ts"));
   await assert.rejects(readFile(join(root, "filter-executed")), { code: "ENOENT" });
+});
+
+test("Review: a pure tracked delete produces deterministic metadata-only Capsules before and after refresh", async (t) => {
+  const temp = await realpath(await createTemporaryDirectory("review-delete-only")), root = join(temp, "repo");
+  await mkdir(root); t.after(() => removeTemporaryDirectory(temp));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", windowsHide: true });
+  git("init", "-b", "main");
+  await writeFixture(root, ".gitignore", ".contextforge/\n");
+  await writeFixture(root, "src/service.ts", "export function service() { return 1; }\n");
+  git("add", "--", ".gitignore", "src/service.ts");
+  git("-c", "user.name=Review fixture", "-c", "user.email=review@example.invalid", "commit", "-m", "fixture");
+  const app = await createContextForgeLifecycle(root);
+  await app.index();
+  await rm(join(root, "src", "service.ts"));
+
+  const staleGeneration = await compileReview(root, { budget: 1000 });
+  assert.equal(validateCapsule(staleGeneration.capsule).schemaVersion, "contextforge-capsule-v2");
+  assert.deepEqual(staleGeneration.review.changes.map((change) => ({ path: change.path, status: change.status, availability: change.availability, sourceHash: change.sourceHash, symbols: change.symbols.length })), [
+    { path: "src/service.ts", status: "DELETED", availability: "DELETED_METADATA_ONLY", sourceHash: null, symbols: 0 },
+  ]);
+  assert.equal(staleGeneration.capsule.deterministic.selected.length, 0);
+  assert.equal(staleGeneration.capsule.deterministic.files.some((file) => file.path === "src/service.ts"), false);
+  assert.equal(staleGeneration.markdown.includes("export function service"), false);
+  assert.ok(new GenericTokenEstimator().estimate(staleGeneration.markdown) <= 1000);
+
+  await app.index();
+  const refreshedA = await compileReview(root, { budget: 1000 });
+  const refreshedB = await compileReview(root, { budget: 1000 });
+  assert.equal(refreshedA.capsule.capsuleHash, refreshedB.capsule.capsuleHash);
+  assert.equal(refreshedA.markdown, refreshedB.markdown);
+  assert.equal(refreshedA.capsule.deterministic.selected.length, 0);
+  const coverage = contextCoverage(refreshedA.capsule).review;
+  assert.deepEqual(coverage?.changedFiles, { available: 1, selected: 0 });
+  assert.deepEqual(coverage?.changedSymbols, { available: 0, represented: 0 });
+  assert.ok(coverage?.lints.some((lint) => lint.code === "HISTORICAL_SOURCE_UNAVAILABLE"));
+  const ordinaryEmpty = structuredClone(refreshedA.capsule);
+  ordinaryEmpty.schemaVersion = "contextforge-capsule-v1";
+  delete ordinaryEmpty.deterministic.review;
+  ordinaryEmpty.capsuleHash = hashCapsuleCore(ordinaryEmpty.deterministic);
+  assert.throws(() => validateCapsule(ordinaryEmpty), /Invalid Context Capsule/iu);
+  const restarted = await createContextForgeLifecycle(root);
+  assert.equal((await verifyReplay(restarted, refreshedA.capsule)).result.status, "EXACT_MATCH");
+
+  await writeFixture(root, "src/service.ts", "export function service() { return 1; }\n");
+  assert.equal(git("status", "--porcelain=v1"), "");
+  await app.index();
+  assert.notEqual((await verifyReplay(app, refreshedA.capsule)).result.status, "EXACT_MATCH");
+});
+
+test("Review: a deleted import target retains only supportable one-hop evidence from a pre-change generation", async (t) => {
+  const temp = await realpath(await createTemporaryDirectory("review-delete-relation")), root = join(temp, "repo");
+  await mkdir(root); t.after(() => removeTemporaryDirectory(temp));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", windowsHide: true });
+  git("init", "-b", "main");
+  await writeFixture(root, "src/service.ts", "export function service() { return 1; }\n");
+  await writeFixture(root, "src/caller.ts", "import { service } from './service.js';\nexport const result = service();\n");
+  git("add", "--", "src/service.ts", "src/caller.ts");
+  git("-c", "user.name=Review fixture", "-c", "user.email=review@example.invalid", "commit", "-m", "fixture");
+  const app = await createContextForgeLifecycle(root);
+  await app.index();
+  await rm(join(root, "src", "service.ts"));
+
+  const result = await compileReview(root, { budget: 1500 });
+  assert.ok(result.review.impact.some((impact) => impact.from === "src/caller.ts" && impact.to === "src/service.ts" && impact.classification === "STRUCTURAL_FACT"));
+  const caller = result.capsule.deterministic.files.find((file) => file.path === "src/caller.ts");
+  assert.ok(caller);
+  const selected = result.capsule.deterministic.selected.find((item) => result.capsule.deterministic.candidates.find((candidate) => candidate.id === item.candidateRef)?.fileRef === caller.id);
+  assert.ok(selected?.evidenceRefs.some((reference) => result.capsule.deterministic.evidence.find((evidence) => evidence.id === reference)?.code === "FILE_IMPORTS_FILE"));
+  assert.equal(result.capsule.deterministic.files.some((file) => file.path === "src/service.ts"), false);
+  assert.equal(result.markdown.includes("export function service"), false);
+});
+
+test("Review: rename, delete and restore lifecycle preserves valid metadata and a healthy durable index", async (t) => {
+  const temp = await realpath(await createTemporaryDirectory("review-rename-delete-restore")), root = join(temp, "repo");
+  await mkdir(root); t.after(() => removeTemporaryDirectory(temp));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", windowsHide: true });
+  git("init", "-b", "main");
+  await writeFixture(root, ".gitignore", ".contextforge/\n");
+  await writeFixture(root, "src/A.ts", "export const value = 1;\n");
+  git("add", "--", ".gitignore", "src/A.ts");
+  git("-c", "user.name=Review fixture", "-c", "user.email=review@example.invalid", "commit", "-m", "baseline");
+  const app = await createContextForgeLifecycle(root);
+  await app.index();
+
+  git("mv", "--", "src/A.ts", "src/B.ts");
+  await app.index();
+  const renameReview = await compileReview(root, { budget: 1000 });
+  assert.ok(renameReview.review.changes.some((change) => change.status === "RENAMED" && change.path === "src/B.ts" && change.previousPath === "src/A.ts"));
+  git("-c", "user.name=Review fixture", "-c", "user.email=review@example.invalid", "commit", "-m", "rename");
+  await app.index();
+
+  await rm(join(root, "src", "B.ts"));
+  await app.index();
+  const deleteReview = await compileReview(root, { budget: 1000 });
+  assert.deepEqual(deleteReview.review.changes.map((change) => [change.status, change.path, change.availability]), [["DELETED", "src/B.ts", "DELETED_METADATA_ONLY"]]);
+  assert.equal(deleteReview.capsule.deterministic.selected.length, 0);
+
+  await writeFixture(root, "src/B.ts", "export const value = 1;\n");
+  assert.equal(git("status", "--porcelain=v1"), "");
+  await app.index();
+  assert.equal((await app.status()).indexStatus, "CURRENT");
+  assert.notEqual((await verifyReplay(app, deleteReview.capsule)).result.status, "EXACT_MATCH");
 });

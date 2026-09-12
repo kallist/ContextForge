@@ -126,6 +126,10 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
     const r = c.review;
     if (r.changeHash !== sha256(canonicalSerialize({ base: r.base, head: r.head, changes: r.changes, excludedChanges: r.excludedChanges }))) invalid();
     if (new Set(r.changes.map((f) => f.path)).size !== r.changes.length) invalid();
+    for (const change of r.changes) {
+      const deletedMetadata = change.status === "DELETED" && change.availability === "DELETED_METADATA_ONLY" && change.sourceHash === null && change.ranges.length === 0 && change.symbols.length === 0;
+      if ((change.status === "DELETED") !== deletedMetadata) invalid();
+    }
   }
   for (const override of c.overrides) {
     if (canonicalSerialize(normalizeControls(override.controls)) !== canonicalSerialize(override.controls)) invalid();
@@ -200,6 +204,8 @@ export function validateCapsule(value: unknown): ContextCapsuleV1 {
   if (c.budget.estimatedTokens > c.budget.requested || c.budget.unused !== c.budget.requested - c.budget.estimatedTokens || c.repository.activeGeneration !== c.repository.indexGeneration) invalid();
   if (c.diagnostics.candidateCount !== c.candidates.length || c.diagnostics.evidenceCount !== c.evidence.length) invalid();
   const selectedExplained = c.selected.filter((s) => s.evidenceRefs.some((ref) => evidence.get(ref)?.stage !== "RANKING")).length;
+  const metadataOnlyDeleteReview = c.review !== undefined && c.review.changes.length > 0 && c.review.changes.every((change) => change.status === "DELETED" && change.availability === "DELETED_METADATA_ONLY");
+  if (c.selected.length === 0 && !metadataOnlyDeleteReview) invalid();
   if (c.coverage.selectedTotal !== c.selected.length || c.coverage.selectedExplained !== selectedExplained || selectedExplained !== c.selected.length || c.coverage.droppedTotal !== c.dropped.length || c.coverage.droppedExplained !== c.dropped.length) invalid();
   if (c.budget.itemContribution !== c.selected.reduce((sum, s) => sum + s.estimatedTokens, 0) || c.budget.envelopeAndOtherContribution !== c.budget.estimatedTokens - c.budget.itemContribution) invalid();
   if ((c.plan === null) !== (c.strategies.planner === null) || (c.task.analysis === null) !== (c.strategies.relationship === null)) invalid();

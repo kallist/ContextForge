@@ -99,6 +99,11 @@ export type ContextPackSearch = (
   request: { readonly repositoryPath: string; readonly task: string; readonly limit: number },
 ) => Promise<ContextPackSearchExecution>;
 
+interface BuildContextPackOptions {
+  /** Review DELETE metadata may be useful even when no current source exists. */
+  readonly allowEmptySelection?: boolean;
+}
+
 interface Representation {
   readonly ranges: readonly ContextRange[];
   readonly wholeFile: boolean;
@@ -461,7 +466,7 @@ function selectLevelIfFits(
   return false;
 }
 
-function reductionOrder(plans: readonly CandidatePlan[], protectedPlan: CandidatePlan): CandidatePlan[] {
+function reductionOrder(plans: readonly CandidatePlan[], protectedPlan: CandidatePlan | undefined): CandidatePlan[] {
   const priority = (plan: CandidatePlan): number => {
     if (plan.role === "DOCUMENTATION") return 0;
     if (plan.role === "DEPENDENCY" && (plan.candidate?.graphDistance ?? 0) >= 2) return 1;
@@ -496,6 +501,7 @@ export async function buildContextPack(
   request: ContextPackRequest,
   tokenEstimator: TokenEstimator = new GenericTokenEstimator(),
   searchExecutor: ContextPackSearch = searchRepository,
+  options: BuildContextPackOptions = {},
 ): Promise<ContextPackExecution> {
   const totalStarted = performance.now();
   validateTokenBudget(request.budget);
@@ -663,10 +669,10 @@ export async function buildContextPack(
     candidates.sort((a, b) => priority(a) - priority(b) || (a.rank ?? 0) - (b.rank ?? 0));
   }
   const protectedPlan = candidates[0];
-  if (protectedPlan === undefined) {
+  if (protectedPlan === undefined && options.allowEmptySelection !== true) {
     throw new ContextForgeError(controls.length > 0 ? "CONTROL_CONFLICT" : "PACK_FAILED", "No generation-verified useful candidate is available for this task. Reindex or make the task more specific.");
   }
-  protectedPlan.selectedLevel = 0;
+  if (protectedPlan !== undefined) protectedPlan.selectedLevel = 0;
 
   const emptyRenderStarted = performance.now();
   const emptyMarkdown = renderContextMarkdown(markdownInput(
@@ -700,7 +706,7 @@ export async function buildContextPack(
   if (minimumRequiredEstimate > request.budget) {
     throw new ContextForgeError(
       mandatory.size > 0 ? "CONTROL_CONFLICT" : "BUDGET_TOO_SMALL",
-      `Budget ${request.budget} cannot fit the required envelope and one useful context unit; minimum estimate is ${minimumRequiredEstimate} using ${estimator.id}.`,
+      `Budget ${request.budget} cannot fit the required envelope${protectedPlan === undefined ? "" : " and one useful context unit"}; minimum estimate is ${minimumRequiredEstimate} using ${estimator.id}.`,
     );
   }
 

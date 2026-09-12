@@ -240,3 +240,35 @@ test("official client can use the compatibility initialization flow", async (con
   await connection.close();
   assert.equal(connection.stderr.join(""), "");
 });
+
+test("CLI and MCP index remain healthy after a durable rename round trip", async (context) => {
+  const root = await createTemporaryDirectory("mcp-rename-round-trip");
+  context.after(() => removeTemporaryDirectory(root));
+  const git = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  assert.equal(git("init", "-b", "main").status, 0);
+  await writeFixture(root, ".gitignore", ".contextforge/\n");
+  await writeFixture(root, "src/A.ts", "export const value = 1;\n");
+  assert.equal(git("add", "--", ".gitignore", "src/A.ts").status, 0);
+  assert.equal(git("-c", "user.name=MCP fixture", "-c", "user.email=mcp@example.invalid", "commit", "-m", "initial").status, 0);
+  assert.equal(runCli(["index", root, "--json"]).status, 0);
+
+  assert.equal(git("mv", "--", "src/A.ts", "src/B.ts").status, 0);
+  const renamed = runCli(["index", root, "--json"]);
+  assert.equal(renamed.status, 0, renamed.stderr);
+  assert.equal((JSON.parse(renamed.stdout) as { generation: number }).generation, 2);
+  assert.equal(git("mv", "--", "src/B.ts", "src/A.ts").status, 0);
+  assert.equal(git("status", "--porcelain=v1").stdout, "");
+  const restored = runCli(["index", root, "--json"]);
+  assert.equal(restored.status, 0, restored.stderr);
+  assert.equal((JSON.parse(restored.stdout) as { generation: number }).generation, 3);
+
+  const connection = await connect(root, true);
+  context.after(() => connection.close().catch(() => undefined));
+  const status = await connection.client.callTool({ name: "status", arguments: {} });
+  assert.equal(structured(status).indexStatus, "CURRENT");
+  const indexed = await connection.client.callTool({ name: "index", arguments: {} });
+  assert.equal(indexed.isError, undefined);
+  assert.equal(structured(indexed).generation, 4);
+  await connection.close();
+  assert.equal(connection.stderr.join(""), "");
+});

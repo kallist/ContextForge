@@ -57,7 +57,7 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
   );
   try {
     await client.connect(transport);
-    if (client.getServerVersion()?.version !== "0.4.0") throw new Error("Installed MCP server version differs from the release.");
+    if (client.getServerVersion()?.version !== "0.4.1") throw new Error("Installed MCP server version differs from the release.");
     if (client.getNegotiatedProtocolVersion() !== "2026-07-28") {
       throw new Error("Installed MCP server did not negotiate the expected modern protocol revision.");
     }
@@ -131,8 +131,8 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
-  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.4.0") {
-    throw new Error("npm pack did not report the expected scoped v0.4.0 package identity.");
+  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.4.1") {
+    throw new Error("npm pack did not report the expected scoped v0.4.1 package identity.");
   }
   if (
     packed[0]?.files?.some(({ path }) =>
@@ -151,12 +151,12 @@ try {
   const tarballPath = join(temporaryRoot, packageFile);
 
   const installArguments = publicRegistry
-    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.4.0"]
+    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.4.1"]
     : ["install", "--no-audit", "--no-fund", tarballPath];
   run(process.execPath, [npmCliPath, ...installArguments], installRoot);
   const installedLock = JSON.parse(await readFile(join(installRoot, "package-lock.json"), "utf8"));
   const installedArtifact = installedLock.packages?.["node_modules/@kallist/contextforge"];
-  if (publicRegistry && (installedArtifact?.version !== "0.4.0" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
+  if (publicRegistry && (installedArtifact?.version !== "0.4.1" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
     throw new Error("Public smoke did not resolve the exact version from the public npm registry.");
   }
   const help = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
@@ -265,8 +265,8 @@ try {
   await runMcpFlow(installedCliPath, fixtureRoot);
 
   const packageDocument = JSON.parse(await readFile(join(installedPackageRoot, "package.json"), "utf8"));
-  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.4.0") {
-    throw new Error("Installed package identity differs from the reviewed scoped v0.4.0 identity.");
+  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.4.1") {
+    throw new Error("Installed package identity differs from the reviewed scoped v0.4.1 identity.");
   }
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
