@@ -1,6 +1,6 @@
 {
   "name": "@kallist/contextforge",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Local-first, task-aware context compiler for coding agents",
   "license": "MIT",
   "repository": {
@@ -26,7 +26,12 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "README_ZH.md",
+    "contextforge",
+    "docs",
+    "SECURITY.md",
+    "CONTRIBUTING.md"
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
@@ -57,7 +62,12 @@
     "benchmark:gate-plan-pack": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js gate-plan-pack",
     "performance:mcp": "npm run build && node scripts/mcp-performance.mjs",
     "benchmark": "npm run build:benchmark && node .benchmark-dist/benchmarks/src/cli.js full",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "skill:validate": "node scripts/skill-validate.mjs",
+    "launch:validate": "node scripts/build-site.mjs && node scripts/launch-validate.mjs",
+    "v05:parity": "node scripts/v05-parity.mjs",
+    "v05:browser": "node scripts/v05-browser.mjs",
+    "site:e2e": "node scripts/build-site.mjs && node scripts/site-e2e.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

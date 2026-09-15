@@ -16,12 +16,24 @@ async function work(label, operation) {
   showStatus(label);
   try { await operation(); }
   catch (error) { showStatus(error.message); }
-  finally { buttons.forEach((b) => { b.disabled = false; }); }
+  finally { buttons.forEach((b) => { b.disabled = false; }); $("copy").disabled = !opened?.payload; }
 }
+const groups = { proposal: "context", context: "context", review: "context", evidence: "why", coverage: "why", history: "history", changes: "history", replay: "history" };
 function tab(name) {
+  const group = groups[name];
+  document.querySelectorAll("[data-nav]").forEach((e) => { e.classList.toggle("active", e.dataset.nav === group); if (e.dataset.nav === group) e.setAttribute("aria-current", "page"); else e.removeAttribute("aria-current"); });
+  document.querySelectorAll("[data-tab]").forEach((e) => { e.hidden = groups[e.dataset.tab] !== group || (e.dataset.tab === "review" && !opened?.capsule.deterministic.review); });
+  $("start").hidden = group !== "context"; $("start").classList.toggle("has-result", !!opened);
+  $("workspace").hidden = !opened || name === "history";
+  $("empty-view").hidden = !!opened || group !== "why";
   document.querySelectorAll("[data-panel]").forEach((e) => { e.hidden = e.dataset.panel !== name; });
   document.querySelectorAll("[data-tab]").forEach((e) => { e.classList.toggle("active", e.dataset.tab === name); });
 }
+document.querySelectorAll("[data-nav]").forEach((e) => e.addEventListener("click", () => tab({ context: "proposal", why: "evidence", history: "history" }[e.dataset.nav])));
+document.querySelectorAll("[data-history-action]").forEach((e) => e.addEventListener("click", () => { if (opened) tab(e.dataset.historyAction); else showStatus("Open a saved context first."); }));
+function mode(review) { $("task-composer").hidden = review; $("review-composer").hidden = !review; $("mode-task").setAttribute("aria-pressed", String(!review)); $("mode-review").setAttribute("aria-pressed", String(review)); }
+$("mode-task").addEventListener("click", () => mode(false));
+$("mode-review").addEventListener("click", () => mode(true));
 document.querySelectorAll("[data-tab]").forEach((e) => e.addEventListener("click", () => tab(e.dataset.tab)));
 async function refreshHistory(more = false) {
   if (!more) { entries = []; offset = 0; }
@@ -38,6 +50,7 @@ async function refreshHistory(more = false) {
   $("more").hidden = data.entries.length < 30;
   $("storage").textContent = `${data.stats.count} saved · ${(data.stats.storedBytes / 1024).toFixed(1)} KiB compressed metadata`;
 }
+const reasonLabels = { SELECTED: "Included in the context", REQUIRED_INSTRUCTION: "Required repository instruction", BUDGET_EXHAUSTED: "Available budget was exhausted", LOWER_PRIORITY: "Not allocated by the recorded priority decision", DUPLICATE: "Already represented in context", STALE_SOURCE: "Source differs from the indexed version", SECTION_LIMIT: "The section allocation could not fit this candidate", UNSUPPORTED_CONTENT: "Content representation is unsupported", NO_USEFUL_RANGE: "No useful source range was available", SOURCE_VERIFICATION_LIMIT: "Source verification reached its bound", GLOBAL_BUDGET: "The total context budget prevented inclusion", SAFETY_LIMIT: "A safety bound prevented inclusion", REDUNDANT_RANGE: "Source range is already represented" };
 function fact(parent, label, value) { const e = node("div", undefined, "fact"); e.append(node("small", label), node("p", value)); parent.append(e); }
 function display(data) {
   opened = data; controls = structuredClone(data.capsule.deterministic.overrides[0]?.controls || []); renderControls();
@@ -54,13 +67,13 @@ function display(data) {
   $("copy").disabled = !data.payload;
   $("explain").replaceChildren(); $("replay-result").replaceChildren();
   renderCandidates(); renderCoverage(data.coverage); renderReview();
-  if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab(c.review ? "review" : "proposal"); }
+  if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab("proposal"); }
 }
 function renderCandidates() {
   if (!opened) return;
   const c = opened.capsule.deterministic; $("candidates").replaceChildren();
   const files = new Map(c.files.map((f) => [f.id, f]));
-  for (const candidate of c.candidates) {
+  for (const candidate of [...c.candidates].sort((a, b) => Number(b.disposition === "SELECTED") - Number(a.disposition === "SELECTED"))) {
     if ($("filter").value !== "ALL" && candidate.disposition !== $("filter").value) continue;
     const file = files.get(candidate.fileRef), selection = c.selected.find((s) => s.candidateRef === candidate.id);
     const tr = node("tr"); tr.dataset.candidate = candidate.id;
@@ -68,18 +81,22 @@ function renderCandidates() {
     button.addEventListener("click", () => work("Reading captured explanation…", async () => {
       const result = await api({ action: "explain", id: opened.capsule.capsuleHash, query: { type: `WHY_${candidate.disposition}`, subject: candidate.id } });
       const target = $("explain"); target.replaceChildren(node("h3", file.path));
-      fact(target, "RECORDED DECISION", result.facts.decisions.map((d) => `${d.reason} (${d.decisionSource})`).join(" · "));
+      fact(target, "SELECTION", { SELECTED: "Included in this repository context", DROPPED: "Considered but not selected for this context", EXCLUDED: "Excluded by a recorded boundary" }[candidate.disposition]);
+      fact(target, "RECORDED DECISION", result.facts.decisions.map((d) => reasonLabels[d.reason] || "See the recorded reason below").join(" · "));
+      const detail = node("details"); detail.append(node("summary", "Exact decision codes and provenance"), node("pre", result.facts.decisions.map((d) => d.reason + " (" + d.decisionSource + ")").join(" · "))); target.append(detail);
       if (result.facts.selection) fact(target, "CONTEXT ROLE", result.facts.selection.role);
       if (result.facts.ranges?.length) fact(target, "RANGES", result.facts.ranges.map((r) => `L${r.startLine}–${r.endLine}`).join(", "));
       if (result.facts.symbols?.length) fact(target, "SYMBOLS", result.facts.symbols.map((s) => s.qualifiedName).join(", "));
       for (const e of (result.facts.evidence || []).slice(0, 40)) fact(target, `${e.stage} · ${e.derivation}`, `${e.code} · ${e.family}${e.querySignal ? ` · ${e.querySignal}` : ""}`);
       for (const r of (result.facts.review?.impact || []).filter((r) => r.from === file.path || r.to === file.path).slice(0, 20)) fact(target, `${r.type} · ${r.classification}`, `${r.from} → ${r.to}`);
       if ((result.facts.evidence?.length || 0) > 40) fact(target, "BOUNDED DISPLAY", "First 40 evidence records shown. Export Capsule for full captured details.");
+      tab("evidence");
+      target.tabIndex = -1; target.focus();
       showStatus(`Explain: ${result.status}. These are compiler facts, not a model's reasoning.`);
     }));
     fileCell.append(button); const state = node("td"); state.append(node("span", candidate.disposition, `tag ${candidate.disposition}`));
     const controlCell = node("td"), select = node("select"); select.setAttribute("aria-label", `Control ${file.path}`);
-    for (const optionName of ["—", "PIN", "EXCLUDE", "PREFER", "FOCUS", "RANGE"]) { const option = node("option", optionName); option.value = optionName; select.append(option); }
+    for (const optionName of ["—", "PIN", "EXCLUDE", "PREFER", "FOCUS", "RANGE"]) { const option = node("option", { "—": "Automatic", PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus (advanced)", RANGE: "Range (advanced)" }[optionName]); option.value = optionName; select.append(option); }
     select.value = controls.find((control) => control.path === file.path)?.kind || "—";
     select.addEventListener("change", () => {
       controls = controls.filter((control) => control.path !== file.path);
@@ -99,7 +116,7 @@ function renderCandidates() {
     controlCell.append(select); tr.append(fileCell, state, node("td", selection?.estimatedTokens || "—"), controlCell); $("candidates").append(tr);
   }
 }
-function renderControls() { $("pending").replaceChildren(...controls.map((c) => node("span", `${c.kind} ${c.path}${c.kind === "RANGE" ? ` L${c.startLine}–${c.endLine}` : ""}`, "chip"))); }
+function renderControls() { $("pending").replaceChildren(...controls.map((c) => node("span", `${({ PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus", RANGE: "Range" })[c.kind]} ${c.path}${c.kind === "RANGE" ? ` L${c.startLine}–${c.endLine}` : ""}`, "chip"))); }
 function renderCoverage(coverage) {
   const target = $("coverage"); target.replaceChildren();
   fact(target, "BOUNDED CANDIDATES", `${coverage.candidates.selected} selected of ${coverage.candidates.available} captured; ${coverage.candidates.excluded} safety exclusions.`);
@@ -134,7 +151,7 @@ $("clear").addEventListener("click", () => { controls = []; renderControls(); re
 $("filter").addEventListener("change", renderCandidates);
 $("more").addEventListener("click", () => work("Loading history summaries…", () => refreshHistory(true)));
 $("copy").addEventListener("click", () => work("Copying exact context…", async () => { if (opened?.payload) { await navigator.clipboard.writeText(opened.payload); showStatus("Exact compiled context copied."); } }));
-$("delete").addEventListener("click", () => work("Deleting selected history metadata…", async () => { if (!opened || !window.confirm("Delete this Capsule from local history? This does not securely erase disk pages.")) return; await api({ action: "delete", id: opened.capsule.capsuleHash }); opened = null; $("workspace").hidden = true; await refreshHistory(); showStatus("Capsule removed from local history."); }));
+$("delete").addEventListener("click", () => work("Deleting selected history metadata…", async () => { if (!opened || !window.confirm("Delete this Capsule from local history? This does not securely erase disk pages.")) return; await api({ action: "delete", id: opened.capsule.capsuleHash }); opened = null; $("workspace").hidden = true; tab("history"); await refreshHistory(); showStatus("Capsule removed from local history."); }));
 $("import").addEventListener("change", () => work("Validating imported Capsule…", async () => { const file = $("import").files[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) throw new Error("Capsule exceeds the 8 MiB import limit."); display(await api({ action: "import", capsule: JSON.parse(await file.text()) })); await refreshHistory(); showStatus("Capsule validated and saved. Source bodies were not imported."); }));
 function renderReview() {
   const c = opened.capsule.deterministic, review = c.review;
@@ -185,4 +202,4 @@ $("review-compile").addEventListener("click", () => work("Analyzing tracked chan
   display(await api({ action: "review", base: $("review-base").value, budget: Number($("review-budget").value), refreshIndex: true }));
   await refreshHistory(); showStatus("Review Context saved. Follow the impact evidence, then shape the proposal.");
 }));
-void work("Opening local history…", async () => { await refreshHistory(); showStatus("Ready. Build Review Context, compile a coding task, or open a saved Capsule."); });
+void work("Opening local history…", async () => { await refreshHistory(); tab("proposal"); showStatus("Ready. Build task context, choose Current Git Change, or open History."); });

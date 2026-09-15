@@ -25,6 +25,7 @@ jobs:
           node-version: 24.20.0
           cache: npm
       - run: npm ci
+      - run: node scripts/v05-core-freeze.mjs
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -87,6 +88,11 @@ jobs:
       - run: npm run build
       - run: npm run studio:e2e
       - run: npm run review:e2e
+      - run: npm run v05:browser
+      - run: npm run skill:validate
+      - run: npm run launch:validate
+      - run: npm run site:e2e
+      - run: npm run v05:parity
       - run: npm run review:benchmark
       - run: npm run package:smoke
         env:

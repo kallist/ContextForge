@@ -57,7 +57,7 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
   );
   try {
     await client.connect(transport);
-    if (client.getServerVersion()?.version !== "0.4.1") throw new Error("Installed MCP server version differs from the release.");
+    if (client.getServerVersion()?.version !== "0.5.0") throw new Error("Installed MCP server version differs from the release.");
     if (client.getNegotiatedProtocolVersion() !== "2026-07-28") {
       throw new Error("Installed MCP server did not negotiate the expected modern protocol revision.");
     }
@@ -131,8 +131,8 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
-  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.4.1") {
-    throw new Error("npm pack did not report the expected scoped v0.4.1 package identity.");
+  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.5.0") {
+    throw new Error("npm pack did not report the expected scoped v0.5.0 package identity.");
   }
   if (
     packed[0]?.files?.some(({ path }) =>
@@ -140,6 +140,8 @@ try {
         path === "package.json" ||
         path === "LICENSE" ||
         path === "README.md" ||
+        path === "README_ZH.md" || path === "SECURITY.md" || path === "CONTRIBUTING.md" ||
+        path.startsWith("docs/") || path.startsWith("contextforge/") ||
         path.startsWith("dist/")
       )
     ) === true
@@ -151,12 +153,12 @@ try {
   const tarballPath = join(temporaryRoot, packageFile);
 
   const installArguments = publicRegistry
-    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.4.1"]
+    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.5.0"]
     : ["install", "--no-audit", "--no-fund", tarballPath];
   run(process.execPath, [npmCliPath, ...installArguments], installRoot);
   const installedLock = JSON.parse(await readFile(join(installRoot, "package-lock.json"), "utf8"));
   const installedArtifact = installedLock.packages?.["node_modules/@kallist/contextforge"];
-  if (publicRegistry && (installedArtifact?.version !== "0.4.1" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
+  if (publicRegistry && (installedArtifact?.version !== "0.5.0" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
     throw new Error("Public smoke did not resolve the exact version from the public npm registry.");
   }
   const help = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
@@ -259,14 +261,15 @@ try {
   await runStudioFlow(installedCliPath, fixtureRoot);
   process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/review-cli-smoke.mjs"), installedPackageRoot], repositoryRoot));
   if (process.env.CONTEXTFORGE_STUDIO_BROWSER === "1") {
+    process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/v05-browser.mjs"), installedPackageRoot], repositoryRoot));
     process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/studio-e2e.mjs"), installedPackageRoot], repositoryRoot));
     process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/review-e2e.mjs"), installedPackageRoot], repositoryRoot));
   }
   await runMcpFlow(installedCliPath, fixtureRoot);
 
   const packageDocument = JSON.parse(await readFile(join(installedPackageRoot, "package.json"), "utf8"));
-  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.4.1") {
-    throw new Error("Installed package identity differs from the reviewed scoped v0.4.1 identity.");
+  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.5.0") {
+    throw new Error("Installed package identity differs from the reviewed scoped v0.5.0 identity.");
   }
   if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
@@ -275,6 +278,7 @@ try {
       throw new Error(`Installed package unexpectedly defines ${installScript}.`);
     }
   }
+  for (const skillFile of ["SKILL.md", "references/workflows.md", "references/trust-and-boundaries.md"]) await access(join(installedPackageRoot, "contextforge", skillFile));
   const installedFiles = await packageFiles(installedPackageRoot);
   if (installedFiles.some((path) => /(^|\/)(?:test|benchmarks|scripts)(\/|$)|(^|\/)\.env(?:\..*)?$/u.test(path))) {
     throw new Error("Installed package contains development, benchmark, script, or secret-path files.");
