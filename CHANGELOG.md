@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 (prepared, unreleased)
+
+- Canonical Agent Skill and task-first Studio navigation.
+- Bilingual product entry, real launch assets and static landing page.
+- Compiler/ranking, benchmark Gold, public V1 default and MCP tools unchanged.
+
+
 All notable changes to ContextForge will be recorded here.
 
 ## Unreleased

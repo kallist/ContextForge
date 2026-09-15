@@ -1,3 +1,4 @@
+import { view } from './studio-navigation.mjs';
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -20,11 +21,12 @@ try {
   studio = await startStudio(app, history);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1512, height: 1080 } });
+  const remote = []; page.on("request", (r) => { if (new URL(r.url()).origin !== studio.origin) remote.push(r.url()); });
   const errors = []; page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(studio.url); await page.getByRole("status").filter({ hasText: "Ready." }).waitFor();
-  await page.locator("#review-budget").fill("1000");
-  await page.getByRole("button", { name: "Build Review Context →", exact: true }).click();
-  await page.getByRole("status").filter({ hasText: "Review Context saved" }).waitFor();
+  await page.locator("#mode-review").click(); await page.locator("#review-budget").fill("1000");
+  await page.locator('[data-nav="context"]').click(); await page.locator("#mode-review").click(); await page.getByRole("button", { name: "Build Review Context →", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Review Context saved" }).waitFor(); await view(page,"review");
   assert.ok((await page.locator("#review-detail").textContent()).includes("ledger"));
   assert.ok(await page.locator(".impact-card").count() > 0);
   assert.ok((await page.locator("#review-summary").textContent()).includes("One hop"));
@@ -32,18 +34,18 @@ try {
   await page.screenshot({ path: ".studio-output/review-overview.png", fullPage: true });
   for (const width of [1024, 1280, 1920]) { await page.setViewportSize({ width, height: 1000 }); assert.ok(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth + 2)); }
   await page.setViewportSize({ width: 1512, height: 1080 });
-  await page.getByRole("button", { name: "Context proposal", exact: true }).click();
-  await page.locator("#filter").selectOption("DROPPED");
+  await view(page,"proposal");
+  await view(page,"proposal"); await page.locator("#filter").selectOption("DROPPED");
   assert.ok(await page.locator("#candidates tr").count() > 0, "Demo must demonstrate a real budget loss");
   const row = page.locator("#candidates tr").first(); await row.getByRole("combobox").selectOption("PIN");
-  await page.getByRole("button", { name: "Recompile & compare", exact: true }).click();
+  await page.getByRole("button", { name: "Rebuild context", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "New Capsule saved" }).waitFor();
   assert.ok((await page.locator("#changes").textContent()).includes("DROPPED → SELECTED"));
   await page.screenshot({ path: ".studio-output/review-control-diff.png", fullPage: true });
-  await page.getByRole("button", { name: "Replay", exact: true }).click();
+  await view(page,"replay");
   await page.getByRole("button", { name: "Verify replay", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Replay: EXACT_MATCH" }).waitFor();
-  await page.getByRole("button", { name: "Exact context", exact: true }).click();
+  await view(page,"context");
   assert.ok((await page.locator("#payload").textContent()).includes("<img src=x onerror="));
   assert.ok(!(await page.locator("body").textContent()).includes("REVIEW_SECRET_SENTINEL"));
   assert.equal(await page.evaluate(() => globalThis.injected), undefined);
@@ -53,7 +55,7 @@ try {
   r.changeHash = sha256(canonicalSerialize({ base: r.base, head: r.head, changes: r.changes, excludedChanges: r.excludedChanges }));
   hostile.capsuleHash = hashCapsuleCore(hostile.deterministic); history.save(hostile);
   await page.reload(); await page.getByRole("status").filter({ hasText: "Ready." }).waitFor();
-  await page.locator(`.history-entry[data-id="${hostile.capsuleHash}"]`).click();
+  await page.locator('[data-nav="history"]').click(); await page.locator(`.history-entry[data-id="${hostile.capsuleHash}"]`).click();
   await page.getByRole("status").filter({ hasText: "Saved metadata opened" }).waitFor();
   assert.ok((await page.locator("#review-detail").textContent()).includes("<img src=x"));
   assert.equal(await page.locator("#review-detail img").count(), 0);
@@ -66,16 +68,16 @@ try {
   git("add", "--", "src/ledger.ts");
   git("-c", "user.name=ContextForge fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Accept modified ledger baseline");
   await rm(join(root, "src/plugin.ts"));
-  await page.getByRole("button", { name: "Build Review Context →", exact: true }).click();
-  await page.getByRole("status").filter({ hasText: "Review Context saved" }).waitFor();
+  await page.locator('[data-nav="context"]').click(); await page.locator("#mode-review").click(); await page.getByRole("button", { name: "Build Review Context →", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Review Context saved" }).waitFor(); await view(page,"review");
   const deleteDetail = await page.locator("#review-detail").textContent();
   assert.ok(deleteDetail.includes("DELETE"));
   assert.ok(deleteDetail.includes("src/plugin.ts"));
-  await page.getByRole("button", { name: "Exact context", exact: true }).click();
+  await view(page,"context");
   assert.ok(!(await page.locator("#payload").textContent()).includes("export function plugin"));
-  await page.getByRole("button", { name: "Coverage & lint", exact: true }).click();
+  await view(page,"coverage");
   assert.ok((await page.locator("#lints").textContent()).includes("HISTORICAL_SOURCE_UNAVAILABLE"));
   assert.ok(!(await page.locator("body").textContent()).includes(root));
-  assert.deepEqual(errors, []);
+  assert.deepEqual(remote, []); assert.deepEqual(errors, []);
   console.log(JSON.stringify({ version: "contextforge-review-browser-v1", passed: 1, failed: 0, skipped: 0, package: process.argv[2] ? "INSTALLED_PACKAGE" : "WORKTREE", browser: await browser.version(), viewports: [1024, 1280, 1512, 1920], journey: ["git-change", "impact", "budget-loss", "pin", "immutable-recompile", "semantic-diff", "exact-replay", "source-xss", "stored-metadata-xss", "ref-injection", "delete-review", "delete-no-fake-source", "delete-coverage-lint", "privacy"] }));
 } finally { await browser?.close(); await studio?.close(); history?.close(); await rm(root, { recursive: true, force: true }); }

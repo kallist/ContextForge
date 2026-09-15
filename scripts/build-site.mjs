@@ -1,0 +1,5 @@
+import { mkdir, copyFile } from 'node:fs/promises';
+await mkdir('.studio-output/site/assets',{recursive:true});
+for (const name of ['index.html','site.css']) await copyFile('site/'+name,'.studio-output/site/'+name);
+for (const name of ['contextforge-hero.png','contextforge-context.png','contextforge-why.png','contextforge-flow.svg','social-card.png']) await copyFile('docs/assets/'+name,'.studio-output/site/assets/'+name);
+console.log('Static site prepared in .studio-output/site; no remote runtime dependencies.');
