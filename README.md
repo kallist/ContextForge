@@ -49,7 +49,14 @@ This refers to repository context supplied by ContextForge. System instructions,
 | CLI | Full scripting, Review and lifecycle workflows |
 | Studio | Visual inspection and human context controls |
 
-The Skill guides the agent; MCP or the CLI executes ContextForge. Review uses the CLI. Compatibility with a Skill format does not imply every agent host was tested; see the acceptance table in the integration guide.
+ContextForge v0.5 includes one canonical Agent Skill. Install it from the public repository in the project where you want to use it:
+
+```sh
+npx skills@1.5.26 add kallist/ContextForge --skill contextforge --agent codex --copy
+npx skills@1.5.26 list
+```
+
+The Skill guides the agent; MCP or the CLI executes ContextForge. Installing the Skill does not install the product. Review uses the CLI. Compatibility with a Skill format does not imply every agent host was tested; the [integration guide](docs/v0.5/AGENT_SKILL.md) separates candidate validation from post-release verification.
 
 ## Context workflow
 
@@ -80,7 +87,7 @@ Review traces bounded structural evidence, not complete runtime impact. Stage ne
 
 ## Measured evidence
 
-The frozen offline benchmark measures context selection, not coding-agent success. Results are mixed; no general token-saving or accuracy claim follows. The historical matrix contains 720 cases and the Capsule conformance matrix contains 240. These are matrix sizes, not a claim that this branch has passed: [V0.2 evidence and limitations](docs/V0.2_FINAL_EVALUATION.md), [benchmark protocol](docs/BENCHMARK.md).
+The frozen offline benchmark measures context selection, not coding-agent success. Results are mixed; no general token-saving or accuracy claim follows. The historical matrix contains 720 cases and the Capsule conformance matrix contains 240. For measured outcomes and limitations, see [V0.2 evidence](docs/V0.2_FINAL_EVALUATION.md) and the [benchmark protocol](docs/BENCHMARK.md).
 
 ## Local-first and security
 
@@ -96,7 +103,7 @@ No model API, source upload, telemetry or account is required. Studio binds loop
 
 ## Install and documentation
 
-The public package is [@kallist/contextforge](https://www.npmjs.com/package/@kallist/contextforge); [stable releases](https://github.com/kallist/ContextForge/releases). This branch prepares V0.5; it does not publish it. The public package may show the previous Studio until release.
+The public package is [@kallist/contextforge](https://www.npmjs.com/package/@kallist/contextforge); see [stable releases](https://github.com/kallist/ContextForge/releases). Check the current stable npm version with `npm view @kallist/contextforge version`.
 
 [Agent setup](docs/v0.5/AGENT_SKILL.md) · [Lifecycle guide](docs/V0.3_PRODUCT_GUIDE.md) · [Review guide](docs/V0.4_PRODUCT_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Engineering reference](docs/ENGINEERING_REFERENCE.md) · [Product specification](docs/PRODUCT_SPEC.md) · [Launch notes](docs/v0.5/LAUNCH.md)
 

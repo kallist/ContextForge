@@ -15,7 +15,7 @@ npm install -g @kallist/contextforge
 contextforge studio
 ```
 
-Agent 用户可阅读[集成指南](docs/v0.5/AGENT_SKILL.md)。本分支准备 V0.5，尚未发布；npm 稳定版可能仍显示上一版界面。
+Agent 用户可阅读[集成指南](docs/v0.5/AGENT_SKILL.md)。使用 `npm view @kallist/contextforge version` 查询当前 npm 稳定版本。
 
 ## 30 秒了解
 
@@ -40,7 +40,14 @@ ContextForge 的可见范围是它提供的仓库上下文；系统指令、对�
 | CLI | 完整自动化、Review 与生命周期操作 |
 | Studio | 可视化检查与人工控制 |
 
-Skill 指导流程，MCP 或 CLI 执行。Review 走 CLI；格式兼容不代表各宿主均已实测。
+ContextForge v0.5 提供一个规范的 Agent Skill。在需要使用它的项目目录中，从公共 GitHub 仓库安装：
+
+```sh
+npx skills@1.5.26 add kallist/ContextForge --skill contextforge --agent codex --copy
+npx skills@1.5.26 list
+```
+
+Skill 指导流程，MCP 或 CLI 执行。安装 Skill 不会安装 ContextForge 产品。Review 走 CLI；格式兼容不代表各宿主均已实测。[集成指南](docs/v0.5/AGENT_SKILL.md) 分别记录候选验证与发布后验证的证据边界。
 
 ## 上下文工作流
 
@@ -60,7 +67,7 @@ Include / Exclude / Prefer 调整现有安全候选，重建产生新的不可�
 
 ## 实测与边界
 
-冻结离线矩阵包含 720 个历史案例，Capsule 一致性矩阵包含 240 个案例。这是矩阵规模，不代表此分支已经通过验收。结果有利有弊，不支持一般性的 token 节省或 Agent 准确率提升结论。[评估证据](docs/V0.2_FINAL_EVALUATION.md) · [基准协议](docs/BENCHMARK.md)。
+冻结离线矩阵包含 720 个历史案例，Capsule 一致性矩阵包含 240 个案例。实测结果与局限见[评估证据](docs/V0.2_FINAL_EVALUATION.md)和[基准协议](docs/BENCHMARK.md)。结果有利有弊，不支持一般性的 token 节省或 Agent 准确率提升结论。
 
 ## 本地优先与安全
 
