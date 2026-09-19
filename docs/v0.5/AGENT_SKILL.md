@@ -1,6 +1,6 @@
 # Agent Skill installation and use
 
-Canonical source: [contextforge/SKILL.md](../../contextforge/SKILL.md), metadata version 0.5.0. One Skill routes coding tasks, local Git Review and context debugging. It executes through the installed product; it contains no retrieval logic.
+Historical canonical source: [`contextforge/SKILL.md` at `v0.5.0`](https://github.com/kallist/ContextForge/blob/v0.5.0/contextforge/SKILL.md), metadata version 0.5.0. One Skill routes coding tasks, local Git Review and context debugging. It executes through the installed product; it contains no retrieval logic.
 
 ## Public installation
 
