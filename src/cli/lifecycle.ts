@@ -15,16 +15,16 @@ import { ContextForgeError } from "../core/errors.js";
 
 export const LIFECYCLE_HELP = `
 Context lifecycle (V1 remains the public default):
-  contextforge history list [--store <directory>] [--limit 30] [--offset 0]
-  contextforge history save <capsule-file> [--store <directory>]
-  contextforge history show|delete <sha256> [--store <directory>]
-  contextforge history prune --keep <count> [--store <directory>]
-  contextforge replay <file-or-id> [--verify --repository <path>] [--task <original>]
-  contextforge diff <before-file-or-id> <after-file-or-id> [--json]
-  contextforge coverage <file-or-id> [--json]
-  contextforge recompile <file-or-id> --controls <json-file> [--budget <n>]
+  repobound history list [--store <directory>] [--limit 30] [--offset 0]
+  repobound history save <capsule-file> [--store <directory>]
+  repobound history show|delete <sha256> [--store <directory>]
+  repobound history prune --keep <count> [--store <directory>]
+  repobound replay <file-or-id> [--verify --repository <path>] [--task <original>]
+  repobound diff <before-file-or-id> <after-file-or-id> [--json]
+  repobound coverage <file-or-id> [--json]
+  repobound recompile <file-or-id> --controls <json-file> [--budget <n>]
       [--repository <path>] [--task <original>] [--out <context.md>] [--store <directory>]
-  contextforge studio [--repository <path>] [--store <directory>] [--port <n>]
+  repobound studio [--repository <path>] [--store <directory>] [--port <n>]
 
 History defaults to .contextforge/history under the bound repository/current directory.
 Replay without --verify is offline inspection; verification never restores old source bytes.
@@ -39,7 +39,7 @@ export async function runLifecycle(argv: readonly string[], workingDirectory: st
     help: { type: "boolean" }, json: { type: "boolean" }, store: { type: "string" }, repository: { type: "string" },
     verify: { type: "boolean" }, task: { type: "string" }, budget: { type: "string" }, controls: { type: "string" },
     out: { type: "string" }, limit: { type: "string" }, offset: { type: "string" }, keep: { type: "string" }, port: { type: "string" },
-  } }); } catch { throw new ContextForgeError("USAGE", "Invalid lifecycle arguments. Run contextforge history --help."); }
+  } }); } catch { throw new ContextForgeError("USAGE", "Invalid lifecycle arguments. Run repobound history --help."); }
   if (parsed.values.help) { process.stdout.write(LIFECYCLE_HELP); return 0; }
   const [command, first, second, ...extra] = parsed.positionals;
   if (extra.length > 0 || (second !== undefined && command !== "history" && command !== "diff")) throw new ContextForgeError("USAGE", "Too many lifecycle positional arguments.");
@@ -65,7 +65,7 @@ export async function runLifecycle(argv: readonly string[], workingDirectory: st
       boundRoot = app.rootRealPath;
       const studio = await startStudio(app, history(), Number(v.port ?? 0));
       keepOpen = true;
-      process.stdout.write(`ContextForge Studio: ${studio.url}\nLocal capability URL; source payloads are not persisted. Press Ctrl+C to stop.\n`);
+      process.stdout.write(`RepoBound Studio: ${studio.url}\nLocal capability URL; source payloads are not persisted. Press Ctrl+C to stop.\n`);
       let closing = false;
       const close = (): void => { if (closing) return; closing = true; void studio.close().finally(() => { store?.close(); store = undefined; }); };
       process.once("SIGINT", close); process.once("SIGTERM", close);

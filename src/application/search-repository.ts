@@ -502,10 +502,10 @@ async function executeSearchRepository(
   const scan = await scanner.scan(request.repositoryPath);
   const active = await repositoryFactory(scan.rootRealPath).loadActive();
   if (active === null) {
-    throw new ContextForgeError("INDEX_REQUIRED", "No active ContextForge index exists. Run 'contextforge index .' first.");
+    throw new ContextForgeError("INDEX_REQUIRED", "No active RepoBound index exists. Run 'repobound index .' first.");
   }
   if (active.graph === null) {
-    throw new ContextForgeError("INDEX_REQUIRED", "The active index predates Repository Graph support. Run 'contextforge index .' again.");
+    throw new ContextForgeError("INDEX_REQUIRED", "The active index predates Repository Graph support. Run 'repobound index .' again.");
   }
 
   const retrievalStarted = performance.now();

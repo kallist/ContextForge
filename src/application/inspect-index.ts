@@ -25,7 +25,7 @@ export async function inspectIndex(
   const scan = await scanner.scan(repositoryPath);
   const repository = repositoryFactory(scan.rootRealPath);
   const active = await repository.loadActive();
-  if (active === null) throw new ContextForgeError("INDEX_NOT_FOUND", "No active ContextForge index exists for this repository.");
+  if (active === null) throw new ContextForgeError("INDEX_NOT_FOUND", "No active RepoBound index exists for this repository.");
   const file = active.files.find((candidate) => candidate.relativePath === normalized) ?? null;
   if (file === null) throw new ContextForgeError("INDEX_NOT_FOUND", `The active index does not contain: ${normalized}`);
   return { schemaVersion: "1.0", generation: active.generation, file };

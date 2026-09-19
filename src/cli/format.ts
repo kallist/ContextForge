@@ -23,7 +23,7 @@ export function formatJson(map: RepositoryMap): string {
 
 export function formatText(map: RepositoryMap): string {
   const lines = [
-    "ContextForge Repository Map",
+    "RepoBound Repository Map",
     "",
     `Repository: ${map.repository.name} (${map.repository.kind})`,
     `Entries: ${map.summary.entries}`,
@@ -64,7 +64,7 @@ export function formatIndexJson(summary: IndexSummary): string {
 
 export function formatIndexText(summary: IndexSummary): string {
   const lines = [
-    "ContextForge Index",
+    "RepoBound Index",
     "",
     `Repository: ${summary.repository.name}`,
     `Generation: ${summary.generation}`,
@@ -117,7 +117,7 @@ export function formatSearchText(result: SearchResult): string {
       ? "PARTIAL (working-tree verification reached its bounded scan limit)"
       : `STALE (${result.indexStatus.changedFiles} changed: ${result.indexStatus.addedFiles} added, ${result.indexStatus.deletedFiles} deleted)`;
   const lines = [
-    "ContextForge Search",
+    "RepoBound Search",
     "",
     "Task",
     terminalText(result.task),
@@ -154,7 +154,7 @@ export function formatSearchText(result: SearchResult): string {
 }
 
 export function formatGraphText(inspection: RepositoryGraphInspection): string {
-  const lines = ["ContextForge Repository Graph", "", inspection.file, "", "Imports"];
+  const lines = ["RepoBound Repository Graph", "", inspection.file, "", "Imports"];
   if (inspection.imports.length === 0) lines.push("  (none)");
   for (const item of inspection.imports) lines.push(`  → ${item.target}  [${item.confidence.toFixed(2)}; ${item.evidence.join("; ")}]`);
   lines.push("", "Imported By");
@@ -189,7 +189,7 @@ export function formatInspectionJson(inspection: IndexedFileInspection): string 
 export function formatInspectionText(inspection: IndexedFileInspection): string {
   const { file } = inspection;
   const lines = [
-    "ContextForge Index Inspection",
+    "RepoBound Index Inspection",
     "",
     `Generation: ${inspection.generation}`,
     `File: ${file.relativePath}`,
