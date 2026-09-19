@@ -46,7 +46,7 @@ test("MCP tool contracts stay bounded and errors are safe", async () => {
   try {
     const tools = await client.listTools();
     assert.deepEqual(tools.tools.map(({ name }) => name), ["status", "index", "search", "pack"]);
-    assert.match(tools.tools.find(({ name }) => name === "index")?.description ?? "", /local ContextForge index/u);
+    assert.match(tools.tools.find(({ name }) => name === "index")?.description ?? "", /local RepoBound index/u);
     assert.match(tools.tools.find(({ name }) => name === "pack")?.description ?? "", /hard-budget/u);
 
     const boundedStatus = await client.callTool({ name: "status", arguments: {} });
@@ -64,7 +64,7 @@ test("MCP tool contracts stay bounded and errors are safe", async () => {
 
     const unexpected = await client.callTool({ name: "search", arguments: { task: "valid task" } });
     assert.equal(unexpected.isError, true);
-    assert.equal(text(unexpected), "ContextForge INTERNAL: An unexpected error occurred.");
+    assert.equal(text(unexpected), "RepoBound INTERNAL: An unexpected error occurred.");
     assert.equal(text(unexpected).includes("implementation detail"), false);
 
     const tiny = await client.callTool({ name: "pack", arguments: { task: "valid task", budget: 1 } });

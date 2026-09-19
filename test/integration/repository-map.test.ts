@@ -40,7 +40,7 @@ test("maps and classifies a real non-Git repository", async (context) => {
     "size",
     "content",
   ]);
-  assert.ok(formatText(map).includes("ContextForge Repository Map"));
+  assert.ok(formatText(map).includes("RepoBound Repository Map"));
   assert.doesNotThrow(() => JSON.parse(formatJson(map)));
 });
 

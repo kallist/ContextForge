@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, access, readdir, stat } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
-const docs=['README.md','README_ZH.md','docs/ENGINEERING_REFERENCE.md',...(await readdir('docs/v0.5')).filter(x=>x.endsWith('.md')).map(x=>'docs/v0.5/'+x)];
+const docs=['README.md','README_ZH.md','docs/AGENT_SKILL.md','docs/ENGINEERING_REFERENCE.md',...(await readdir('docs/brand')).filter(x=>x.endsWith('.md')).map(x=>'docs/brand/'+x),...(await readdir('docs/v0.5')).filter(x=>x.endsWith('.md')).map(x=>'docs/v0.5/'+x)];
 let links=0;
 for(const file of docs){
  const text=await readFile(file,'utf8');
@@ -11,7 +11,7 @@ for(const file of docs){
  }
  assert.ok(!/[A-Z]:[\\/](?:Users|aiwork)|\/Users\//.test(text),'Machine path in '+file);
 }
-for(const name of ['contextforge-hero.png','contextforge-context.png','contextforge-why.png','social-card.png']){
+for(const name of ['repobound-hero.png','repobound-context.png','repobound-why.png','social-card.png']){
  const data=await readFile('docs/assets/'+name);assert.equal(data.toString('hex',0,8),'89504e470d0a1a0a');
  assert.ok((await stat('docs/assets/'+name)).size<1500000);
  if(name==='social-card.png'){assert.equal(data.readUInt32BE(16),1200);assert.equal(data.readUInt32BE(20),630);}

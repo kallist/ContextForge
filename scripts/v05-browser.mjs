@@ -22,6 +22,7 @@ try{
  let url=await start();browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1512,height:982}});const remote=[],errors=[];let origin=new URL(url).origin;
  page.on('request',r=>{if(new URL(r.url()).origin!==origin)remote.push(r.url());});page.on('pageerror',e=>errors.push(e.message));
  const first=performance.now();await page.goto(url);await page.locator('#status').filter({hasText:'Ready.'}).waitFor();const firstLoadMs=performance.now()-first;
+ assert.equal(await page.title(),'RepoBound Studio');assert.ok((await page.locator('.brand').innerText()).includes('RepoBound'));
  assert.equal(await page.locator('h1').innerText(),'What should your agent see?');assert.equal(await page.locator('[data-nav]').count(),3);assert.equal(await page.locator('#budget').inputValue(),'8000');assert.equal(new URL(page.url()).hash,'');
  await page.locator('#task').fill('Fix session expiration race condition');await page.locator('#budget').fill('1200');const buildStart=performance.now();await page.locator('#compile').click();await page.locator('#status').filter({hasText:'Compiled and saved'}).waitFor();const buildMs=performance.now()-buildStart;
  const parent=await page.locator('#identity').textContent();await view(page,'context');assert.ok((await page.locator('#payload').textContent()).includes('<img src=x onerror='));assert.equal(await page.locator('img').count(),0);assert.equal(await page.evaluate(()=>globalThis.injected),undefined);

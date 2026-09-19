@@ -22,7 +22,7 @@ for (const responsibility of responsibilities) {
 const app = await createContextForgeLifecycle(root);
 const history = new SqliteCapsuleHistory(join(root, ".contextforge/history"));
 const studio = await startStudio(app, history);
-console.log(`ContextForge demo: ${studio.url}\nCompile the default 'fix ledger' task at 2000 tokens. Inspect a dropped file, PIN it, then recompile, compare and verify.\nSynthetic fixture only. Ctrl+C removes this temporary demo and its history.`);
+console.log(`RepoBound demo: ${studio.url}\nCompile the default 'fix ledger' task at 2000 tokens. Inspect a dropped file, PIN it, then recompile, compare and verify.\nSynthetic fixture only. Ctrl+C removes this temporary demo and its history.`);
 let closing = false;
 const close = () => {
   if (closing) return; closing = true;

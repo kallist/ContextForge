@@ -23,12 +23,12 @@ try {
  await page.locator('#task').fill('Fix session race condition'); await page.locator('#budget').fill('800'); await page.locator('#compile').click();
  await page.locator('#status').filter({hasText:'Compiled and saved'}).waitFor();
  await mkdir('docs/assets',{recursive:true}); await mkdir('.studio-output',{recursive:true});
- await page.screenshot({path:'docs/assets/contextforge-hero.png'});
- await page.locator('[data-tab="context"]').click(); await page.screenshot({path:'docs/assets/contextforge-context.png'});
+ await page.screenshot({path:'docs/assets/repobound-hero.png'});
+ await page.locator('[data-tab="context"]').click(); await page.screenshot({path:'docs/assets/repobound-context.png'});
  await page.locator('[data-tab="proposal"]').click(); await page.locator('#filter').selectOption('DROPPED');
  const testRow=page.locator('#candidates tr').filter({hasText:'test/session.test.ts'}); assert.equal(await testRow.count(),1,'Demo test must really be dropped');
  await testRow.getByRole('button').click(); await page.locator('#status').filter({hasText:'Explain: OK'}).waitFor();
- await page.screenshot({path:'docs/assets/contextforge-why.png'});
+ await page.screenshot({path:'docs/assets/repobound-why.png'});
  // A Why navigation may hide the candidate table; return to Context before control.
  if(await page.locator('[data-nav="context"]').count())await page.locator('[data-nav="context"]').click();
  await testRow.getByRole('combobox').selectOption('PIN'); await page.locator('#recompile').click(); await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();
@@ -37,6 +37,6 @@ try {
  assert.deepEqual(errors,[]); assert.deepEqual(remote,[]);
  console.log(JSON.stringify({fixture:'synthetic session race',task:'Fix session race condition',budget:800,transition:'test/session.test.ts DROPPED → SELECTED',modelExecuted:false,remoteRequests:remote.length,browserErrors:errors.length}));
  const card=await browser.newPage({viewport:{width:1200,height:630},deviceScaleFactor:1});
- await card.setContent('<html><body style="margin:0;background:#10151b;color:#edf2f5;font-family:Segoe UI,system-ui;padding:62px;box-sizing:border-box;width:1200px;height:630px"><div style="color:#9ce5c4;font-size:23px">◈ ContextForge</div><h1 style="font-size:49px;line-height:1.17;letter-spacing:-1.5px;font-weight:600;margin:47px 0 42px">See and control the repository context<br>your coding agent works with.</h1><div style="font-size:26px;padding:24px 0;border-top:1px solid #3c4650;border-bottom:1px solid #3c4650">Repo <span style="color:#9ce5c4">→ ContextForge →</span> Agent Context</div><p style="color:#acb8c4;font-size:20px;margin-top:37px">Local-first &nbsp; / &nbsp; Explainable &nbsp; / &nbsp; Hard budget &nbsp; / &nbsp; Agent Skill</p></body></html>');
+ await card.setContent('<html><body style="margin:0;background:#10151b;color:#edf2f5;font-family:Segoe UI,system-ui;padding:62px;box-sizing:border-box;width:1200px;height:630px"><div style="color:#9ce5c4;font-size:23px">◈ RepoBound</div><h1 style="font-size:49px;line-height:1.17;letter-spacing:-1.5px;font-weight:600;margin:47px 0 42px">See and control the repository context<br>your coding agent gets.</h1><div style="font-size:26px;padding:24px 0;border-top:1px solid #3c4650;border-bottom:1px solid #3c4650">Repo <span style="color:#9ce5c4">→ RepoBound →</span> Agent Context</div><p style="color:#acb8c4;font-size:20px;margin-top:37px">Local-first &nbsp; / &nbsp; Explainable &nbsp; / &nbsp; Hard budget &nbsp; / &nbsp; Agent Skill</p></body></html>');
  await card.screenshot({path:'docs/assets/social-card.png'});
 } finally {await browser?.close();await studio?.close();history?.close();await rm(root,{recursive:true,force:true});}

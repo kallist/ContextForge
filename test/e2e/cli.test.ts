@@ -16,10 +16,10 @@ function runCli(args: readonly string[], cwd?: string) {
 test("compiled CLI exposes help and version", () => {
   const help = runCli(["--help"]);
   assert.equal(help.status, 0, help.stderr);
-  assert.match(help.stdout, /contextforge map/u);
+  assert.match(help.stdout, /repobound map/u);
   const version = runCli(["--version"]);
   assert.equal(version.status, 0, version.stderr);
-  assert.match(version.stdout, /^0\.5\.0\n$/u);
+  assert.match(version.stdout, /^0\.5\.1\n$/u);
 });
 
 test("compiled CLI maps a repository in text and JSON modes", async (context) => {
@@ -30,7 +30,7 @@ test("compiled CLI maps a repository in text and JSON modes", async (context) =>
 
   const text = runCli(["map", root]);
   assert.equal(text.status, 0, text.stderr);
-  assert.match(text.stdout, /ContextForge Repository Map/u);
+  assert.match(text.stdout, /RepoBound Repository Map/u);
   assert.equal(text.stderr, "");
 
   const json = runCli(["map", root, "--json"]);
@@ -206,7 +206,7 @@ test("compiled CLI indexes and deterministically inspects repository graph JSON 
 
   const text = runCli(["graph", "src/main.ts", root]);
   assert.equal(text.status, 0, text.stderr);
-  assert.match(text.stdout, /ContextForge Repository Graph/u);
+  assert.match(text.stdout, /RepoBound Repository Graph/u);
   assert.match(text.stdout, /Imported By/u);
   assert.match(text.stdout, /Related Tests/u);
   assert.match(text.stdout, /Git Signals/u);
@@ -232,7 +232,7 @@ test("compiled installed-path CLI searches in text/JSON, applies limits, reports
   assert.equal(indexed.status, 0, indexed.stderr);
   const text = runCli(["search", "fix MemoryService disable race", root, "--limit", "1"]);
   assert.equal(text.status, 0, text.stderr);
-  assert.match(text.stdout, /ContextForge Search/u);
+  assert.match(text.stdout, /RepoBound Search/u);
   assert.match(text.stdout, /contextforge-structural-v1/u);
   assert.match(text.stdout, /src\/memory\.ts/u);
 

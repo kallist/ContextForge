@@ -25,7 +25,8 @@ jobs:
           node-version: 24.20.0
           cache: npm
       - run: npm ci
-      - run: node scripts/v05-core-freeze.mjs
+      - run: npm run brand:core-freeze
+      - run: npm run brand:audit
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -92,8 +93,9 @@ jobs:
       - run: npm run skill:validate
       - run: npm run launch:validate
       - run: npm run site:e2e
-      - run: npm run v05:parity
+      - run: npm run brand:parity
+      - run: npm run brand:state-compatibility
       - run: npm run review:benchmark
       - run: npm run package:smoke
         env:
-          CONTEXTFORGE_STUDIO_BROWSER: "1"
+          REPOBOUND_STUDIO_BROWSER: "1"
