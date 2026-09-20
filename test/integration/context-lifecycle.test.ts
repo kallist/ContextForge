@@ -5,6 +5,8 @@ import { mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises"
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { DatabaseSync } from "node:sqlite";
+import { performance } from "node:perf_hooks";
+import { createInterface } from "node:readline";
 import { createContextForgeLifecycle } from "../../src/composition/contextforge-lifecycle.js";
 import { SqliteCapsuleHistory } from "../../src/adapters/sqlite/sqlite-capsule-history.js";
 import { inspectReplay, recompileContext, verifyReplay } from "../../src/application/context-lifecycle.js";
@@ -177,15 +179,85 @@ test("recompile rejects generation activation between verification and compilati
 test("history: concurrent real processes deduplicate without lost writes or partial entries", async (t) => {
   const { capsule, temp } = await setup(t), directory = join(temp, "concurrent-history"), file = join(temp, "capsule.json");
   await writeFile(file, JSON.stringify(capsule));
-  const children = Array.from({ length: 2 }, () => spawn(process.execPath, [join(process.cwd(), ".test-dist/test/helpers/history-process.js"), directory, file], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true }));
-  const errors = children.map(() => "");
-  children.forEach((child, index) => child.stderr.on("data", (chunk: Buffer) => { errors[index] += chunk.toString(); }));
-  const exits = children.map((child) => once(child, "exit"));
-  try {
-    await Promise.all(children.map(async (child) => { const [chunk] = await once(child.stdout, "data") as [Buffer]; assert.equal(chunk.toString(), "READY\n"); }));
-    for (const child of children) child.stdin.end("SAVE\n");
-    for (const [index, result] of (await Promise.all(exits)).entries()) assert.equal(result[0], 0, errors[index]);
-    const store = new SqliteCapsuleHistory(directory);
+  async function saveWithProcesses(target: string, count: number): Promise<void> {
+    const children = Array.from({ length: count }, () => spawn(process.execPath, [join(process.cwd(), ".test-dist/test/helpers/history-process.js"), target, file], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true }));
+    const errors = children.map(() => "");
+    children.forEach((child, index) => child.stderr.on("data", (chunk: Buffer) => { errors[index] += chunk.toString(); }));
+    const exits = children.map((child) => once(child, "exit"));
+    try {
+      await Promise.all(children.map(async (child) => { const [chunk] = await once(child.stdout, "data") as [Buffer]; assert.equal(chunk.toString(), "READY\n"); }));
+      for (const child of children) child.stdin.end("SAVE\n");
+      for (const [index, result] of (await Promise.all(exits)).entries()) assert.equal(result[0], 0, errors[index]);
+    } finally { for (const child of children) if (child.exitCode === null) child.kill(); await Promise.all(exits); }
+  }
+  for (let iteration = 0; iteration < 10; iteration++) {
+    const target = join(directory, `fresh-${iteration}`);
+    await saveWithProcesses(target, 2);
+    const store = new SqliteCapsuleHistory(target);
     try { assert.equal(store.stats().count, 1); assert.equal(store.get(capsule.capsuleHash).capsuleHash, capsule.capsuleHash); } finally { store.close(); }
-  } finally { for (const child of children) if (child.exitCode === null) child.kill(); await Promise.all(exits); }
+  }
+  const fourProcess = join(directory, "fresh-four-process");
+  await saveWithProcesses(fourProcess, 4);
+  const initialized = new SqliteCapsuleHistory(fourProcess); initialized.close();
+  await saveWithProcesses(fourProcess, 4);
+  const store = new SqliteCapsuleHistory(fourProcess);
+  try { assert.equal(store.stats().count, 1); assert.equal(store.get(capsule.capsuleHash).capsuleHash, capsule.capsuleHash); } finally { store.close(); }
+
+  const controlled = join(directory, "controlled-overlap"), helper = join(process.cwd(), ".test-dist/test/helpers/history-process.js");
+  const holder = spawn(process.execPath, [helper, controlled, file, "hold-bootstrap"], { stdio: ["pipe", "pipe", "pipe", "pipe"], windowsHide: true });
+  const waiter = spawn(process.execPath, [helper, controlled, file, "observe-bootstrap"], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+  const holderErrors: Buffer[] = [], waiterErrors: Buffer[] = [];
+  holder.stderr.on("data", (chunk: Buffer) => holderErrors.push(chunk)); waiter.stderr.on("data", (chunk: Buffer) => waiterErrors.push(chunk));
+  const holderExit = once(holder, "exit"), waiterExit = once(waiter, "exit");
+  const holderLines = createInterface({ input: holder.stdout })[Symbol.asyncIterator](), waiterLines = createInterface({ input: waiter.stdout })[Symbol.asyncIterator]();
+  const expectLine = async (lines: AsyncIterator<string>, expected: string) => { const result = await lines.next(); assert.equal(result.value, expected); };
+  try {
+    await Promise.all([expectLine(holderLines, "READY"), expectLine(waiterLines, "READY")]);
+    holder.stdin.end("SAVE\n");
+    await expectLine(holderLines, "BOOTSTRAP_LOCKED");
+    waiter.stdin.end("SAVE\n");
+    await expectLine(waiterLines, "BOOTSTRAP_BEGIN");
+    // Barriers establish the overlap. This deliberate hold exceeds the former
+    // 750 ms bootstrap limit and is the behavior under test, not synchronization.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const release = holder.stdio[3] as NodeJS.WritableStream | null; assert.ok(release); release.end("RELEASE\n");
+    const [holderResult, waiterResult] = await Promise.all([holderExit, waiterExit]);
+    assert.equal(holderResult[0], 0, Buffer.concat(holderErrors).toString());
+    assert.equal(waiterResult[0], 0, Buffer.concat(waiterErrors).toString());
+    const controlledStore = new SqliteCapsuleHistory(controlled);
+    try { assert.equal(controlledStore.stats().count, 1); assert.equal(controlledStore.get(capsule.capsuleHash).capsuleHash, capsule.capsuleHash); } finally { controlledStore.close(); }
+  } finally {
+    if (holder.exitCode === null) holder.kill(); if (waiter.exitCode === null) waiter.kill();
+    await Promise.all([holderExit, waiterExit]);
+  }
+});
+
+test("history: initialization wait is bounded and operation timeout is restored", async (t) => {
+  const { capsule, temp } = await setup(t), directory = join(temp, "history-timeouts"), databasePath = join(directory, "capsules.sqlite");
+  await mkdir(directory);
+  const bootstrapHolder = new DatabaseSync(databasePath, { timeout: 25 });
+  bootstrapHolder.exec("BEGIN EXCLUSIVE");
+  const bootstrapStarted = performance.now();
+  assert.throws(() => new SqliteCapsuleHistory(directory), { code: "HISTORY_ERROR" });
+  const bootstrapElapsed = performance.now() - bootstrapStarted;
+  assert.ok(bootstrapElapsed >= 2500 && bootstrapElapsed < 7000, `bootstrap wait was ${bootstrapElapsed}ms`);
+  assert.equal(bootstrapHolder.prepare("PRAGMA user_version").get()?.user_version, 0);
+  assert.equal(bootstrapHolder.prepare("SELECT COUNT(*) AS count FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").get()?.count, 0);
+  bootstrapHolder.exec("ROLLBACK"); bootstrapHolder.close();
+
+  const store = new SqliteCapsuleHistory(directory), operationHolder = new DatabaseSync(databasePath, { timeout: 25 });
+  try {
+    operationHolder.exec("BEGIN IMMEDIATE");
+    const operationStarted = performance.now();
+    assert.throws(() => store.save(capsule), { code: "HISTORY_ERROR" });
+    const operationElapsed = performance.now() - operationStarted;
+    assert.ok(operationElapsed >= 500 && operationElapsed < 2500, `operation wait was ${operationElapsed}ms`);
+    operationHolder.exec("ROLLBACK");
+    assert.equal(store.stats().count, 0);
+    assert.equal(store.save(capsule).id, capsule.capsuleHash);
+    assert.equal(store.stats().count, 1);
+  } finally {
+    try { operationHolder.exec("ROLLBACK"); } catch { /* transaction already closed */ }
+    operationHolder.close(); store.close();
+  }
 });
