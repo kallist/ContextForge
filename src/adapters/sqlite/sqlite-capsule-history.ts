@@ -8,6 +8,7 @@ import { hasAbsolutePath } from "../../core/capsule-privacy.js";
 import type { CapsuleHistory, CapsuleSummary } from "../../application/capsule-history.js";
 
 const MAX_ENTRIES = 2000, MAX_STORED_BYTES = 256 * 1024 * 1024;
+const HISTORY_BOOTSTRAP_BUSY_TIMEOUT_MS = 3000, HISTORY_OPERATION_BUSY_TIMEOUT_MS = 750;
 function fail(): never { throw new ContextForgeError("HISTORY_ERROR", "Local history is unavailable, corrupt or unsafe. No entry was silently discarded."); }
 function checkPath(path: string, directory: boolean, optional = false): void {
   try {
@@ -49,10 +50,11 @@ export class SqliteCapsuleHistory implements CapsuleHistory {
   constructor(directory: string) {
     let db: DatabaseSync | undefined;
     try {
-      db = new DatabaseSync(safeStorePath(directory));
-      // Even schema inspection needs a read lock during another process's first commit.
-      // Configure the connection before its first read; this does not mutate the store.
-      db.exec("PRAGMA busy_timeout=750;");
+      db = new DatabaseSync(safeStorePath(directory), { timeout: HISTORY_BOOTSTRAP_BUSY_TIMEOUT_MS });
+      // First-open schema work and WAL negotiation briefly contend across processes.
+      // Give bootstrap a bounded native wait before its first read, then restore the
+      // shorter operation timeout so normal commands still fail fast under a stuck writer.
+      db.exec(`PRAGMA busy_timeout=${HISTORY_BOOTSTRAP_BUSY_TIMEOUT_MS};`);
       db.enableDefensive(true);
       const version = db.prepare("PRAGMA user_version").get()?.user_version;
       if (version !== 0 && version !== 1) throw new ContextForgeError("UNSUPPORTED_SCHEMA", "Unsupported local history format. Expected history schema 1.");
@@ -70,6 +72,7 @@ export class SqliteCapsuleHistory implements CapsuleHistory {
       }
       db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;");
       if (db.prepare("PRAGMA quick_check").get()?.quick_check !== "ok") fail();
+      db.exec(`PRAGMA busy_timeout=${HISTORY_OPERATION_BUSY_TIMEOUT_MS};`);
       this.#db = db;
     } catch (error) {
       db?.close();
