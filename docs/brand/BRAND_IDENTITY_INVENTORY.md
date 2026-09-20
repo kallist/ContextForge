@@ -11,7 +11,7 @@ repository search for `ContextForge`, `contextforge`, `CONTEXTFORGE`,
 | Category | Treatment |
 |---|---|
 | `PUBLIC_BRAND` | Rename current user-facing product copy to RepoBound. |
-| `PUBLIC_COMMAND` | Make `repobound` canonical; keep `contextforge` only as the v0.5.1 compatibility alias. |
+| `PUBLIC_COMMAND` | Make `repobound` the only RepoBound command; keep `contextforge` owned by the historical package. |
 | `PUBLIC_PACKAGE` | Change the candidate to `@kallist/repobound@0.5.1`; retain the old package only in migration/history text. |
 | `PUBLIC_URL` | Point release-candidate metadata and current docs at `kallist/RepoBound` or use relative links. |
 | `STABLE_PROTOCOL_IDENTIFIER` | Preserve serialized Capsule, Explain, controls, diff, replay, review, strategy, estimator and MCP compatibility identifiers. |
@@ -19,7 +19,7 @@ repository search for `ContextForge`, `contextforge`, `CONTEXTFORGE`,
 | `BENCHMARK_IDENTIFIER` | Preserve frozen dataset, benchmark, system, strategy and evidence identifiers. |
 | `HISTORICAL_RECORD` | Preserve dated release/evaluation evidence and immutable tag/package references. |
 | `TEST_FIXTURE` | Preserve fixture labels when identity is not public; update assertions only when they test a migrated public surface. |
-| `COMPATIBILITY_ALIAS` | Retain the legacy CLI/bin and explicit old-package migration examples. |
+| `LEGACY_PACKAGE_EXECUTABLE` | Preserve old-package migration examples; do not duplicate `contextforge` in RepoBound. |
 | `INTERNAL_SYMBOL` | Keep `ContextForge*` TypeScript symbols and filenames where they are not public display/API contracts. |
 | `GENERATED_ARTIFACT` | Do not edit ignored build, benchmark or runtime output; regenerate from the candidate. |
 
@@ -31,8 +31,8 @@ repository search for `ContextForge`, `contextforge`, `CONTEXTFORGE`,
   integration/launch documentation, and visible SVG/raster assets.
 - `PUBLIC_COMMAND`: package `bin`, README/site/current docs/Skill examples, CLI help,
   package smoke, release hardening/check, Skill/Studio/browser/site validation and
-  migrated CLI tests. Legacy `contextforge` remains only where the alias is exercised
-  or migration behavior is documented.
+  migrated CLI tests. Legacy `contextforge` remains only where the historical
+  package is exercised or migration behavior is documented.
 - `PUBLIC_PACKAGE`: `package.json`, `package-lock.json`, README/site/current docs and
   candidate packaging/install assertions. `@kallist/contextforge` remains in historical
   release evidence and migration/compatibility tests.
@@ -57,8 +57,9 @@ repository search for `ContextForge`, `contextforge`, `CONTEXTFORGE`,
 - `TEST_FIXTURE`: temporary directory prefixes, client names, fake Git identities,
   error-input names and internal schema fixtures in `test/**` and `scripts/**`. Public
   display/package/bin assertions will migrate; protocol/state fixtures will not.
-- `COMPATIBILITY_ALIAS`: the second package bin entry, v0.5.1 CLI parity tests,
-  migration guide, release notes and final rename runbook.
+- `LEGACY_PACKAGE_EXECUTABLE`: `contextforge` stays owned by
+  `@kallist/contextforge`; v0.5.1 parity/coexistence tests, the migration guide,
+  release notes and final rename runbook document this boundary.
 - `INTERNAL_SYMBOL`: `ContextForgeError`, `createContextForgeApplication`,
   `BoundContextForgeApplication`, `createContextForgeLifecycle`, MCP adapter module
   filenames/imports and other private composition types. They remain to avoid churn.

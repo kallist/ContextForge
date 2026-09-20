@@ -7,7 +7,8 @@ This preserves the former README. Version labels and UI labels below describe hi
 > Brand note: RepoBound is the new name of ContextForge in v0.5.1. This maintained
 > reference includes historical ContextForge release evidence and intentionally
 > preserved `contextforge-*` protocol/state identifiers. Canonical new commands
-> use `repobound`; the `contextforge` CLI remains a compatibility alias.
+> use `repobound`. The historical `@kallist/contextforge` package remains the
+> owner of the separate `contextforge` executable during migration.
 
 **ContextForge v0.4 — review the change with the context that matters.**
 
@@ -152,7 +153,7 @@ node dist/cli/main.js search "fix stale index activation" . --json
 node dist/cli/main.js pack "fix stale index activation" . --budget 8000 --out context.md
 ```
 
-For source-checkout packaging validation, create a tarball with `npm pack`, install that tarball into a clean temporary project, and run its `contextforge` bin. `npm run package:smoke` performs this complete flow automatically and deletes its temporary files.
+For source-checkout packaging validation, create a tarball with `npm pack`, install that tarball into a clean temporary project, and run its `repobound` bin. `npm run package:smoke` performs this complete flow automatically and deletes its temporary files. `npm run bin:compatibility` separately proves that the public historical package owns `contextforge`, RepoBound owns `repobound`, both global install orders work, and uninstalling either package preserves the other executable.
 
 To verify the installable artifact without publishing it:
 

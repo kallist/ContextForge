@@ -23,8 +23,7 @@
     "node": ">=24.15 <25"
   },
   "bin": {
-    "repobound": "dist/cli/main.js",
-    "contextforge": "dist/cli/main.js"
+    "repobound": "dist/cli/main.js"
   },
   "files": [
     "dist",
@@ -73,7 +72,8 @@
     "brand:core-freeze": "node scripts/brand-core-freeze.mjs",
     "brand:audit": "node scripts/brand-audit.mjs",
     "brand:parity": "node scripts/v05-parity.mjs",
-    "brand:state-compatibility": "node scripts/brand-state-compatibility.mjs"
+    "brand:state-compatibility": "node scripts/brand-state-compatibility.mjs",
+    "bin:compatibility": "node scripts/bin-compatibility.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

@@ -9,29 +9,32 @@ const source = resolve(".");
 const npm = process.env.npm_execpath;
 assert.ok(npm, "Run via npm run brand:state-compatibility");
 const temp = await realpath(await mkdtemp(join(tmpdir(), "repobound-state-compatibility-")));
-const run = (command, args, cwd) => {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: process.env });
+const run = (command, args, cwd, options = {}) => {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: process.env, ...options });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout || String(result.error));
   return result.stdout;
+};
+const executable = (prefix, name) => process.platform === "win32" ? join(prefix, `${name}.cmd`) : join(prefix, "bin", name);
+const runCli = (prefix, name, args, cwd) => {
+  const cli = executable(prefix, name);
+  if (process.platform !== "win32") return run(cli, args, cwd);
+  const quotedArgs = args.map((value) => `"${value.replaceAll('"', '""')}"`).join(" ");
+  return run(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `""${cli}"${quotedArgs === "" ? "" : ` ${quotedArgs}`}"`], cwd, { windowsVerbatimArguments: true });
 };
 
 try {
   const packed = JSON.parse(run(process.execPath, [npm, "pack", "--json", "--pack-destination", temp], source))[0];
   assert.equal(packed.name, "@kallist/repobound");
   assert.equal(packed.version, "0.5.1");
-  const stableInstall = join(temp, "stable-install");
-  const candidateInstall = join(temp, "candidate-install");
+  const prefix = join(temp, "coexistence-prefix");
+  const cache = join(temp, "fresh-cache");
   const repository = join(temp, "repository");
   const artifacts = join(temp, "artifacts");
-  for (const directory of [stableInstall, candidateInstall, repository, artifacts]) await mkdir(directory, { recursive: true });
-  for (const directory of [stableInstall, candidateInstall]) await writeFile(join(directory, "package.json"), "{}");
-  run(process.execPath, [npm, "install", "--ignore-scripts", "--no-audit", "--no-fund", "--cache", join(temp, "stable-cache"), "--registry", "https://registry.npmjs.org", "@kallist/contextforge@0.5.0"], stableInstall);
-  run(process.execPath, [npm, "install", "--ignore-scripts", "--no-audit", "--no-fund", join(temp, packed.filename)], candidateInstall);
-  const stableCli = join(stableInstall, "node_modules", "@kallist", "contextforge", "dist", "cli", "main.js");
-  const candidateCli = join(candidateInstall, "node_modules", "@kallist", "repobound", "dist", "cli", "main.js");
-  const stable = (args) => run(process.execPath, [stableCli, ...args], repository);
-  const candidate = (args) => run(process.execPath, [candidateCli, ...args], repository);
+  for (const directory of [repository, artifacts]) await mkdir(directory, { recursive: true });
+  run(process.execPath, [npm, "install", "--global", "--prefix", prefix, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", cache, "--registry", "https://registry.npmjs.org", "@kallist/contextforge@0.5.0"], temp);
+  const stable = (args) => runCli(prefix, "contextforge", args, repository);
   await reviewFixture(repository);
+  assert.equal(stable(["--version"]).trim(), "0.5.0");
   const oldIndex = JSON.parse(stable(["index", repository, "--json"]));
   const taskCapsule = join(artifacts, "contextforge-v050-task.json");
   const reviewCapsule = join(artifacts, "contextforge-v050-review.json");
@@ -40,6 +43,9 @@ try {
   const history = join(repository, ".contextforge", "history");
   const savedTask = JSON.parse(stable(["history", "save", taskCapsule, "--store", history]));
   const savedReview = JSON.parse(stable(["history", "save", reviewCapsule, "--store", history]));
+  run(process.execPath, [npm, "install", "--global", "--prefix", prefix, "--ignore-scripts", "--no-audit", "--no-fund", join(temp, packed.filename)], temp);
+  const candidate = (args) => runCli(prefix, "repobound", args, repository);
+  assert.equal(candidate(["--version"]).trim(), "0.5.1");
   const search = JSON.parse(candidate(["search", "fix ledger", repository, "--json"]));
   assert.equal(search.generation, oldIndex.generation);
   assert.equal(search.indexStatus.status, "FRESH");
@@ -54,6 +60,8 @@ try {
   assert.ok(["EXACT_MATCH", "PAYLOAD_MATCH_PROVENANCE_CHANGED"].includes(replay.status));
   const candidateReview = JSON.parse(candidate(["review", repository, "--base", "HEAD", "--budget", "1000", "--json"]));
   assert.equal(candidateReview.capsule.schemaVersion, "contextforge-capsule-v2");
+  assert.equal(JSON.parse(stable(["search", "fix ledger", repository, "--json"])).generation, oldIndex.generation);
+  assert.ok(JSON.parse(stable(["history", "list", "--store", history])).entries.some(({ id }) => id === savedTask.id));
   await access(join(repository, ".contextforge", "index.sqlite"));
   await assert.rejects(access(join(repository, ".repobound")), (error) => error?.code === "ENOENT");
   const report = {
@@ -71,6 +79,8 @@ try {
     stateRoot: ".contextforge",
     duplicateStateRoot: false,
     databaseMigration: false,
+    coexistence: "contextforge@0.5.0 + repobound@0.5.1",
+    bothClisOperational: true,
     passed: true,
   };
   await mkdir(".benchmark-output", { recursive: true });

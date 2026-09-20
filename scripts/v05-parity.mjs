@@ -10,35 +10,37 @@ const source = resolve(".");
 const temp = await realpath(await mkdtemp(join(tmpdir(), "repobound-brand-parity-")));
 const npm = process.env.npm_execpath;
 assert.ok(npm, "Run via npm run brand:parity");
-const run = (command, args, cwd) => {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: process.env });
+const run = (command, args, cwd, options = {}) => {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024, env: process.env, ...options });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout || String(result.error));
   return result.stdout;
 };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const executable = (prefix, name) => process.platform === "win32" ? join(prefix, `${name}.cmd`) : join(prefix, "bin", name);
+const runCli = (prefix, name, args, cwd) => {
+  const cli = executable(prefix, name);
+  if (process.platform !== "win32") return run(cli, args, cwd);
+  const quotedArgs = args.map((value) => `"${value.replaceAll('"', '""')}"`).join(" ");
+  return run(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `""${cli}"${quotedArgs === "" ? "" : ` ${quotedArgs}`}"`], cwd, { windowsVerbatimArguments: true });
+};
 
 try {
   const pack = JSON.parse(run(process.execPath, [npm, "pack", "--json", "--pack-destination", temp], source))[0];
   assert.equal(pack.name, "@kallist/repobound");
   assert.equal(pack.version, "0.5.1");
+  const prefix = join(temp, "coexistence-prefix");
+  run(process.execPath, [npm, "install", "--global", "--prefix", prefix, "--ignore-scripts", "--no-audit", "--no-fund", "--cache", join(temp, "fresh-cache"), "--registry", "https://registry.npmjs.org", "@kallist/contextforge@0.5.0"], temp);
+  run(process.execPath, [npm, "install", "--global", "--prefix", prefix, "--ignore-scripts", "--no-audit", "--no-fund", join(temp, pack.filename)], temp);
   const results = [];
-  for (const [label, spec, packagePath, version] of [
-    ["stable", "@kallist/contextforge@0.5.0", join("@kallist", "contextforge"), "0.5.0"],
-    ["candidate", join(temp, pack.filename), join("@kallist", "repobound"), "0.5.1"],
+  for (const [label, commandName, version] of [
+    ["stable", "contextforge", "0.5.0"],
+    ["candidate", "repobound", "0.5.1"],
   ]) {
-    const install = join(temp, label, "install");
     const repo = join(temp, label, "repo");
     const artifacts = join(temp, label, "artifacts");
-    await mkdir(install, { recursive: true });
     await mkdir(repo, { recursive: true });
     await mkdir(artifacts, { recursive: true });
-    await writeFile(join(install, "package.json"), "{}");
-    const installArguments = [npm, "install", "--ignore-scripts", "--no-audit", "--no-fund", "--cache", join(temp, label, "fresh-cache")];
-    if (label === "stable") installArguments.push("--registry", "https://registry.npmjs.org");
-    installArguments.push(spec);
-    run(process.execPath, installArguments, install);
-    const cli = join(install, "node_modules", packagePath, "dist", "cli", "main.js");
-    const command = (args) => run(process.execPath, [cli, ...args], repo);
+    const command = (args) => runCli(prefix, commandName, args, repo);
     await reviewFixture(repo);
     assert.equal(command(["--version"]).trim(), version);
     assert.ok(command(["--help"]).includes("review"));
@@ -52,10 +54,7 @@ try {
     const coverage = JSON.parse(command(["coverage", join(artifacts, "task.json"), "--json"]));
     const reviewCoverage = JSON.parse(command(["coverage", join(artifacts, "review.json"), "--json"]));
     const replay = JSON.parse(command(["replay", join(artifacts, "task.json"), "--verify", "--repository", repo]));
-    const aliasCoverage = label === "candidate"
-      ? run(process.execPath, [npm, "exec", "--", "contextforge", "coverage", join(artifacts, "task.json"), "--json"], install)
-      : null;
-    results.push({ index, search, task, review, explain, coverage, reviewCoverage, replay, aliasCoverage, taskMarkdown: await readFile(join(artifacts, "task.md"), "utf8"), reviewMarkdown: await readFile(join(artifacts, "review.md"), "utf8") });
+    results.push({ index, search, task, review, explain, coverage, reviewCoverage, replay, taskMarkdown: await readFile(join(artifacts, "task.md"), "utf8"), reviewMarkdown: await readFile(join(artifacts, "review.md"), "utf8") });
   }
   const normalize = (result) => {
     const value = structuredClone(result);
@@ -66,7 +65,6 @@ try {
     delete value.search.repositoryRoot;
     delete value.task.runtime;
     delete value.review.runtime;
-    delete value.aliasCoverage;
     return value;
   };
   const stable = normalize(results[0]);
@@ -74,7 +72,6 @@ try {
   await mkdir(".benchmark-output", { recursive: true });
   await writeFile(".benchmark-output/repobound-brand-parity-diagnostic.json", JSON.stringify([stable, candidate], null, 2));
   assert.deepEqual(candidate, stable, "Brand migration semantic parity: normalization must not erase behavior differences");
-  assert.equal(results[1].aliasCoverage, `${JSON.stringify(results[1].coverage, null, 2)}\n`, "Candidate direct CLI output must stay byte-identical for the compatibility alias target");
   const report = {
     schemaVersion: "repobound-brand-parity-v1",
     gate: "public @kallist/contextforge@0.5.0 vs fresh @kallist/repobound@0.5.1 tarball",
@@ -90,7 +87,8 @@ try {
     explain: "IDENTICAL",
     coverageLint: "IDENTICAL",
     replay: "IDENTICAL",
-    legacyAlias: "IDENTICAL",
+    cliComparison: "contextforge@0.5.0 vs repobound@0.5.1",
+    legacyExecutableOwner: "@kallist/contextforge",
     normalization: ["index.performance", "index.repositoryRoot", "index.indexedAt", "search.performance", "search.repositoryRoot", "task.runtime", "review.runtime"],
     normalizationExclusions: ["candidate order", "scores", "selected/dropped", "source", "ranges", "evidence", "relationships", "budget", "reasons", "payload"],
     package: { name: pack.name, version: pack.version, files: pack.entryCount, packedBytes: pack.size, unpackedBytes: pack.unpackedSize, shasum: pack.shasum, integrity: pack.integrity },

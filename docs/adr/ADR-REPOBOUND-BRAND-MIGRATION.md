@@ -13,8 +13,9 @@ changing the compiler, ranking, packing, persistence or integration contracts.
 - Display product, package, canonical CLI, canonical Skill, Studio and website
   identities become RepoBound, `@kallist/repobound`, `repobound` and
   `kallist/RepoBound`.
-- `contextforge` remains a silent CLI/bin compatibility alias in v0.5.1. Both
-  bins execute the same `dist/cli/main.js`; no alias-specific logic is added.
+- Executable ownership is package-specific: `@kallist/contextforge` continues to
+  own `contextforge`, while `@kallist/repobound` owns only `repobound`. The new
+  package does not duplicate the legacy bin, so both packages can coexist.
 - The existing `.contextforge` state root, SQLite schemas, generation metadata,
   `contextforge-capability` browser-session key and all deterministic serialized
   identifiers remain unchanged. No database or state migration occurs.

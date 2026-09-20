@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -164,9 +165,7 @@ try {
   const help = run(process.execPath, [npmCliPath, "exec", "--", "repobound", "--help"], installRoot);
   if (!help.includes("repobound map")) throw new Error("Installed canonical CLI help is incomplete.");
   const version = run(process.execPath, [npmCliPath, "exec", "--", "repobound", "--version"], installRoot).trim();
-  const legacyHelp = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
-  const legacyVersion = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--version"], installRoot).trim();
-  if (legacyHelp !== help || legacyVersion !== version) throw new Error("Legacy contextforge alias differs from canonical repobound help/version output.");
+  await assert.rejects(access(join(installRoot, "node_modules", ".bin", process.platform === "win32" ? "contextforge.cmd" : "contextforge")), (error) => error?.code === "ENOENT");
   const jsonOutput = run(
     process.execPath,
     [npmCliPath, "exec", "--", "repobound", "map", fixtureRoot, "--json"],
@@ -176,9 +175,6 @@ try {
   if (map.schemaVersion !== "1.0" || map.entries?.[0]?.path !== "src") {
     throw new Error("Installed CLI did not produce the expected Repository Map.");
   }
-  const legacyMap = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "map", fixtureRoot, "--json"], installRoot);
-  if (legacyMap !== jsonOutput) throw new Error("Legacy contextforge alias changed stable JSON output.");
-
   const indexOutput = run(
     process.execPath,
     [npmCliPath, "exec", "--", "repobound", "index", fixtureRoot, "--json"],
@@ -276,7 +272,7 @@ try {
   if (packageDocument.name !== "@kallist/repobound" || packageDocument.version !== "0.5.1") {
     throw new Error("Installed package identity differs from the reviewed scoped v0.5.1 identity.");
   }
-  if (packageDocument.bin?.repobound !== "dist/cli/main.js" || packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed canonical or compatibility bin contract is missing.");
+  assert.deepEqual(packageDocument.bin, { repobound: "dist/cli/main.js" }, "Installed package must own only the canonical repobound executable.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
   for (const installScript of ["preinstall", "install", "postinstall", "prepare"]) {
     if (packageDocument.scripts?.[installScript] !== undefined) {
@@ -312,7 +308,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write(`${JSON.stringify({ package: packageDocument.name, version, installSource: publicRegistry ? "PUBLIC_NPM_REGISTRY_FRESH_CACHE" : "LOCAL_TARBALL", installedArtifactIntegrity: installedArtifact?.integrity, publicDefault: "V1", canonicalCli: "repobound", legacyAlias: "contextforge: PASS", cli: "PASS", mcp: "PASS", installedFiles: installedFiles.length, localTarballFiles: packed[0].entryCount, localTarballPackedBytes: packed[0].size, localTarballUnpackedBytes: packed[0].unpackedSize, shasum: packed[0].shasum, integrity: packed[0].integrity, wasmAssets: 5, leakageCheck: "PASS" }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ package: packageDocument.name, version, installSource: publicRegistry ? "PUBLIC_NPM_REGISTRY_FRESH_CACHE" : "LOCAL_TARBALL", installedArtifactIntegrity: installedArtifact?.integrity, publicDefault: "V1", canonicalCli: "repobound", contextforgeBinFromRepoBound: "ABSENT", cli: "PASS", mcp: "PASS", installedFiles: installedFiles.length, localTarballFiles: packed[0].entryCount, localTarballPackedBytes: packed[0].size, localTarballUnpackedBytes: packed[0].unpackedSize, shasum: packed[0].shasum, integrity: packed[0].integrity, wasmAssets: 5, leakageCheck: "PASS" }, null, 2)}\n`);
   process.stdout.write("Package smoke passed: npm pack, fresh install, packaged WASM parsers, CLI flows, and the official-client MCP stdio flow.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });

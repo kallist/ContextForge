@@ -20,7 +20,7 @@ npm install -g @kallist/repobound
 repobound studio
 ```
 
-These are the v0.5.1 release-target commands; `@kallist/repobound` is not public until the final release gate completes. The historical `@kallist/contextforge@0.5.0` package remains available, and `contextforge` is retained as a silent compatibility alias in v0.5.1.
+These are the v0.5.1 release-target commands; `@kallist/repobound` is not public until the final release gate completes. The historical `@kallist/contextforge@0.5.0` package continues to provide the `contextforge` command. RepoBound provides only the canonical `repobound` command, so both packages can coexist during migration.
 
 Agent user? Start with the [Agent integration guide](docs/AGENT_SKILL.md). Studio is the quickest way to see the product; the CLI exposes the full workflow.
 

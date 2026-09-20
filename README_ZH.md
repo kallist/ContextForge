@@ -17,7 +17,7 @@ npm install -g @kallist/repobound
 repobound studio
 ```
 
-以上是 v0.5.1 最终发布后的目标命令；在最终发布门禁完成前，`@kallist/repobound` 尚未公开。当前公共稳定包仍是 `@kallist/contextforge@0.5.0`，v0.5.1 继续静默支持 `contextforge` CLI 别名。Agent 用户可阅读[集成指南](docs/AGENT_SKILL.md)。
+以上是 v0.5.1 最终发布后的目标命令；在最终发布门禁完成前，`@kallist/repobound` 尚未公开。旧的 `@kallist/contextforge@0.5.0` 包继续提供 `contextforge` 命令；新的 `@kallist/repobound` 只提供规范的 `repobound` 命令，两个包可以在迁移期间同时安装。Agent 用户可阅读[集成指南](docs/AGENT_SKILL.md)。
 
 ## 30 秒了解
 

@@ -4,7 +4,8 @@
 
 - [ ] Exact base is `v0.5.0` / `origin/main` at the recorded starting SHA.
 - [ ] Name audit finds no significant same-category collision; legal limitation stated.
-- [ ] Package is `@kallist/repobound@0.5.1`; bins are `repobound` and the silent `contextforge` alias.
+- [ ] Package is `@kallist/repobound@0.5.1`; its only bin is `repobound`. The historical package remains the owner of `contextforge`.
+- [ ] Both global installation orders and both uninstall ownership directions pass without `EEXIST`, `--force`, shims or partial packages.
 - [ ] Canonical Skill is only `repobound`; no duplicate active Skill directory exists.
 - [ ] `.contextforge` state, database schema, protocol IDs, frozen dataset and Gold remain unchanged.
 - [ ] Public v0.5.0 versus candidate engine parity report passes without semantic normalization.

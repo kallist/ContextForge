@@ -10,7 +10,7 @@ const stale = /ContextForge|contextforge|CONTEXTFORGE|@kallist\/contextforge|kal
 const counts = {
   HISTORICAL: 0,
   PROTOCOL_SERIALIZED_COMPATIBILITY: 0,
-  LEGACY_CLI_ALIAS: 0,
+  LEGACY_PACKAGE_EXECUTABLE: 0,
   OLD_PACKAGE_MIGRATION_DOCUMENTATION: 0,
   BACKWARD_COMPATIBILITY_TEST: 0,
 };
@@ -24,13 +24,13 @@ function stripAllowedPublicLegacy(path, line) {
     "README.md": [
       "RepoBound is the new name of ContextForge.",
       "Existing ContextForge releases remain available",
+      "The historical `@kallist/contextforge@0.5.0` package continues to provide the `contextforge` command",
       "`@kallist/contextforge@0.5.0`",
-      "`contextforge` is retained as a silent compatibility alias",
       "[@kallist/contextforge@0.5.0](https://www.npmjs.com/package/@kallist/contextforge)",
       "MIGRATION_FROM_CONTEXTFORGE.md",
     ],
-    "README_ZH.md": ["RepoBound 是原 ContextForge 的新名称。", "既有 ContextForge 发布仍然保留", "`@kallist/contextforge@0.5.0`", "`contextforge` CLI 别名", "MIGRATION_FROM_CONTEXTFORGE.md"],
-    "site/index.html": ["renamed continuation of ContextForge", "<code>@kallist/contextforge@0.5.0</code>", "<code>contextforge</code> as a compatibility alias"],
+    "README_ZH.md": ["RepoBound 是原 ContextForge 的新名称。", "既有 ContextForge 发布仍然保留", "`@kallist/contextforge@0.5.0`", "`contextforge` 命令", "MIGRATION_FROM_CONTEXTFORGE.md"],
+    "site/index.html": ["renamed continuation of ContextForge", "<code>@kallist/contextforge@0.5.0</code>", "<code>contextforge</code> command"],
   }[path] ?? (path.startsWith("repobound/references/") ? [".contextforge/history", ".contextforgeignore"] : []);
   return allowed.reduce((value, fragment) => value.replaceAll(fragment, ""), line);
 }
@@ -48,7 +48,7 @@ function findUnexpectedPublicBrand(path, text) {
 function category(path, line) {
   if (/^(?:docs\/v0\.5\/|docs\/(?:V0\.|BENCHMARK|PHASE|RESULTS|RELEASE_REPORT|RELEASE_NOTES_V0\.[0-4]|REVIEW_EVALUATION)|docs\/adr\/ADR-(?!REPOBOUND)|docs\/assets\/contextforge-|CHANGELOG\.md|CONTEXTFORGE_MASTER_SPEC\.md)/u.test(path)) return "HISTORICAL";
   if (/^(?:README(?:_ZH)?\.md|site\/|docs\/brand\/|docs\/adr\/ADR-REPOBOUND|docs\/AGENT_SKILL\.md|docs\/RELEASE_(?:NOTES_V0\.5\.1|CHECKLIST)\.md)/u.test(path)) return "OLD_PACKAGE_MIGRATION_DOCUMENTATION";
-  if (/^(?:package(?:-lock)?\.json)$/u.test(path) && /contextforge/u.test(line)) return "LEGACY_CLI_ALIAS";
+  if (/^(?:package(?:-lock)?\.json)$/u.test(path) && /contextforge/u.test(line)) return "LEGACY_PACKAGE_EXECUTABLE";
   if (/^(?:test\/|scripts\/|\.github\/)/u.test(path)) return "BACKWARD_COMPATIBILITY_TEST";
   if (/^(?:src\/|benchmarks\/|repobound\/|docs\/(?:ARCHITECTURE|PRODUCT_SPEC|CONTEXT_CAPSULE|EXPLAIN_CONTRACT|ENGINEERING_REFERENCE)\.md|AGENTS\.md|CONTRIBUTING\.md)/u.test(path)) return "PROTOCOL_SERIALIZED_COMPATIBILITY";
   return undefined;
@@ -78,7 +78,7 @@ for (const path of git.stdout.split(/\r?\n/u).filter(Boolean).map((value) => val
 const packageDocument = JSON.parse(readFileSync("package.json", "utf8"));
 assert.equal(packageDocument.name, "@kallist/repobound");
 assert.equal(packageDocument.version, "0.5.1");
-assert.deepEqual(packageDocument.bin, { repobound: "dist/cli/main.js", contextforge: "dist/cli/main.js" });
+assert.deepEqual(packageDocument.bin, { repobound: "dist/cli/main.js" });
 assert.match(readFileSync("site/index.html", "utf8"), /<title>RepoBound/u);
 const readme = readFileSync("README.md", "utf8");
 const readmeZh = readFileSync("README_ZH.md", "utf8");

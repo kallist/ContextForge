@@ -25,10 +25,12 @@ ranking system.
 
 ## Compatibility
 
-The `contextforge` executable remains a silent alias in v0.5.1. Existing local
-state and Capsules remain readable. Stable serialized `contextforge-*`
-identifiers intentionally remain unchanged. Historical ContextForge packages,
-tags, releases and evidence remain available.
+The historical `@kallist/contextforge` package remains available during migration
+and continues to provide the `contextforge` executable. RepoBound's canonical and
+only executable is `repobound`; both packages can coexist. Existing local state
+and Capsules remain readable. Stable serialized `contextforge-*` identifiers
+intentionally remain unchanged. Historical ContextForge tags, releases and
+evidence remain available.
 
 The old npm package is deprecated only after the new RepoBound package has been
 published and verified from a fresh public-registry consumer. It is never

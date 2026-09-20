@@ -35,8 +35,10 @@ rewrite history, move a tag, bypass review or publish a different artifact.
     shasum, integrity, file count and sizes with the reviewed candidate. Publish
     only `@kallist/repobound@0.5.1` with public access.
 11. Query the public registry for exact version/dist-tags/shasum/integrity. In a
-    fresh directory and cache, install from the registry and run canonical and
-    legacy CLI, official-client MCP, Studio, Review and state-compatibility smoke.
+    fresh directory and cache, install RepoBound from the registry and run its
+    canonical `repobound` CLI, official-client MCP, Studio, Review and
+    state-compatibility smoke. Separately install the historical package and
+    verify that it still owns `contextforge`; verify both global packages coexist.
 12. Validate the public Skill source and exact syntax:
 
     ```sh
@@ -49,7 +51,8 @@ rewrite history, move a tag, bypass review or publish a different artifact.
     `docs/RELEASE_NOTES_V0.5.1.md` only after npm and fresh-install acceptance.
 14. Only after the new public package and install are healthy, run the exact npm
     deprecation command in [MIGRATION_FROM_CONTEXTFORGE.md](MIGRATION_FROM_CONTEXTFORGE.md).
-    Never unpublish or overwrite the historical package.
+    Never unpublish or overwrite the historical package. It remains the owner of
+    the `contextforge` executable; RepoBound owns only `repobound`.
 15. Upload `docs/assets/social-card.png` as the repository Social Preview through
     GitHub repository settings and verify the rendered 1200 × 630 image.
 16. Recheck README English/Chinese, package metadata, public Skill, Pages and all

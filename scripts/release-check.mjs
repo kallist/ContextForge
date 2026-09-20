@@ -21,6 +21,7 @@ const commands = [
   "build",
   "smoke",
   "package:smoke",
+  "bin:compatibility",
   "release:hardening",
   "benchmark:validate",
   "benchmark:smoke",
@@ -51,7 +52,7 @@ if (packageDocument.license === "UNLICENSED" || !licensePresent) releaseBlockers
 if (packageDocument.private === true) releaseBlockers.push("PUBLICATION_DISABLED");
 if (packageDocument.name !== "@kallist/repobound") releaseBlockers.push("PACKAGE_IDENTITY_INCORRECT");
 if (packageDocument.version !== "0.5.1") releaseBlockers.push("PACKAGE_VERSION_INCORRECT");
-if (packageDocument.bin?.repobound !== "dist/cli/main.js" || packageDocument.bin?.contextforge !== "dist/cli/main.js") releaseBlockers.push("CLI_BIN_INCORRECT");
+if (JSON.stringify(packageDocument.bin) !== JSON.stringify({ repobound: "dist/cli/main.js" })) releaseBlockers.push("CLI_BIN_INCORRECT");
 if (typeof packageDocument.version !== "string" || packageDocument.version.includes("-dev.")) {
   releaseBlockers.push("VERSION_FINALIZATION_REQUIRED");
 }

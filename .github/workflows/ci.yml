@@ -33,6 +33,7 @@ jobs:
       - run: npm run build
       - run: npm run smoke
       - run: npm run package:smoke
+      - run: npm run bin:compatibility
       - run: npm run release:hardening
       - run: npm run benchmark:validate
       - run: npm run benchmark:smoke
