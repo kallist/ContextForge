@@ -1,8 +1,8 @@
-# ContextForge Product Specification
+# RepoBound Product Specification
 
 ## Document Status and Authority
 
-This document defines what ContextForge should do and why. It consolidates the product requirements from `CONTEXTFORGE_MASTER_SPEC.md` without claiming that they are implemented. Implementation status and design decisions belong in `ARCHITECTURE.md`; measurement procedures and results belong in `BENCHMARK.md`.
+This document defines what RepoBound should do and why. It consolidates the product requirements from `CONTEXTFORGE_MASTER_SPEC.md` without claiming that they are implemented. Implementation status and design decisions belong in `ARCHITECTURE.md`; measurement procedures and results belong in `BENCHMARK.md`.
 
 **Product status: V1 SPECIFIED — implementation status is tracked in `ARCHITECTURE.md`**
 
@@ -18,13 +18,13 @@ promise coding-agent success. V0.4 adds the bounded, local change-aware
 [Review Context product](V0.4_PRODUCT_GUIDE.md); its syntax/relationship evidence
 does not establish runtime impact or review quality.
 
-ContextForge is a local-first context compiler for coding agents. Given a repository, a coding task, and a token budget, it produces a task-aware Context Pack containing the smallest useful subset of repository information needed to understand and complete that task.
+RepoBound is a local-first context compiler for coding agents. Given a repository, a coding task, and a token budget, it produces a task-aware Context Pack containing the smallest useful subset of repository information needed to understand and complete that task.
 
 Its central promise is:
 
 > Coding agents should not need your whole repository. They need the right context.
 
-ContextForge is a task-aware context compiler, not merely another code-RAG application.
+RepoBound is a task-aware context compiler, not merely another code-RAG application.
 
 ## Problem
 
@@ -40,7 +40,7 @@ Primary users include:
 
 ## Goals
 
-For a supplied repository, task, and token budget, ContextForge should:
+For a supplied repository, task, and token budget, RepoBound should:
 
 1. understand the repository structure;
 2. identify task-relevant files and symbols;
@@ -56,9 +56,9 @@ The primary objectives are to reduce unnecessary context and token use, preserve
 
 Every major V1 feature should materially help answer at least one of these questions:
 
-1. Did ContextForge select the right context?
-2. Did ContextForge use fewer tokens?
-3. Can ContextForge explain why that context was selected?
+1. Did RepoBound select the right context?
+2. Did RepoBound use fewer tokens?
+3. Can RepoBound explain why that context was selected?
 
 Features that do not materially improve these outcomes should normally remain outside V1. Success is demonstrated through reproducible offline benchmarks and real product-path tests, not feature count or unsupported claims.
 
@@ -96,13 +96,13 @@ Context Pack
 
 ## Repository Discovery
 
-ContextForge must discover repositories safely. Where practical, it should detect the repository root, Git repository, languages, source directories, tests, documentation, configuration, package managers, and frameworks.
+RepoBound must discover repositories safely. Where practical, it should detect the repository root, Git repository, languages, source directories, tests, documentation, configuration, package managers, and frameworks.
 
-Discovery must not require Git. When Git is unavailable, ContextForge must continue with reduced Git-derived signals.
+Discovery must not require Git. When Git is unavailable, RepoBound must continue with reduced Git-derived signals.
 
 ## Repository Safety
 
-All repository files and metadata are untrusted input. ContextForge must safely handle:
+All repository files and metadata are untrusted input. RepoBound must safely handle:
 
 - symlink loops and symlink escape;
 - path traversal and paths outside the repository root;
@@ -124,7 +124,7 @@ V1 prioritizes TypeScript, JavaScript, and Python, including `.ts`, `.tsx`, `.js
 
 ## Symbol Extraction
 
-For supported programming languages, ContextForge should extract useful structure where the language permits:
+For supported programming languages, RepoBound should extract useful structure where the language permits:
 
 - functions, classes, and methods;
 - interfaces and types;
@@ -135,7 +135,7 @@ Useful symbol metadata includes name, kind, file, line range, parent, export sta
 
 ## Repository Graph
 
-ContextForge should build a lightweight graph supporting useful relationships such as:
+RepoBound should build a lightweight graph supporting useful relationships such as:
 
 ```text
 File   → imports    → File
@@ -148,11 +148,11 @@ Symbol-reference relationships may be included only where they can be derived re
 
 ## Test Discovery
 
-Tests are first-class context. When source is selected, ContextForge should attempt to discover related tests through naming conventions, imports, references, and directory relationships. For example, `memory_service.py` may relate to `test_memory_service.py`, while `memory.ts` may relate to `memory.test.ts` or `memory.spec.ts`. Related tests should receive additional ranking weight.
+Tests are first-class context. When source is selected, RepoBound should attempt to discover related tests through naming conventions, imports, references, and directory relationships. For example, `memory_service.py` may relate to `test_memory_service.py`, while `memory.ts` may relate to `memory.test.ts` or `memory.spec.ts`. Related tests should receive additional ranking weight.
 
 ## Documentation Discovery
 
-ContextForge should recognize high-value repository instructions and architecture documents, including `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, `DESIGN.md`, `*_DESIGN.md`, ADR directories, `docs/`, and `CONTRIBUTING.md`. Selection must remain task-aware; the product must not blindly include an entire documentation tree.
+RepoBound should recognize high-value repository instructions and architecture documents, including `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, `DESIGN.md`, `*_DESIGN.md`, ADR directories, `docs/`, and `CONTRIBUTING.md`. Selection must remain task-aware; the product must not blindly include an entire documentation tree.
 
 ## Git Intelligence
 
@@ -176,17 +176,17 @@ Scores are comparative inputs to packing, not a substitute for budget allocation
 
 ## Graph Expansion
 
-After primary candidates are found, ContextForge should perform bounded structural expansion to related definitions, dependencies, consumers, and tests. Expansion must prevent dependency explosion. Controls should include the equivalent of maximum depth, maximum neighbors, and score decay; their exact representation is an architecture decision.
+After primary candidates are found, RepoBound should perform bounded structural expansion to related definitions, dependencies, consumers, and tests. Expansion must prevent dependency explosion. Controls should include the equivalent of maximum depth, maximum neighbors, and score decay; their exact representation is an architecture decision.
 
 ## Symbol-level Context
 
-Selecting a relevant file does not automatically require including the entire file. Where practical, ContextForge should extract symbols or line ranges and include necessary imports or surrounding code. Small relevant files may be included in full. Selected line ranges must be accurate and attributable to the source.
+Selecting a relevant file does not automatically require including the entire file. Where practical, RepoBound should extract symbols or line ranges and include necessary imports or surrounding code. Small relevant files may be included in full. Selected line ranges must be accurate and attributable to the source.
 
 ## Token Budget
 
 The user-supplied token budget is a first-class, hard output constraint. Generated output must remain within it. Token estimation must be abstracted so model-specific tokenizers can be added later.
 
-If a budget is too small to produce useful context, ContextForge must say so explicitly rather than silently emitting a broken or misleading pack.
+If a budget is too small to produce useful context, RepoBound must say so explicitly rather than silently emitting a broken or misleading pack.
 
 ## Budget Allocation
 
@@ -196,7 +196,7 @@ V1 must not rely only on a naive global score sort followed by appending content
 
 ## Context Packing
 
-Packing must choose the highest-value safe combination of full files, symbols, and line ranges within the budget. It should preserve enough surrounding structure to make excerpts understandable, avoid redundant content, and record material exclusions or truncation. Identical repository state, task, configuration, and ContextForge version should yield stable output where practical.
+Packing must choose the highest-value safe combination of full files, symbols, and line ranges within the budget. It should preserve enough surrounding structure to make excerpts understandable, avoid redundant content, and record material exclusions or truncation. Identical repository state, task, configuration, and RepoBound version should yield stable output where practical.
 
 ## Context Pack Format
 
@@ -234,14 +234,14 @@ The implemented Phase 5 manifest is deterministic and intentionally has no creat
 V1 is CLI-first. Its expected capability surface includes:
 
 ```text
-contextforge init
-contextforge index
-contextforge map
-contextforge search "MemoryService"
-contextforge pack "Fix memory disable race condition"
-contextforge explain
-contextforge benchmark
-contextforge doctor
+repobound init
+repobound index
+repobound map
+repobound search "MemoryService"
+repobound pack "Fix memory disable race condition"
+repobound explain
+repobound benchmark
+repobound doctor
 ```
 
 `map`, `index`, `inspect`, `graph`, `search`, `pack`, and the local `mcp` server command are implemented. The remaining commands are product expectations whose contracts may evolve during later phases.
@@ -254,7 +254,7 @@ An interrupted write must not make a partial index active. The product must dete
 
 ## Local Persistence
 
-ContextForge may persist file metadata, hashes, symbols, graph relationships, and index metadata locally. It should not unnecessarily duplicate entire repository source files in persistent storage. Context Packs should normally read current source from the working tree, with stale-index cases handled explicitly.
+RepoBound may persist file metadata, hashes, symbols, graph relationships, and index metadata locally. It should not unnecessarily duplicate entire repository source files in persistent storage. Context Packs should normally read current source from the working tree, with stale-index cases handled explicitly.
 
 The choice of persistence technology is not fixed by this product specification.
 
@@ -264,7 +264,7 @@ Expected failures include parser and database/storage failure, interrupted index
 
 ## Concurrency
 
-ContextForge must safely handle concurrent `index + index` and `index + pack` activity. Index publication must be atomic from readers' perspective: no reader may observe a corrupted or half-completed active state. The implemented concurrency policy, retry behavior, and recovery boundary must be documented and tested.
+RepoBound must safely handle concurrent `index + index` and `index + pack` activity. Index publication must be atomic from readers' perspective: no reader may observe a corrupted or half-completed active state. The implemented concurrency policy, retry behavior, and recovery boundary must be documented and tested.
 
 ## Privacy
 
@@ -287,7 +287,7 @@ Security rules must be fail-safe and apply independently of relevance scores. V1
 
 ## MCP Integration
 
-MCP is an integration layer, not part of the ContextForge core. The implemented local stdio adapter binds one repository at startup and exposes only `status`, explicit `index`, read-only `search`, and read-only `pack`. Tools cannot redirect repository scope, and Search/Pack do not auto-index.
+MCP is an integration layer, not part of the RepoBound core. The implemented local stdio adapter binds one repository at startup and exposes only `status`, explicit `index`, read-only `search`, and read-only `pack`. Tools cannot redirect repository scope, and Search/Pack do not auto-index.
 
 The implementation uses the stable official split TypeScript SDK current at implementation time. MCP-specific code owns only runtime schemas, result/error translation, annotations, and transport lifecycle; it does not own discovery, retrieval, ranking, budgeting, packing, or SQLite behavior. Remote MCP/HTTP, multi-root operation, Resources, Prompts, and application-level cancellation propagation remain deferred.
 
@@ -317,7 +317,7 @@ Tests must assert behavior rather than echo implementation details. Relevant ass
 
 ## Performance Requirements
 
-ContextForge must measure cold index duration, incremental index duration, and Context Pack latency. Repository graph and parsing work must be bounded using limits for file size, graph depth, neighbors, and parsing work. No performance claim may be made without a recorded measurement and environment.
+RepoBound must measure cold index duration, incremental index duration, and Context Pack latency. Repository graph and parsing work must be bounded using limits for file size, graph depth, neighbors, and parsing work. No performance claim may be made without a recorded measurement and environment.
 
 No fixed latency target is specified for V1 in the source specification.
 
@@ -368,4 +368,4 @@ The following are outside V1 and must not complicate its implementation prematur
 
 ## Product Positioning
 
-ContextForge is not a coding agent and not a generic code-RAG system. Its differentiated job is to compile a safe, explainable, task-aware subset of a repository into a hard token budget for use by coding agents.
+RepoBound is not a coding agent and not a generic code-RAG system. Its differentiated job is to compile a safe, explainable, task-aware subset of a repository into a hard token budget for use by coding agents.

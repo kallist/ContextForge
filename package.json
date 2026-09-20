@@ -1,19 +1,20 @@
 {
-  "name": "@kallist/contextforge",
-  "version": "0.5.0",
-  "description": "Local-first, task-aware context compiler for coding agents",
+  "name": "@kallist/repobound",
+  "version": "0.5.1",
+  "description": "Local-first repository context compiler for coding agents",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kallist/ContextForge.git"
+    "url": "git+https://github.com/kallist/RepoBound.git"
   },
   "bugs": {
-    "url": "https://github.com/kallist/ContextForge/issues"
+    "url": "https://github.com/kallist/RepoBound/issues"
   },
-  "homepage": "https://github.com/kallist/ContextForge#readme",
+  "homepage": "https://github.com/kallist/RepoBound#readme",
   "keywords": [
     "coding-agents",
     "context",
+    "repobound",
     "mcp",
     "repository-analysis"
   ],
@@ -22,13 +23,13 @@
     "node": ">=24.15 <25"
   },
   "bin": {
-    "contextforge": "dist/cli/main.js"
+    "repobound": "dist/cli/main.js"
   },
   "files": [
     "dist",
     "README.md",
     "README_ZH.md",
-    "contextforge",
+    "repobound",
     "docs",
     "SECURITY.md",
     "CONTRIBUTING.md"
@@ -67,7 +68,12 @@
     "launch:validate": "node scripts/build-site.mjs && node scripts/launch-validate.mjs",
     "v05:parity": "node scripts/v05-parity.mjs",
     "v05:browser": "node scripts/v05-browser.mjs",
-    "site:e2e": "node scripts/build-site.mjs && node scripts/site-e2e.mjs"
+    "site:e2e": "node scripts/build-site.mjs && node scripts/site-e2e.mjs",
+    "brand:core-freeze": "node scripts/brand-core-freeze.mjs",
+    "brand:audit": "node scripts/brand-audit.mjs",
+    "brand:parity": "node scripts/v05-parity.mjs",
+    "brand:state-compatibility": "node scripts/brand-state-compatibility.mjs",
+    "bin:compatibility": "node scripts/bin-compatibility.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",

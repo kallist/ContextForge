@@ -80,5 +80,5 @@ function explainValidated(capsule: ContextCapsuleV1, input: ExplainQueryV1): Exp
 
 /** Deterministic plain output; JSON quoting prevents terminal-control injection. */
 export function renderExplain(result: ExplainResultV1): string {
-  return [`ContextForge Explain ${result.query.type}: ${result.status}`, ...Object.entries(result.facts).map(([key, value]) => `${key}: ${JSON.stringify(value)}`), `limitations: ${JSON.stringify(result.limitations)}`, ""].join("\n");
+  return [`RepoBound Explain ${result.query.type}: ${result.status}`, ...Object.entries(result.facts).map(([key, value]) => `${key}: ${JSON.stringify(value)}`), `limitations: ${JSON.stringify(result.limitations)}`, ""].join("\n");
 }

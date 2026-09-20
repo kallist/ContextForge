@@ -15,9 +15,17 @@ const inventory = await read(evidence + "integrity-manifest.json");
 // selection-policy, estimator, database, Gold and historical artifacts stay frozen.
 const observationalFiles = new Set([
   "src/application/build-context-pack.ts", "src/application/build-context-pack-v2.ts",
-  "src/application/search-repository-v2.ts", "src/cli/main.ts",
+  "src/application/search-repository-v2.ts", "src/application/search-repository.ts",
+  "src/application/inspect-index.ts", "src/application/inspect-repository-graph.ts",
+  "src/cli/main.ts", "src/cli/format.ts", "src/cli/lifecycle.ts", "src/cli/review.ts",
   "src/core/context-pack.ts", "src/core/errors.ts",
+  "src/core/explain-context.ts",
   "src/adapters/git/git-signals-reader.ts",
+  // V0.5.1 changes only human-visible brand strings in these adapters. The
+  // brand-core-freeze gate constrains the allowed production diff separately;
+  // historical evidence hashes remain anchored to the evaluation commit.
+  "src/adapters/mcp/contextforge-mcp-server.ts",
+  "src/adapters/sqlite/sqlite-index-repository.ts",
 ]);
 for (const item of [...inventory.invariantFiles, ...inventory.evidenceFiles]) {
   assert.ok(!item.path.includes("..") && !/^[A-Za-z]:|^[/\\]/u.test(item.path), "Unsafe evidence inventory path");

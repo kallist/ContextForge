@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
-const assets = new Map([["/", "index.html"], ["/site.css", "site.css"], ...["contextforge-hero.png", "contextforge-context.png", "contextforge-why.png", "contextforge-flow.svg", "social-card.png"].map((name) => ["/assets/" + name, "assets/" + name])]);
+const assets = new Map([["/", "index.html"], ["/site.css", "site.css"], ...["repobound-hero.png", "repobound-context.png", "repobound-why.png", "repobound-flow.svg", "social-card.png"].map((name) => ["/assets/" + name, "assets/" + name])]);
 const server = createServer(async (req, res) => {
   const name = assets.get(req.url);
   if (!name) { res.writeHead(404); res.end(); return; }
@@ -22,6 +22,9 @@ try {
   page.on("request", (r) => requests.push(r.url()));
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(origin);
+  assert.equal(await page.title(), "RepoBound — repository context, under your control");
+  assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), "https://kallist.github.io/RepoBound/");
+  assert.ok((await page.locator("body").innerText()).includes("RepoBound"));
   for (const width of [390, 1024, 1280, 1512, 1920]) {
     await page.setViewportSize({ width, height: 982 });
     assert.ok(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth));

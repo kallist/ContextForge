@@ -27,10 +27,10 @@ export async function verifyCodexDiscovery(executable, cwd, expectedText) {
     child.stdin.write(JSON.stringify({ id, method, params }) + "\n");
   });
   try {
-    await request("initialize", { clientInfo: { name: "contextforge-skill-acceptance", version: "0.5.0" } });
+    await request("initialize", { clientInfo: { name: "repobound-skill-acceptance", version: "0.5.1" } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const result = await request("skills/list", { cwds: [cwd], forceReload: true });
-    const found = result.data.flatMap((entry) => entry.skills).filter((skill) => skill.name === "contextforge" && resolve(skill.path).startsWith(cwd));
+    const found = result.data.flatMap((entry) => entry.skills).filter((skill) => skill.name === "repobound" && resolve(skill.path).startsWith(cwd));
     assert.equal(found.length, 1);
     assert.equal(found[0].enabled, true);
     assert.ok(found[0].description.includes("repository context"));

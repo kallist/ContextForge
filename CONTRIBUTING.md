@@ -1,6 +1,6 @@
-# Contributing to ContextForge
+# Contributing to RepoBound
 
-ContextForge is a local-first TypeScript CLI and MCP stdio server. Keep changes small, typed, offline-by-default, and inside the existing discovery, analysis, graph, retrieval, packing, persistence, CLI, and adapter boundaries.
+RepoBound is a local-first TypeScript CLI and MCP stdio server. Keep changes small, typed, offline-by-default, and inside the existing discovery, analysis, graph, retrieval, packing, persistence, CLI, and adapter boundaries.
 
 ## Development setup
 

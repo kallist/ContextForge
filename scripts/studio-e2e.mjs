@@ -27,6 +27,8 @@ try {
   const errors = []; page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(studio.url);
   await page.getByRole("status").filter({ hasText: "Ready." }).waitFor();
+  assert.equal(await page.title(), "RepoBound Studio");
+  assert.ok((await page.locator(".brand").innerText()).includes("RepoBound"));
   await page.locator("#task").fill("fix ledger"); await page.locator("#budget").fill("2000");
   await page.getByRole("button", { name: "Build Context →", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Compiled and saved" }).waitFor();

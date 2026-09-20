@@ -50,10 +50,10 @@ export async function inspectRepositoryGraph(
   const requestedPath = normalizedPath(relativePath);
   const scan = await scanner.scan(repositoryPath);
   const active = await repositoryFactory(scan.rootRealPath).loadActive();
-  if (active === null) throw new ContextForgeError("INDEX_NOT_FOUND", "No active ContextForge index exists for this repository.");
+  if (active === null) throw new ContextForgeError("INDEX_NOT_FOUND", "No active RepoBound index exists for this repository.");
   const file = active.files.find((candidate) => candidate.relativePath === requestedPath);
   if (file === undefined) throw new ContextForgeError("INDEX_NOT_FOUND", `The active index does not contain: ${requestedPath}`);
-  if (active.graph === null) throw new ContextForgeError("INDEX_NOT_FOUND", "The active index predates Repository Graph support; run contextforge index again.");
+  if (active.graph === null) throw new ContextForgeError("INDEX_NOT_FOUND", "The active index predates Repository Graph support; run repobound index again.");
 
   const imports = active.graph.edges
     .filter((edge) => edge.kind === "FILE_IMPORTS_FILE" && edge.sourcePath === requestedPath)

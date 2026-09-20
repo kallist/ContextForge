@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ const repositoryRoot = resolve(import.meta.dirname, "..");
 const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "contextforge-package-smoke-")));
 const installRoot = join(temporaryRoot, "install");
 const fixtureRoot = join(temporaryRoot, "fixture repo");
-const installedPackageRoot = join(installRoot, "node_modules", "@kallist", "contextforge");
+const installedPackageRoot = join(installRoot, "node_modules", "@kallist", "repobound");
 const npmCliPath = process.env.npm_execpath;
 const publicRegistry = process.argv.slice(2).includes("--public-registry");
 if (process.argv.slice(2).some((arg) => arg !== "--public-registry")) throw new Error("Unknown package smoke option.");
@@ -52,12 +53,12 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
   const stderr = [];
   transport.stderr?.on("data", (chunk) => stderr.push(chunk.toString()));
   const client = new Client(
-    { name: "contextforge-package-smoke", version: "1.0.0" },
+    { name: "repobound-package-smoke", version: "1.0.0" },
     { versionNegotiation: { mode: { pin: "2026-07-28" } } },
   );
   try {
     await client.connect(transport);
-    if (client.getServerVersion()?.version !== "0.5.0") throw new Error("Installed MCP server version differs from the release.");
+    if (client.getServerVersion()?.name !== "contextforge" || client.getServerVersion()?.version !== "0.5.1") throw new Error("Installed MCP server compatibility identity or version differs from the release.");
     if (client.getNegotiatedProtocolVersion() !== "2026-07-28") {
       throw new Error("Installed MCP server did not negotiate the expected modern protocol revision.");
     }
@@ -86,7 +87,7 @@ async function runMcpFlow(installedCliPath, repositoryPath) {
       throw new Error("Installed MCP pack tool did not return the expected Context Markdown payload.");
     }
     const publicOutput = JSON.stringify({ tools, status, index, search, pack });
-    if (publicOutput.includes("CONTEXTFORGE_PACKAGE_MCP_SECRET") || publicOutput.includes(repositoryPath)) {
+    if (publicOutput.includes("REPOBOUND_PACKAGE_MCP_SECRET") || publicOutput.includes(repositoryPath)) {
       throw new Error("Installed MCP flow exposed secret content or an absolute repository path.");
     }
   } finally {
@@ -116,14 +117,14 @@ async function runStudioFlow(cli, repository) {
 try {
   await mkdir(installRoot, { recursive: true });
   await mkdir(join(fixtureRoot, "src"), { recursive: true });
-  await writeFile(join(installRoot, "package.json"), '{"name":"contextforge-smoke","private":true}', "utf8");
+  await writeFile(join(installRoot, "package.json"), '{"name":"repobound-smoke","private":true}', "utf8");
   await writeFile(
     join(fixtureRoot, "src", "main.ts"),
     'import { ready } from "./ready.js";\nexport class Smoke { run() { return ready; } }\n',
     "utf8",
   );
   await writeFile(join(fixtureRoot, "src", "ready.ts"), "export const ready = true;\n", "utf8");
-  await writeFile(join(fixtureRoot, ".env.local"), "CONTEXTFORGE_PACKAGE_MCP_SECRET", "utf8");
+  await writeFile(join(fixtureRoot, ".env.local"), "REPOBOUND_PACKAGE_MCP_SECRET", "utf8");
 
   const packedOutput = run(
     process.execPath,
@@ -131,8 +132,8 @@ try {
     repositoryRoot,
   );
   const packed = JSON.parse(packedOutput);
-  if (packed[0]?.name !== "@kallist/contextforge" || packed[0]?.version !== "0.5.0") {
-    throw new Error("npm pack did not report the expected scoped v0.5.0 package identity.");
+  if (packed[0]?.name !== "@kallist/repobound" || packed[0]?.version !== "0.5.1") {
+    throw new Error("npm pack did not report the expected scoped v0.5.1 package identity.");
   }
   if (
     packed[0]?.files?.some(({ path }) =>
@@ -141,7 +142,7 @@ try {
         path === "LICENSE" ||
         path === "README.md" ||
         path === "README_ZH.md" || path === "SECURITY.md" || path === "CONTRIBUTING.md" ||
-        path.startsWith("docs/") || path.startsWith("contextforge/") ||
+        path.startsWith("docs/") || path.startsWith("repobound/") ||
         path.startsWith("dist/")
       )
     ) === true
@@ -153,30 +154,30 @@ try {
   const tarballPath = join(temporaryRoot, packageFile);
 
   const installArguments = publicRegistry
-    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/contextforge@0.5.0"]
+    ? ["install", "--no-audit", "--no-fund", "--registry", "https://registry.npmjs.org", "--cache", join(temporaryRoot, "fresh-cache"), "@kallist/repobound@0.5.1"]
     : ["install", "--no-audit", "--no-fund", tarballPath];
   run(process.execPath, [npmCliPath, ...installArguments], installRoot);
   const installedLock = JSON.parse(await readFile(join(installRoot, "package-lock.json"), "utf8"));
-  const installedArtifact = installedLock.packages?.["node_modules/@kallist/contextforge"];
-  if (publicRegistry && (installedArtifact?.version !== "0.5.0" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
+  const installedArtifact = installedLock.packages?.["node_modules/@kallist/repobound"];
+  if (publicRegistry && (installedArtifact?.version !== "0.5.1" || new URL(installedArtifact.resolved).origin !== "https://registry.npmjs.org" || typeof installedArtifact.integrity !== "string")) {
     throw new Error("Public smoke did not resolve the exact version from the public npm registry.");
   }
-  const help = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--help"], installRoot);
-  if (!help.includes("contextforge map")) throw new Error("Installed CLI help is incomplete.");
-  const version = run(process.execPath, [npmCliPath, "exec", "--", "contextforge", "--version"], installRoot).trim();
+  const help = run(process.execPath, [npmCliPath, "exec", "--", "repobound", "--help"], installRoot);
+  if (!help.includes("repobound map")) throw new Error("Installed canonical CLI help is incomplete.");
+  const version = run(process.execPath, [npmCliPath, "exec", "--", "repobound", "--version"], installRoot).trim();
+  await assert.rejects(access(join(installRoot, "node_modules", ".bin", process.platform === "win32" ? "contextforge.cmd" : "contextforge")), (error) => error?.code === "ENOENT");
   const jsonOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "map", fixtureRoot, "--json"],
+    [npmCliPath, "exec", "--", "repobound", "map", fixtureRoot, "--json"],
     installRoot,
   );
   const map = JSON.parse(jsonOutput);
   if (map.schemaVersion !== "1.0" || map.entries?.[0]?.path !== "src") {
     throw new Error("Installed CLI did not produce the expected Repository Map.");
   }
-
   const indexOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "index", fixtureRoot, "--json"],
+    [npmCliPath, "exec", "--", "repobound", "index", fixtureRoot, "--json"],
     installRoot,
   );
   const index = JSON.parse(indexOutput);
@@ -185,7 +186,7 @@ try {
   }
   const inspectOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "inspect", "src/main.ts", fixtureRoot, "--json"],
+    [npmCliPath, "exec", "--", "repobound", "inspect", "src/main.ts", fixtureRoot, "--json"],
     installRoot,
   );
   const inspection = JSON.parse(inspectOutput);
@@ -197,7 +198,7 @@ try {
   }
   const graphOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "graph", "src/main.ts", fixtureRoot, "--json"],
+    [npmCliPath, "exec", "--", "repobound", "graph", "src/main.ts", fixtureRoot, "--json"],
     installRoot,
   );
   const graph = JSON.parse(graphOutput);
@@ -209,7 +210,7 @@ try {
   }
   const searchOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "search", "Smoke.run", fixtureRoot, "--limit", "1", "--json"],
+    [npmCliPath, "exec", "--", "repobound", "search", "Smoke.run", fixtureRoot, "--limit", "1", "--json"],
     installRoot,
   );
   const search = JSON.parse(searchOutput);
@@ -223,7 +224,7 @@ try {
   }
   const contextMarkdown = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "pack", "Smoke.run", fixtureRoot, "--budget", "2000"],
+    [npmCliPath, "exec", "--", "repobound", "pack", "Smoke.run", fixtureRoot, "--budget", "2000"],
     installRoot,
   );
   if (!contextMarkdown.startsWith("# ContextForge Context Pack\n") || !contextMarkdown.includes("src/main.ts")) {
@@ -231,7 +232,7 @@ try {
   }
   const contextManifestOutput = run(
     process.execPath,
-    [npmCliPath, "exec", "--", "contextforge", "pack", "Smoke.run", fixtureRoot, "--budget", "2000", "--json"],
+    [npmCliPath, "exec", "--", "repobound", "pack", "Smoke.run", fixtureRoot, "--budget", "2000", "--json"],
     installRoot,
   );
   const contextManifest = JSON.parse(contextManifestOutput);
@@ -260,7 +261,7 @@ try {
   if (recompiled.capsule.capsuleHash === saved.id || recompiled.diff.identical) throw new Error("Installed what-if did not create a distinct Capsule");
   await runStudioFlow(installedCliPath, fixtureRoot);
   process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/review-cli-smoke.mjs"), installedPackageRoot], repositoryRoot));
-  if (process.env.CONTEXTFORGE_STUDIO_BROWSER === "1") {
+  if (process.env.REPOBOUND_STUDIO_BROWSER === "1") {
     process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/v05-browser.mjs"), installedPackageRoot], repositoryRoot));
     process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/studio-e2e.mjs"), installedPackageRoot], repositoryRoot));
     process.stdout.write(run(process.execPath, [resolve(repositoryRoot, "scripts/review-e2e.mjs"), installedPackageRoot], repositoryRoot));
@@ -268,17 +269,17 @@ try {
   await runMcpFlow(installedCliPath, fixtureRoot);
 
   const packageDocument = JSON.parse(await readFile(join(installedPackageRoot, "package.json"), "utf8"));
-  if (packageDocument.name !== "@kallist/contextforge" || packageDocument.version !== "0.5.0") {
-    throw new Error("Installed package identity differs from the reviewed scoped v0.5.0 identity.");
+  if (packageDocument.name !== "@kallist/repobound" || packageDocument.version !== "0.5.1") {
+    throw new Error("Installed package identity differs from the reviewed scoped v0.5.1 identity.");
   }
-  if (packageDocument.bin?.contextforge !== "dist/cli/main.js") throw new Error("Installed package bin contract is missing.");
+  assert.deepEqual(packageDocument.bin, { repobound: "dist/cli/main.js" }, "Installed package must own only the canonical repobound executable.");
   if (version !== packageDocument.version) throw new Error("Installed CLI version differs from package metadata.");
   for (const installScript of ["preinstall", "install", "postinstall", "prepare"]) {
     if (packageDocument.scripts?.[installScript] !== undefined) {
       throw new Error(`Installed package unexpectedly defines ${installScript}.`);
     }
   }
-  for (const skillFile of ["SKILL.md", "references/workflows.md", "references/trust-and-boundaries.md"]) await access(join(installedPackageRoot, "contextforge", skillFile));
+  for (const skillFile of ["SKILL.md", "references/workflows.md", "references/trust-and-boundaries.md"]) await access(join(installedPackageRoot, "repobound", skillFile));
   const installedFiles = await packageFiles(installedPackageRoot);
   if (installedFiles.some((path) => /(^|\/)(?:test|benchmarks|scripts)(\/|$)|(^|\/)\.env(?:\..*)?$/u.test(path))) {
     throw new Error("Installed package contains development, benchmark, script, or secret-path files.");
@@ -307,7 +308,7 @@ try {
   ]) {
     await access(join(parserAssetRoot, asset));
   }
-  process.stdout.write(`${JSON.stringify({ package: packageDocument.name, version, installSource: publicRegistry ? "PUBLIC_NPM_REGISTRY_FRESH_CACHE" : "LOCAL_TARBALL", installedArtifactIntegrity: installedArtifact?.integrity, publicDefault: "V1", cli: "PASS", mcp: "PASS", installedFiles: installedFiles.length, localTarballFiles: packed[0].entryCount, localTarballPackedBytes: packed[0].size, localTarballUnpackedBytes: packed[0].unpackedSize, wasmAssets: 5, leakageCheck: "PASS" }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ package: packageDocument.name, version, installSource: publicRegistry ? "PUBLIC_NPM_REGISTRY_FRESH_CACHE" : "LOCAL_TARBALL", installedArtifactIntegrity: installedArtifact?.integrity, publicDefault: "V1", canonicalCli: "repobound", contextforgeBinFromRepoBound: "ABSENT", cli: "PASS", mcp: "PASS", installedFiles: installedFiles.length, localTarballFiles: packed[0].entryCount, localTarballPackedBytes: packed[0].size, localTarballUnpackedBytes: packed[0].unpackedSize, shasum: packed[0].shasum, integrity: packed[0].integrity, wasmAssets: 5, leakageCheck: "PASS" }, null, 2)}\n`);
   process.stdout.write("Package smoke passed: npm pack, fresh install, packaged WASM parsers, CLI flows, and the official-client MCP stdio flow.\n");
 } finally {
   await rm(temporaryRoot, { force: true, recursive: true });

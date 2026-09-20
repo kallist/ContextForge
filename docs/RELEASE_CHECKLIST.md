@@ -1,4 +1,22 @@
-# ContextForge release checklist
+# RepoBound release checklist
+
+## v0.5.1 brand-migration candidate gates
+
+- [ ] Exact base is `v0.5.0` / `origin/main` at the recorded starting SHA.
+- [ ] Name audit finds no significant same-category collision; legal limitation stated.
+- [ ] Package is `@kallist/repobound@0.5.1`; its only bin is `repobound`. The historical package remains the owner of `contextforge`.
+- [ ] Both global installation orders and both uninstall ownership directions pass without `EEXIST`, `--force`, shims or partial packages.
+- [ ] Canonical Skill is only `repobound`; no duplicate active Skill directory exists.
+- [ ] `.contextforge` state, database schema, protocol IDs, frozen dataset and Gold remain unchanged.
+- [ ] Public v0.5.0 versus candidate engine parity report passes without semantic normalization.
+- [ ] State produced by public `@kallist/contextforge@0.5.0` is read by the candidate without migration or duplication.
+- [ ] 720/720 frozen cases and 240/240 Capsule conformance pass with unchanged hashes.
+- [ ] Review regressions, official MCP client, real Chromium Studio, Skill, site, security and package leakage gates pass.
+- [ ] Independent review reports BLOCKING 0 and IMPORTANT 0.
+- [ ] Draft PR final HEAD passes Ubuntu/Windows/macOS 24.20, minimum Node 24.15, benchmark/conformance, installed-package/Studio and Pages build jobs.
+- [ ] No merge, live repository rename, tag, npm publish/deprecation, GitHub Release or production Pages mutation occurs in candidate preparation.
+
+The executable final order is in [`brand/FINAL_RENAME_RUNBOOK.md`](brand/FINAL_RENAME_RUNBOOK.md).
 
 ## V0.2.0 release gates
 

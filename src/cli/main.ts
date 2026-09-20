@@ -33,19 +33,19 @@ import {
   formatText,
 } from "./format.js";
 
-const HELP = `ContextForge — safe repository context discovery
+const HELP = `RepoBound — safe repository context discovery
 
 Usage:
-  contextforge map [repository] [--json]
-  contextforge index [repository] [--json]
-  contextforge inspect <relative-path> [repository] [--json]
-  contextforge graph <relative-path> [repository] [--json]
-  contextforge search <task> [repository] [--limit <n>] [--json]
-  contextforge pack <task> [repository] --budget <tokens> [--json] [--out <path>] [--capsule <path>]
-  contextforge explain <capsule> [--query <type>] [--subject <id-or-path>] [--json]
-  contextforge mcp [--repository <path>]
-  contextforge --help
-  contextforge --version
+  repobound map [repository] [--json]
+  repobound index [repository] [--json]
+  repobound inspect <relative-path> [repository] [--json]
+  repobound graph <relative-path> [repository] [--json]
+  repobound search <task> [repository] [--limit <n>] [--json]
+  repobound pack <task> [repository] --budget <tokens> [--json] [--out <path>] [--capsule <path>]
+  repobound explain <capsule> [--query <type>] [--subject <id-or-path>] [--json]
+  repobound mcp [--repository <path>]
+  repobound --help
+  repobound --version
 
 Commands:
   map       Discover and classify repository files without emitting file contents.
@@ -79,7 +79,7 @@ async function packageVersion(): Promise<string> {
 }
 
 function usageError(message: string): ContextForgeError {
-  return new ContextForgeError("USAGE", `${message}\nRun 'contextforge --help' for usage.`);
+  return new ContextForgeError("USAGE", `${message}\nRun 'repobound --help' for usage.`);
 }
 
 export async function run(argv: readonly string[], workingDirectory = process.cwd()): Promise<number> {
@@ -212,7 +212,7 @@ export async function run(argv: readonly string[], workingDirectory = process.cw
     if (parsed.values.out === undefined) process.stdout.write(output);
     else await new FileSystemOutputArtifactWriter().writeExclusive(resolve(workingDirectory, parsed.values.out), output);
     for (const diagnostic of execution.manifest.diagnostics) {
-      process.stderr.write(`ContextForge PACK_DIAGNOSTIC: ${diagnostic}\n`);
+      process.stderr.write(`RepoBound PACK_DIAGNOSTIC: ${diagnostic}\n`);
     }
     return 0;
   }
@@ -238,11 +238,11 @@ async function main(): Promise<void> {
     process.exitCode = await run(process.argv.slice(2));
   } catch (error) {
     if (error instanceof ContextForgeError) {
-      process.stderr.write(`ContextForge ${error.code}: ${error.message}\n`);
+      process.stderr.write(`RepoBound ${error.code}: ${error.message}\n`);
       process.exitCode = error.exitCode;
       return;
     }
-    process.stderr.write("ContextForge INTERNAL: An unexpected error occurred.\n");
+    process.stderr.write("RepoBound INTERNAL: An unexpected error occurred.\n");
     process.exitCode = 70;
   }
 }

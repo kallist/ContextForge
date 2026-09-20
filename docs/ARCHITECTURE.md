@@ -1,4 +1,4 @@
-# ContextForge V1 Architecture
+# RepoBound V1 Architecture
 
 ## V0.4 Review Context
 
@@ -50,7 +50,7 @@ Audit dates: 2026-08-29 (initial), 2026-08-30 (Phases 2–6), 2026-08-31 (Phases
 
 ### Current State
 
-- This directory is the designated ContextForge project root.
+- This directory is the designated RepoBound project root.
 - At the start of this architecture task it was not a Git repository and contained no hidden configuration. Git is initialized during this task on branch `main`, with no commit or remote.
 - The initial audit described the pre-implementation repository. The current repository contains the TypeScript CLI, application/core boundaries, filesystem/Tree-sitter/SQLite adapters, packaged WASM assets, fixtures/tests, npm configuration, and hosted workflow.
 - As of 2026-08-31, Phase 0–8 production and hardening code is implemented. The frozen benchmark strategies and evidence remain unchanged. Local MCP stdio is present; remote providers, remote MCP/HTTP, and actual Codex/Claude Code/Cursor host QA remain absent. The v0.1.0 package metadata is finalized for MIT-licensed public CLI distribution.
@@ -344,7 +344,7 @@ Hard-budget enforcement:
 6. stop after a bounded number of units; never byte-truncate JSON or source mid-line;
 7. if required skeleton plus one useful primary unit cannot fit, return `BUDGET_TOO_SMALL` and no completed pack.
 
-Benchmark token reduction must use the same estimator for baseline and ContextForge output.
+Benchmark token reduction must use the same estimator for baseline and RepoBound output.
 
 ## Section-aware Packing Policy
 
@@ -414,7 +414,7 @@ The first implementation may hold the generation transaction for the whole bound
 - Apply `.gitignore`, `.contextforgeignore`, built-in generated/dependency exclusions, sensitive-name rules, binary detection, encoding validation, and file/work limits before reading for parsing.
 - Recheck path containment and file identity around reads to reduce race-time replacement risk.
 - Never place source secrets in logs, diagnostics, manifests, benchmark artifacts, or SQLite. Diagnostics identify safe relative paths/reason codes without content excerpts.
-- Treat repository instructions and source comments as data, never as commands executed by ContextForge.
+- Treat repository instructions and source comments as data, never as commands executed by RepoBound.
 
 ## Cross-platform and Packaging Strategy
 
@@ -430,11 +430,11 @@ The first implementation may hold the generation transaction for the whole bound
 
 ## MCP Boundary and Transport
 
-Phase 7 implements a separate local stdio adapter with the official split TypeScript SDK. `contextforge mcp --repository <path>` resolves and binds one canonical repository root at process startup. No normal tool accepts a repository argument. The adapter registers only `status`, `index`, `search`, and `pack`; it adds no Resources, Prompts, HTTP server, file watcher, network calls, command execution, arbitrary file access, or hidden indexing.
+Phase 7 implements a separate local stdio adapter with the official split TypeScript SDK. `repobound mcp --repository <path>` resolves and binds one canonical repository root at process startup. No normal tool accepts a repository argument. The adapter registers only `status`, `index`, `search`, and `pack`; it adds no Resources, Prompts, HTTP server, file watcher, network calls, command execution, arbitrary file access, or hidden indexing.
 
 The composition root constructs the existing filesystem, parser, Git, SQLite, Search, and Pack dependencies once for CLI/MCP parity. MCP schemas, annotations, negotiation, and stdio lifecycle stay in `src/adapters/mcp`; the Core contains no MCP types. Pack Markdown appears once as text content, while structured content is bounded source-free metadata. Stdout is reserved for protocol frames and normal successful operation emits no stderr.
 
-The implementation uses `@modelcontextprotocol/server` 2.0.0 and Zod runtime schemas. The SDK's `serveStdio` handles the stable `2026-07-28` discovery/negotiation lifecycle and compatible legacy initialization; ContextForge does not implement JSON-RPC or version shims. See [official package guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/packages.md), [stdio guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/serving/stdio.md), and ADR-008.
+The implementation uses `@modelcontextprotocol/server` 2.0.0 and Zod runtime schemas. The SDK's `serveStdio` handles the stable `2026-07-28` discovery/negotiation lifecycle and compatible legacy initialization; RepoBound does not implement JSON-RPC or version shims. See [official package guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/get-started/packages.md), [stdio guidance](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/serving/stdio.md), and ADR-008.
 
 ## Minimal Hosted CI Design
 
@@ -480,25 +480,25 @@ File nodes are existing `indexed_file` rows and symbol nodes are existing `symbo
 
 JavaScript/TypeScript resolution covers repository-relative literal imports/re-exports/require/dynamic imports, common source extensions, directory indexes, and unique NodeNext compiled-extension mappings. Python covers ordinary repository-root packages with `__init__.py` and explicit relative imports. Alias/compiler-complete resolution, advanced Python import machinery, and non-literal dynamic imports remain out of scope and become unresolved/external rather than guessed.
 
-Graph derivation intentionally performs a full metadata rebuild per generation while Phase 2 parsing remains incremental. Documentation input is bounded to 2,000 approved files or 16 MiB, individual reference/module heuristics are capped, and Git history is bounded to 100 commits by default. `contextforge graph` remains inspection only; Phase 4 consumes this graph through the separate Search use case. See ADR-004.
+Graph derivation intentionally performs a full metadata rebuild per generation while Phase 2 parsing remains incremental. Documentation input is bounded to 2,000 approved files or 16 MiB, individual reference/module heuristics are capped, and Git history is bounded to 100 commits by default. `repobound graph` remains inspection only; Phase 4 consumes this graph through the separate Search use case. See ADR-004.
 
 ### Phase 4 — Task Retrieval and Explainable Ranking
 
-**IMPLEMENTED.** Normalize bounded untrusted tasks into exact and decomposed coding signals; retrieve file envelopes from path, basename, symbol, import/module, and generation-hash-verified source evidence; rank direct candidates; expand bounded imports, reverse imports, tests, and documentation with distance decay and hub damping; weakly rescore existing candidates with generation-bound Git data; and return deterministic text/JSON through `contextforge search`.
+**IMPLEMENTED.** Normalize bounded untrusted tasks into exact and decomposed coding signals; retrieve file envelopes from path, basename, symbol, import/module, and generation-hash-verified source evidence; rank direct candidates; expand bounded imports, reverse imports, tests, and documentation with distance decay and hub damping; weakly rescore existing candidates with generation-bound Git data; and return deterministic text/JSON through `repobound search`.
 
-The implementation preserves symbol-level evidence and ranges inside one file result, uses additive reconstructible score contributions and versioned `contextforge-structural-v1` constants, reports stale/partial lexical verification, and never mutates the index. The source-free Phase 5 manifest now carries pack decisions, but a separate `contextforge explain` command remains deferred. Fuzzy retrieval is deliberately not implemented. See ADR-005.
+The implementation preserves symbol-level evidence and ranges inside one file result, uses additive reconstructible score contributions and versioned `contextforge-structural-v1` constants, reports stale/partial lexical verification, and never mutates the index. The source-free Phase 5 manifest now carries pack decisions, and `repobound explain` exposes recorded decisions. Fuzzy retrieval is deliberately not implemented. See ADR-005.
 
 ### Phase 5 — Token Budget and Context Packs
 
 **IMPLEMENTED.** `BuildContextPack` invokes Phase 4 Search and consumes its exact active snapshot; assigns instruction, primary, dependency, test, documentation, and configuration roles; builds progressively richer whole-file or semantic-range representations; allocates by versioned section policy; and verifies the complete Markdown render with `contextforge-generic-v1`. Exact over-budget output triggers bounded deterministic reduction, while an unusably small budget returns `BUDGET_TOO_SMALL` with no artifact.
 
-Pack reads, hashes, and slices each candidate from the same source string. Hash mismatch, unsafe current-map state, or verification limits exclude content and make the manifest honestly partial. Root `AGENTS.md` is whole-file when small and fence-aware heading-selected when large. Output uses LF, terminal-safe control escaping, and a backtick fence longer than the longest run in source. `contextforge pack` supports Markdown stdout, source-free manifest JSON, and atomic exclusive `--out`; it never mutates the index or overwrites output. See ADR-006.
+Pack reads, hashes, and slices each candidate from the same source string. Hash mismatch, unsafe current-map state, or verification limits exclude content and make the manifest honestly partial. Root `AGENTS.md` is whole-file when small and fence-aware heading-selected when large. Output uses LF, terminal-safe control escaping, and a backtick fence longer than the longest run in source. `repobound pack` supports Markdown stdout, source-free manifest JSON, and atomic exclusive `--out`; it never mutates the index or overwrites output. See ADR-006.
 
 ### Phase 6 — Offline Benchmark
 
 **IMPLEMENTED.** `contextforge-benchmark-v1` freezes 24 manually reviewed Gold tasks across four repository snapshots and compares lexical whole-file, production structural ranking with whole-file packing, and the production rank-and-pack path under one estimator and five hard budgets. Gold is evaluator-only, pinned/curated corpus identities are hashed, invalid entities fail before scoring, quality output is byte-deterministic, and environment-specific performance remains separate. The benchmark is developer tooling rather than a new production CLI command. See ADR-007 and `BENCHMARK_RESULTS_V1.md`.
 
-The first formal result is mixed and retained without production tuning: structural whole-file retrieval underperformed lexical retrieval on this finite dataset, while ContextForge packing improved 8K required-symbol recall and precision over structural whole-file. Matched-recall paired macro token reduction was 1.5% versus lexical and 7.8% versus structural whole-file, so no strong general token-savings claim is justified. External-human review, large external repositories, cross-platform full-run reproduction, and coding-agent task success remain untested.
+The first formal result is mixed and retained without production tuning: structural whole-file retrieval underperformed lexical retrieval on this finite dataset, while RepoBound packing improved 8K required-symbol recall and precision over structural whole-file. Matched-recall paired macro token reduction was 1.5% versus lexical and 7.8% versus structural whole-file, so no strong general token-savings claim is justified. External-human review, large external repositories, cross-platform full-run reproduction, and coding-agent task success remain untested.
 
 ### Phase 7 — MCP and Coding-Agent Integration
 
@@ -519,7 +519,7 @@ Deliver the first real product loop:
 ```text
 install/build local package
         ↓
-contextforge map <repository>
+repobound map <repository>
         ↓
 safe deterministic repository map (text or JSON)
 ```
@@ -572,7 +572,7 @@ Names may adjust during implementation, but dependency direction must remain.
 ### Acceptance Criteria
 
 - `npm ci`, lint, typecheck, tests, build, and local CLI smoke pass on a supported Node 24.15+ environment. The currently audited Node 24.10 installation requires a patch upgrade before this final gate.
-- The built package executes `contextforge map` against a real temporary repository and produces stable text and JSON maps.
+- The built package executes `repobound map` against a real temporary repository and produces stable text and JSON maps.
 - No excluded secret, binary, outside-root, or oversized content is read into output.
 - A non-Git directory works; invalid/outside roots fail safely.
 - Output order and JSON schema are deterministic for identical input.

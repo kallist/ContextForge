@@ -1,8 +1,8 @@
-# ContextForge Agent Instructions
+# RepoBound Agent Instructions
 
 ## Project Context
 
-ContextForge is a local-first, task-aware context compiler for coding agents. It selects and explains the smallest useful repository context that fits a requested token budget. The authoritative product requirements are in [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md). The original source specification remains in [`CONTEXTFORGE_MASTER_SPEC.md`](CONTEXTFORGE_MASTER_SPEC.md) for reference.
+RepoBound is a local-first, task-aware context compiler for coding agents. It selects and explains the smallest useful repository context that fits a requested token budget. The authoritative product requirements are in [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md). The original source specification remains in [`CONTEXTFORGE_MASTER_SPEC.md`](CONTEXTFORGE_MASTER_SPEC.md) for reference.
 
 ## Required Reading
 

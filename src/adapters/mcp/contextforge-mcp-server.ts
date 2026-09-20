@@ -18,9 +18,9 @@ export const MCP_SERVER_NAME = "contextforge";
 export const MCP_TOOL_NAMES = ["status", "index", "search", "pack"] as const;
 export const MCP_SERVER_INSTRUCTIONS = [
   "Use status when index readiness is unknown.",
-  "Use index only to explicitly build or refresh ContextForge local index state; it does not modify repository source.",
+  "Use index only to explicitly build or refresh RepoBound local index state; it does not modify repository source.",
   "Use search to inspect relevant indexed files and symbols.",
-  "Use pack to compile task-relevant repository context under a hard ContextForge token-estimate budget.",
+  "Use pack to compile task-relevant repository context under a hard RepoBound token-estimate budget.",
 ].join(" ");
 
 const taskSchema = z.string()
@@ -131,11 +131,11 @@ function redactRepositoryPath(value: string, rootRealPath: string): string {
 function errorResult(error: unknown, rootRealPath: string): CallToolResult {
   if (error instanceof ContextForgeError) {
     const message = boundedText(redactRepositoryPath(error.message, rootRealPath), MAXIMUM_ERROR_LENGTH);
-    return { isError: true, content: [{ type: "text", text: `ContextForge ${error.code}: ${message}` }] };
+    return { isError: true, content: [{ type: "text", text: `RepoBound ${error.code}: ${message}` }] };
   }
   return {
     isError: true,
-    content: [{ type: "text", text: "ContextForge INTERNAL: An unexpected error occurred." }],
+    content: [{ type: "text", text: "RepoBound INTERNAL: An unexpected error occurred." }],
   };
 }
 
@@ -162,8 +162,8 @@ export function createContextForgeMcpServer(
   server.registerTool(
     "status",
     {
-      title: "ContextForge Status",
-      description: "Check whether the bound repository has a current ContextForge index.",
+      title: "RepoBound Status",
+      description: "Check whether the bound repository has a current RepoBound index.",
       inputSchema: z.object({}).strict(),
       outputSchema: statusOutputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -192,8 +192,8 @@ export function createContextForgeMcpServer(
   server.registerTool(
     "index",
     {
-      title: "Build ContextForge Index",
-      description: "Build or refresh the bound repository's local ContextForge index without modifying source files.",
+      title: "Build RepoBound Index",
+      description: "Build or refresh the bound repository's local RepoBound index without modifying source files.",
       inputSchema: z.object({}).strict(),
       outputSchema: indexOutputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -219,8 +219,8 @@ export function createContextForgeMcpServer(
   server.registerTool(
     "search",
     {
-      title: "Search ContextForge Index",
-      description: "Find files and symbols relevant to a coding task using ContextForge's indexed structural ranking.",
+      title: "Search RepoBound Index",
+      description: "Find files and symbols relevant to a coding task using RepoBound's indexed structural ranking.",
       inputSchema: z.object({
         task: taskSchema,
         limit: z.number().int().min(1).max(STRUCTURAL_V1.cli.maximumLimit).optional(),
@@ -251,7 +251,7 @@ export function createContextForgeMcpServer(
         ...diagnostics(result.diagnostics),
       };
       const lines = [
-        `ContextForge Search — generation ${compact.generation} — ${compact.indexStatus}`,
+        `RepoBound Search — generation ${compact.generation} — ${compact.indexStatus}`,
         ...compact.candidates.map((candidate, index) => `${index + 1}. ${candidate.relativePath} (${candidate.score.toFixed(2)})`),
       ];
       return {
@@ -264,7 +264,7 @@ export function createContextForgeMcpServer(
   server.registerTool(
     "pack",
     {
-      title: "Build ContextForge Pack",
+      title: "Build RepoBound Pack",
       description: "Compile coding-task context from the bound repository into a deterministic hard-budget payload.",
       inputSchema: z.object({
         task: taskSchema,
@@ -313,7 +313,7 @@ export function serveContextForgeMcpStdio(
     () => createContextForgeMcpServer(application, version),
     {
       onerror: () => {
-        process.stderr.write("ContextForge MCP_PROTOCOL_ERROR: The MCP transport reported an error.\n");
+        process.stderr.write("RepoBound MCP_PROTOCOL_ERROR: The MCP transport reported an error.\n");
       },
     },
   );
@@ -329,7 +329,7 @@ export function startContextForgeMcpStdio(
     if (closing) return;
     closing = true;
     void handle.close().catch(() => {
-      process.stderr.write("ContextForge MCP_SHUTDOWN_ERROR: The MCP server did not close cleanly.\n");
+      process.stderr.write("RepoBound MCP_SHUTDOWN_ERROR: The MCP server did not close cleanly.\n");
       process.exitCode = 70;
     });
   };
