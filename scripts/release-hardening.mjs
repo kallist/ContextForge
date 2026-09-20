@@ -9,6 +9,8 @@ import { DatabaseSync } from "node:sqlite";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
+import { observeWindowsProcess, summarizeProcessObservations } from "./release-hardening-process-observer.mjs";
+
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const npmCliPath = process.env.npm_execpath;
 if (typeof npmCliPath !== "string" || npmCliPath.length === 0) {
@@ -170,22 +172,23 @@ async function waitForExit(pid, timeoutMs = 10_000) {
 
 function processObservation(pid) {
   if (process.platform === "win32") {
-    const script = `$p=Get-Process -Id ${pid} -ErrorAction Stop; [pscustomobject]@{rss=$p.WorkingSet64;handles=$p.HandleCount}|ConvertTo-Json -Compress`;
-    const result = run("powershell.exe", ["-NoProfile", "-Command", script], repositoryRoot, { timeout: 10_000 });
-    if (result.status !== 0) return { rssBytes: null, handles: null };
-    const parsed = JSON.parse(result.stdout);
-    return { rssBytes: parsed.rss, handles: parsed.handles };
+    return observeWindowsProcess({ pid, runCommand: run, cwd: repositoryRoot });
   }
   const rss = run("ps", ["-o", "rss=", "-p", String(pid)], repositoryRoot, { timeout: 10_000 });
   const rssBytes = rss.status === 0 ? Number(rss.stdout.trim()) * 1024 : null;
   if (process.platform === "linux") {
     try {
-      return { rssBytes, handles: spawnSync("sh", ["-c", `find /proc/${pid}/fd -mindepth 1 -maxdepth 1 | wc -l`], { encoding: "utf8" }).stdout.trim() };
+      return {
+        rssBytes,
+        handles: spawnSync("sh", ["-c", `find /proc/${pid}/fd -mindepth 1 -maxdepth 1 | wc -l`], { encoding: "utf8" }).stdout.trim(),
+        attempted: true,
+        unavailableReason: null,
+      };
     } catch {
-      return { rssBytes, handles: null };
+      return { rssBytes, handles: null, attempted: true, unavailableReason: "HANDLE_COUNT_UNAVAILABLE" };
     }
   }
-  return { rssBytes, handles: null };
+  return { rssBytes, handles: null, attempted: true, unavailableReason: "HANDLE_COUNT_UNAVAILABLE" };
 }
 
 function createMcpClient(command, args, name) {
@@ -510,12 +513,32 @@ try {
   let peakRssBytes;
   let soakDurationMs;
   let soakError;
+  let windowsObservationUnavailableReason;
+  const processObservations = [];
   const soakCleanupErrors = [];
+  const observeSoakProcess = (pid) => {
+    let observation;
+    if (process.platform === "win32" && windowsObservationUnavailableReason !== undefined) {
+      observation = {
+        rssBytes: null,
+        handles: null,
+        attempted: false,
+        unavailableReason: windowsObservationUnavailableReason,
+      };
+    } else {
+      observation = processObservation(pid);
+      if (process.platform === "win32" && observation.unavailableReason !== null) {
+        windowsObservationUnavailableReason = observation.unavailableReason;
+      }
+    }
+    processObservations.push(observation);
+    return observation;
+  };
   try {
     await soak.client.connect(soak.transport);
     soakPid = soak.transport.pid;
     assert.equal(typeof soakPid, "number");
-    initialProcess = processObservation(soakPid);
+    initialProcess = observeSoakProcess(soakPid);
     peakRssBytes = initialProcess.rssBytes;
     let firstSearchResult;
     let firstPackResult;
@@ -537,12 +560,12 @@ try {
         assert.equal(result.structuredContent?.indexStatus, "CURRENT");
       }
       if (index % 100 === 0) {
-        const observation = processObservation(soakPid);
+        const observation = observeSoakProcess(soakPid);
         if (observation.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, observation.rssBytes);
       }
     }
     soakDurationMs = performance.now() - soakStarted;
-    finalProcess = processObservation(soakPid);
+    finalProcess = observeSoakProcess(soakPid);
     if (finalProcess.rssBytes !== null) peakRssBytes = Math.max(peakRssBytes ?? 0, finalProcess.rssBytes);
   } catch (error) {
     soakError = error;
@@ -572,6 +595,7 @@ try {
 
   const finalHealth = sqliteHealth(databasePath);
   const tarballMetadata = await stat(tarballPath);
+  const processMetrics = summarizeProcessObservations(processObservations);
   process.stdout.write(`${JSON.stringify({
     schemaVersion: "1.0",
     environment: { node: process.version, platform: process.platform, arch: process.arch },
@@ -616,6 +640,7 @@ try {
     soak: {
       requests: soakRequests,
       durationMs: Math.round(soakDurationMs * 100) / 100,
+      processMetrics,
       initialRssBytes: initialProcess.rssBytes,
       peakRssBytes,
       finalRssBytes: finalProcess.rssBytes,
