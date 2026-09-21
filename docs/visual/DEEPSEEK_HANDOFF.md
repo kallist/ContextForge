@@ -68,9 +68,9 @@ required hosted checks without merging.
 - Hosted CI: not run yet for this branch.
 - Published Pages `/proof/`: not deployed until merge to `main`; local static build is tested.
 - Hero is WebM plus a static poster; no large GIF is produced.
-- The legacy `brand:core-freeze` gate rejects all intended `src/adapters/studio/assets/**`
-  changes because it was designed for the earlier rename-only migration. It was not
-  weakened. An exact frozen-engine path diff against `origin/main` passed instead.
+- The production freeze gate now includes the three Studio display assets in its
+  exact audited patch hash. Compiler/ranking/Pack/benchmark/database/MCP paths remain
+  outside the allowlist and unchanged.
 
 ## Validation commands
 
@@ -88,8 +88,8 @@ npm run brand:audit
 Final local evidence: lint PASS; typecheck PASS; production/test builds PASS;
 `npm test` 216 passed / 0 failed; Studio Chromium PASS; five-route Pages Chromium
 PASS at 390/1024/1512; launch validation PASS; brand audit PASS; `git diff --check`
-PASS; frozen compiler/application/composition/SQLite/MCP/filesystem/parser/Git/
-benchmark path diff PASS.
+PASS; production/core freeze PASS; frozen compiler/application/composition/SQLite/
+MCP/filesystem/parser/Git/benchmark path diff PASS.
 
 ## Visual references
 

@@ -9,6 +9,8 @@ const paths = [...new Set([...git("diff", "--name-only", base, "--", "src", "ben
 const brandAllowed = new Set([
   "src/adapters/mcp/contextforge-mcp-server.ts",
   "src/adapters/studio/assets/index.html",
+  "src/adapters/studio/assets/studio.css",
+  "src/adapters/studio/assets/studio.js",
   "src/adapters/sqlite/sqlite-index-repository.ts",
   "src/application/inspect-index.ts",
   "src/application/inspect-repository-graph.ts",
@@ -21,15 +23,15 @@ const brandAllowed = new Set([
   "src/core/explain-context.ts",
 ]);
 const releaseCorrectionAllowed = new Set(["src/adapters/sqlite/sqlite-capsule-history.ts"]);
-assert.deepEqual(paths.filter((path) => !brandAllowed.has(path) && !releaseCorrectionAllowed.has(path)), [], "RepoBound migration plus its audited history release correction may not change compiler, ranking, Pack, or benchmark sources");
+assert.deepEqual(paths.filter((path) => !brandAllowed.has(path) && !releaseCorrectionAllowed.has(path)), [], "RepoBound migration and visual launch may change only the audited display adapter; compiler, ranking, Pack, and benchmark sources stay frozen");
 const auditedPatch = execFileSync("git", ["diff", "--binary", "--no-ext-diff", base, "--", ...[...brandAllowed].sort()], { windowsHide: true });
 const auditedPatchSha256 = createHash("sha256").update(auditedPatch).digest("hex");
 const historyPatch = execFileSync("git", ["diff", "--binary", "--no-ext-diff", base, "--", ...releaseCorrectionAllowed], { windowsHide: true });
 const historyPatchSha256 = createHash("sha256").update(historyPatch).digest("hex");
 assert.equal(
   auditedPatchSha256,
-  "aefd4440cb38571b25d9a552dc7bdb35852709d2a3787b57dce2e4304b7f581e",
-  "The production diff differs from the exact reviewed display-only patch; inspect it before updating this invariant",
+  "ac713a9e23bc99bd855a13ce6ececbcb0105b0033cd6503b73394a459fc80c0d",
+  "The production diff differs from the exact reviewed brand and visual display patch; inspect it before updating this invariant",
 );
 assert.equal(
   historyPatchSha256,
@@ -37,4 +39,4 @@ assert.equal(
   "The history correction differs from the exact reviewed bounded-timeout patch; inspect it before updating this invariant",
 );
 assert.ok(readFileSync("src/core/context-serialization.ts", "utf8").includes("# ContextForge Context Pack"), "Hash-covered legacy Pack heading must remain stable");
-console.log(JSON.stringify({ gate: "RepoBound v0.5.1 production and benchmark freeze", base, changedProductionPaths: paths, auditedPatchSha256, historyPatchSha256, compiler: "UNCHANGED", ranking: "UNCHANGED", pack: "UNCHANGED", gold: "UNCHANGED", v2Promotion: "NONE", databaseSchema: "UNCHANGED", mcpTools: "UNCHANGED", passed: true }));
+console.log(JSON.stringify({ gate: "RepoBound v0.5.1 production, visual adapter, and benchmark freeze", base, changedProductionPaths: paths, auditedPatchSha256, historyPatchSha256, compiler: "UNCHANGED", ranking: "UNCHANGED", pack: "UNCHANGED", gold: "UNCHANGED", v2Promotion: "NONE", databaseSchema: "UNCHANGED", mcpTools: "UNCHANGED", passed: true }));
