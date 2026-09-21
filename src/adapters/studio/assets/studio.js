@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1) || sessionStorage.getItem("contextforge-capability") || "";
 if (location.hash) { sessionStorage.setItem("contextforge-capability", token); history.replaceState(null, "", "/"); }
-let opened = null, entries = [], controls = [], offset = 0;
+let opened = null, entries = [], controls = [], offset = 0, activeCandidateId = null, snapshotEvidence = null, replayStatus = null, snapshotTransition = null;
 const node = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = String(text); if (className) e.className = className; return e; };
 const showStatus = (text) => { $("status").textContent = text; };
 async function api(request) {
@@ -22,12 +22,13 @@ const groups = { proposal: "context", context: "context", review: "context", evi
 function tab(name) {
   const group = groups[name];
   document.querySelectorAll("[data-nav]").forEach((e) => { e.classList.toggle("active", e.dataset.nav === group); if (e.dataset.nav === group) e.setAttribute("aria-current", "page"); else e.removeAttribute("aria-current"); });
-  document.querySelectorAll("[data-tab]").forEach((e) => { e.hidden = groups[e.dataset.tab] !== group || (e.dataset.tab === "review" && !opened?.capsule.deterministic.review); });
+  document.querySelectorAll(".view-tabs [data-tab]").forEach((e) => { e.hidden = e.dataset.tab === "review" && !opened?.capsule.deterministic.review; });
   $("start").hidden = group !== "context"; $("start").classList.toggle("has-result", !!opened);
   $("workspace").hidden = !opened || name === "history";
   $("empty-view").hidden = !!opened || group !== "why";
-  document.querySelectorAll("[data-panel]").forEach((e) => { e.hidden = e.dataset.panel !== name; });
-  document.querySelectorAll("[data-tab]").forEach((e) => { e.classList.toggle("active", e.dataset.tab === name); });
+  const panel = name === "evidence" ? "proposal" : name;
+  document.querySelectorAll("[data-panel]").forEach((e) => { e.hidden = e.dataset.panel !== panel; });
+  document.querySelectorAll(".view-tabs [data-tab]").forEach((e) => { e.classList.toggle("active", e.dataset.tab === name || (name === "evidence" && e.dataset.tab === "proposal")); });
 }
 document.querySelectorAll("[data-nav]").forEach((e) => e.addEventListener("click", () => tab({ context: "proposal", why: "evidence", history: "history" }[e.dataset.nav])));
 document.querySelectorAll("[data-history-action]").forEach((e) => e.addEventListener("click", () => { if (opened) tab(e.dataset.historyAction); else showStatus("Open a saved context first."); }));
@@ -35,6 +36,7 @@ function mode(review) { $("task-composer").hidden = review; $("review-composer")
 $("mode-task").addEventListener("click", () => mode(false));
 $("mode-review").addEventListener("click", () => mode(true));
 document.querySelectorAll("[data-tab]").forEach((e) => e.addEventListener("click", () => tab(e.dataset.tab)));
+$("exact-context-shortcut").addEventListener("click", () => tab("context"));
 async function refreshHistory(more = false) {
   if (!more) { entries = []; offset = 0; }
   const data = await api({ action: "history", offset }); entries.push(...data.entries); offset += data.entries.length;
@@ -53,19 +55,26 @@ async function refreshHistory(more = false) {
 const reasonLabels = { SELECTED: "Included in the context", REQUIRED_INSTRUCTION: "Required repository instruction", BUDGET_EXHAUSTED: "Available budget was exhausted", LOWER_PRIORITY: "Not allocated by the recorded priority decision", DUPLICATE: "Already represented in context", STALE_SOURCE: "Source differs from the indexed version", SECTION_LIMIT: "The section allocation could not fit this candidate", UNSUPPORTED_CONTENT: "Content representation is unsupported", NO_USEFUL_RANGE: "No useful source range was available", SOURCE_VERIFICATION_LIMIT: "Source verification reached its bound", GLOBAL_BUDGET: "The total context budget prevented inclusion", SAFETY_LIMIT: "A safety bound prevented inclusion", REDUNDANT_RANGE: "Source range is already represented" };
 function fact(parent, label, value) { const e = node("div", undefined, "fact"); e.append(node("small", label), node("p", value)); parent.append(e); }
 function display(data) {
-  opened = data; controls = structuredClone(data.capsule.deterministic.overrides[0]?.controls || []); renderControls();
+  opened = data; controls = structuredClone(data.capsule.deterministic.overrides[0]?.controls || []); activeCandidateId = null; snapshotEvidence = null; replayStatus = null;
+  snapshotTransition = data.diff?.candidates?.find((item) => item.before?.disposition && item.after?.disposition && item.before.disposition !== item.after.disposition) || null; renderControls();
   const c = data.capsule.deterministic;
   $("workspace").hidden = false; $("identity").textContent = data.capsule.capsuleHash.slice(0, 12);
   $("usage").textContent = `${c.budget.estimatedTokens.toLocaleString()} / ${c.budget.requested.toLocaleString()}`;
   $("budget-bar").value = 100 * c.budget.utilization;
   $("counts").textContent = `${c.selected.length} selected · ${c.dropped.length} dropped`;
   $("generation").textContent = `gen ${c.repository.activeGeneration} · ${c.repository.gitCommit?.slice(0, 8) || "no Git"}`;
+  $("repo-label").textContent = c.repository.gitCommit ? `Repository · ${c.repository.gitCommit.slice(0, 8)}` : "Local repository";
+  $("index-state").lastChild.textContent = " Indexed";
+  $("result-task").textContent = c.task.text || (c.review ? "Tracked Git change" : "Redacted task");
+  document.querySelectorAll(".capsule-identity").forEach((element) => { element.textContent = data.capsule.capsuleHash.slice(0, 12); });
   $("provenance").textContent = JSON.stringify({ task: c.task, repository: c.repository, strategies: c.strategies, overrides: c.overrides, payloadHash: c.payloadHash, capsuleHash: data.capsule.capsuleHash }, null, 2);
   $("whatif-budget").value = c.budget.requested;
   $("payload").textContent = data.payload || "Exact context is not stored in history. Verify replay to reconstruct it from matching current sources. Path-bearing payloads remain available only through the explicit CLI output boundary.";
   $("payload-note").textContent = data.payload ? `Exact ephemeral payload · SHA-256 ${c.payloadHash}` : data.payloadStatus;
   $("copy").disabled = !data.payload;
-  $("explain").replaceChildren(); $("replay-result").replaceChildren();
+  $("explain").replaceChildren(node("div", undefined, "inspector-empty"));
+  $("explain").firstChild.append(node("span", "→", "inspector-glyph"), node("h3", "Select a file"), node("p", "Inspect why it was selected, dropped, or excluded. These are recorded compiler facts."));
+  $("inspector-controls").hidden = true; $("inspector-controls").replaceChildren(); $("replay-result").replaceChildren();
   renderCandidates(); renderCoverage(data.coverage); renderReview();
   if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab("proposal"); }
 }
@@ -76,10 +85,11 @@ function renderCandidates() {
   for (const candidate of [...c.candidates].sort((a, b) => Number(b.disposition === "SELECTED") - Number(a.disposition === "SELECTED"))) {
     if ($("filter").value !== "ALL" && candidate.disposition !== $("filter").value) continue;
     const file = files.get(candidate.fileRef), selection = c.selected.find((s) => s.candidateRef === candidate.id);
-    const tr = node("tr"); tr.dataset.candidate = candidate.id;
+    const tr = node("tr"); tr.dataset.candidate = candidate.id; tr.dataset.state = candidate.disposition; tr.classList.toggle("active", activeCandidateId === candidate.id);
     const fileCell = node("td"), button = node("button", `${candidate.rank || "—"}  ${file.path}`);
     button.addEventListener("click", () => work("Reading captured explanation…", async () => {
       const result = await api({ action: "explain", id: opened.capsule.capsuleHash, query: { type: `WHY_${candidate.disposition}`, subject: candidate.id } });
+      activeCandidateId = candidate.id;
       const target = $("explain"); target.replaceChildren(node("h3", file.path));
       fact(target, "SELECTION", { SELECTED: "Included in this repository context", DROPPED: "Considered but not selected for this context", EXCLUDED: "Excluded by a recorded boundary" }[candidate.disposition]);
       fact(target, "RECORDED DECISION", result.facts.decisions.map((d) => reasonLabels[d.reason] || "See the recorded reason below").join(" · "));
@@ -90,6 +100,9 @@ function renderCandidates() {
       for (const e of (result.facts.evidence || []).slice(0, 40)) fact(target, `${e.stage} · ${e.derivation}`, `${e.code} · ${e.family}${e.querySignal ? ` · ${e.querySignal}` : ""}`);
       for (const r of (result.facts.review?.impact || []).filter((r) => r.from === file.path || r.to === file.path).slice(0, 20)) fact(target, `${r.type} · ${r.classification}`, `${r.from} → ${r.to}`);
       if ((result.facts.evidence?.length || 0) > 40) fact(target, "BOUNDED DISPLAY", "First 40 evidence records shown. Export Capsule for full captured details.");
+      snapshotEvidence = { path: file.path, state: candidate.disposition, decision: result.facts.decisions.map((d) => reasonLabels[d.reason] || d.reason).join(" · "), relationship: result.facts.review?.impact?.find((r) => r.from === file.path || r.to === file.path) };
+      renderInspectorControls(file.path);
+      renderCandidates();
       tab("evidence");
       target.tabIndex = -1; target.focus();
       showStatus(`Explain: ${result.status}. These are compiler facts, not a model's reasoning.`);
@@ -98,22 +111,27 @@ function renderCandidates() {
     const controlCell = node("td"), select = node("select"); select.setAttribute("aria-label", `Control ${file.path}`);
     for (const optionName of ["—", "PIN", "EXCLUDE", "PREFER", "FOCUS", "RANGE"]) { const option = node("option", { "—": "Automatic", PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus (advanced)", RANGE: "Range (advanced)" }[optionName]); option.value = optionName; select.append(option); }
     select.value = controls.find((control) => control.path === file.path)?.kind || "—";
-    select.addEventListener("change", () => {
-      controls = controls.filter((control) => control.path !== file.path);
-      const kind = select.value;
-      if (kind !== "—") {
-        let control = { kind, path: file.path };
-        if (kind === "FOCUS") control.path = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : file.path;
-        if (kind === "RANGE") {
-          const text = window.prompt("Inclusive verified line range, for example 2-8", "1-3");
-          if (!/^\d+-\d+$/.test(text || "")) { select.value = "—"; renderControls(); return; }
-          const [startLine, endLine] = text.split("-").map(Number); control = { ...control, startLine, endLine };
-        }
-        controls = controls.filter((existing) => !(existing.path === control.path && existing.kind === control.kind)); controls.push(control);
-      }
-      renderControls();
-    });
+    select.addEventListener("change", () => { if (!setControl(file.path, select.value)) select.value = "—"; renderCandidates(); });
     controlCell.append(select); tr.append(fileCell, state, node("td", selection?.estimatedTokens || "—"), controlCell); $("candidates").append(tr);
+  }
+}
+function setControl(path, kind) {
+  controls = controls.filter((control) => control.path !== path);
+  if (kind === "—") { renderControls(); renderInspectorControls(path); return true; }
+  let control = { kind, path };
+  if (kind === "FOCUS") control.path = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path;
+  if (kind === "RANGE") {
+    const text = window.prompt("Inclusive verified line range, for example 2-8", "1-3");
+    if (!/^\d+-\d+$/.test(text || "")) { renderControls(); return false; }
+    const [startLine, endLine] = text.split("-").map(Number); control = { ...control, startLine, endLine };
+  }
+  controls.push(control); renderControls(); renderInspectorControls(path); return true;
+}
+function renderInspectorControls(path) {
+  const target = $("inspector-controls"); target.hidden = false; target.replaceChildren();
+  for (const [kind, label] of [["PIN", "Include"], ["PREFER", "Prefer"], ["EXCLUDE", "Exclude"]]) {
+    const button = node("button", label); button.classList.toggle("active", controls.some((control) => control.kind === kind && control.path === path));
+    button.addEventListener("click", () => { setControl(path, kind); renderCandidates(); showStatus(`${label} ${path} in the next build. Rebuild to create a new Capsule.`); }); target.append(button);
   }
 }
 function renderControls() { $("pending").replaceChildren(...controls.map((c) => node("span", `${({ PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus", RANGE: "Range" })[c.kind]} ${c.path}${c.kind === "RANGE" ? ` L${c.startLine}–${c.endLine}` : ""}`, "chip"))); }
@@ -143,14 +161,79 @@ function renderDiff(diff) {
   }
   if (!diff.candidates.length) target.append(node("p", "No captured candidate changed semantically."));
 }
+function canvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+  const words = String(text || "").split(/\s+/u); const lines = []; let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width <= maxWidth || !line) line = next;
+    else { lines.push(line); line = word; if (lines.length === maxLines - 1) break; }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  const consumed = lines.join(" ").split(/\s+/u).length;
+  if (consumed < words.length && lines.length) { while (ctx.measureText(`${lines.at(-1)}…`).width > maxWidth) lines[lines.length - 1] = lines.at(-1).slice(0, -1); lines[lines.length - 1] += "…"; }
+  lines.forEach((value, index) => ctx.fillText(value, x, y + index * lineHeight)); return y + lines.length * lineHeight;
+}
+function fitPath(ctx, path, maxWidth) {
+  if (ctx.measureText(path).width <= maxWidth) return path;
+  const tail = path.slice(-28); let head = path.slice(0, 18);
+  while (head && ctx.measureText(`${head}…${tail}`).width > maxWidth) head = head.slice(0, -1);
+  return `${head}…${tail}`;
+}
+function renderSnapshot() {
+  if (!opened) return;
+  const canvas = $("snapshot"), ctx = canvas.getContext("2d"), c = opened.capsule.deterministic;
+  const fileMap = new Map(c.files.map((file) => [file.id, file.path]));
+  const selectedPaths = c.selected.map((selection) => c.candidates.find((candidate) => candidate.id === selection.candidateRef)).filter(Boolean).map((candidate) => fileMap.get(candidate.fileRef)).filter(Boolean).slice(0, 5);
+  ctx.clearRect(0, 0, 1200, 630); ctx.fillStyle = "#f8f6f1"; ctx.fillRect(0, 0, 1200, 630);
+  ctx.strokeStyle = "#d4cbbd"; ctx.lineWidth = 1; ctx.strokeRect(28.5, 28.5, 1143, 573);
+  ctx.fillStyle = "#211f1b"; ctx.font = "700 22px Segoe UI, Arial, sans-serif"; ctx.fillText("RepoBound", 66, 76);
+  ctx.strokeStyle = "#211f1b"; ctx.strokeRect(42.5, 49.5, 16, 20); ctx.font = "700 7px Consolas, monospace"; ctx.fillText("RB", 45, 62);
+  ctx.fillStyle = "#a96818"; ctx.font = "700 12px Segoe UI, Arial, sans-serif"; ctx.fillText("CONTEXT SNAPSHOT", 932, 71);
+  ctx.fillStyle = "#827a70"; ctx.font = "12px Consolas, monospace"; ctx.fillText(opened.capsule.capsuleHash.slice(0, 12), 1038, 92);
+  ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(66, 108.5); ctx.lineTo(1134, 108.5); ctx.stroke();
+  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText("TASK", 66, 144);
+  ctx.fillStyle = "#211f1b"; ctx.font = "600 35px Segoe UI, Arial, sans-serif";
+  const taskBottom = canvasText(ctx, c.task.text || (c.review ? "Review tracked Git change" : "Redacted task"), 66, 184, 640, 43, 3);
+  const metricsY = Math.max(310, taskBottom + 30);
+  ctx.fillStyle = "#211f1b"; ctx.font = "650 27px Segoe UI, Arial, sans-serif"; ctx.fillText(String(c.selected.length), 66, metricsY); ctx.fillText(String(c.dropped.length), 190, metricsY); ctx.fillText(`${(c.budget.estimatedTokens / 1000).toFixed(c.budget.estimatedTokens >= 1000 ? 1 : 2)}k`, 330, metricsY);
+  ctx.fillStyle = "#827a70"; ctx.font = "700 10px Segoe UI, Arial, sans-serif"; ctx.fillText("SELECTED", 66, metricsY + 23); ctx.fillText("DROPPED", 190, metricsY + 23); ctx.fillText(`/ ${(c.budget.requested / 1000).toFixed(c.budget.requested >= 1000 ? 0 : 2)}k BUDGET`, 330, metricsY + 23);
+  ctx.fillStyle = "#e7e1d7"; ctx.fillRect(66, metricsY + 42, 620, 4); ctx.fillStyle = "#a96818"; ctx.fillRect(66, metricsY + 42, Math.min(620, 620 * c.budget.utilization), 4);
+  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText("KEY CONTEXT", 66, metricsY + 84);
+  ctx.font = "14px Consolas, monospace"; selectedPaths.forEach((path, index) => { ctx.fillStyle = index === 0 ? "#a96818" : "#5f5a52"; ctx.fillRect(66, metricsY + 105 + index * 28, index === 0 ? 3 : 1, 16); ctx.fillStyle = "#211f1b"; ctx.fillText(fitPath(ctx, path, 585), 81, metricsY + 118 + index * 28); });
+  ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(748.5, 132); ctx.lineTo(748.5, 533); ctx.stroke();
+  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText(snapshotTransition ? "LAST CHANGE" : "WHY", 790, 144);
+  if (snapshotTransition) {
+    ctx.fillStyle = "#211f1b"; ctx.font = "600 17px Consolas, monospace"; ctx.fillText(fitPath(ctx, snapshotTransition.path, 344), 790, 181);
+    ctx.fillStyle = "#a96818"; ctx.font = "700 15px Segoe UI, Arial, sans-serif"; ctx.fillText(`${snapshotTransition.before.disposition} → ${snapshotTransition.after.disposition}`, 790, 214);
+  } else if (snapshotEvidence) {
+    ctx.fillStyle = "#211f1b"; ctx.font = "600 17px Consolas, monospace"; ctx.fillText(fitPath(ctx, snapshotEvidence.path, 344), 790, 181);
+    ctx.fillStyle = "#a96818"; ctx.font = "700 12px Segoe UI, Arial, sans-serif"; ctx.fillText(snapshotEvidence.state, 790, 207);
+    ctx.fillStyle = "#5f5a52"; ctx.font = "15px Segoe UI, Arial, sans-serif"; canvasText(ctx, snapshotEvidence.decision, 790, 242, 330, 24, 5);
+    if (snapshotEvidence.relationship) { ctx.fillStyle = "#827a70"; ctx.font = "12px Consolas, monospace"; canvasText(ctx, `${snapshotEvidence.relationship.from} → ${snapshotEvidence.relationship.to}`, 790, 390, 330, 20, 3); }
+  } else {
+    ctx.fillStyle = "#211f1b"; ctx.font = "600 19px Segoe UI, Arial, sans-serif"; ctx.fillText("Recorded selection", 790, 183);
+    ctx.fillStyle = "#5f5a52"; ctx.font = "15px Segoe UI, Arial, sans-serif"; canvasText(ctx, "Open a file in Why to add its recorded decision to this Snapshot.", 790, 220, 330, 24, 4);
+  }
+  if (replayStatus) { ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText(`REPLAY ${replayStatus}`, 790, 488); }
+  ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(66, 548.5); ctx.lineTo(1134, 548.5); ctx.stroke();
+  ctx.fillStyle = "#5f5a52"; ctx.font = "12px Segoe UI, Arial, sans-serif"; ctx.fillText("Local-first  ·  Hard declared estimator budget  ·  Context evidence, not agent outcome", 66, 580);
+}
+function downloadSnapshot() {
+  renderSnapshot(); $("snapshot").toBlob((blob) => { if (!blob || !opened) return; const url = URL.createObjectURL(blob), link = document.createElement("a"); link.href = url; link.download = `repobound-context-${opened.capsule.capsuleHash.slice(0, 8)}.png`; link.click(); URL.revokeObjectURL(url); }, "image/png");
+}
 $("compile").addEventListener("click", () => work("Compiling safe sources and saving provenance…", async () => { const task = $("task").value; display(await api({ action: "compile", task, budget: Number($("budget").value), refreshIndex: $("refresh").checked })); $("task").value = opened.capsule.deterministic.task.text || ""; await refreshHistory(); showStatus("Compiled and saved. Inspect the proposal, then try a control."); }));
 $("recompile").addEventListener("click", () => work("Applying controls under the same safety and budget rules…", async () => { if (!opened) return; const task = $("replay-task").value; display(await api({ action: "recompile", id: opened.capsule.capsuleHash, budget: Number($("whatif-budget").value), controls, ...(task ? { task } : {}) })); $("replay-task").value = ""; await refreshHistory(); showStatus("New Capsule saved. The original is unchanged; inspect the semantic diff."); }));
-$("verify").addEventListener("click", () => work("Verifying current sources and recompiling recorded inputs…", async () => { const task = $("replay-task").value; const data = await api({ action: "verify", id: opened.capsule.capsuleHash, ...(task ? { task } : {}) }); display(data.opened); $("replay-task").value = ""; tab("replay"); $("replay-result").append(node("h3", data.replay.status), node("p", data.replay.reason)); if (data.replay.changedFiles.length) fact($("replay-result"), "MISMATCHED FILE IDENTITIES", data.replay.changedFiles.join(", ")); showStatus(`Replay: ${data.replay.status}`); }));
+$("verify").addEventListener("click", () => work("Verifying current sources and recompiling recorded inputs…", async () => { const task = $("replay-task").value; const data = await api({ action: "verify", id: opened.capsule.capsuleHash, ...(task ? { task } : {}) }); display(data.opened); replayStatus = data.replay.status; $("replay-task").value = ""; tab("replay"); $("replay-result").append(node("h3", data.replay.status), node("p", data.replay.reason)); if (data.replay.changedFiles.length) fact($("replay-result"), "MISMATCHED FILE IDENTITIES", data.replay.changedFiles.join(", ")); showStatus(`Replay: ${data.replay.status}`); }));
 $("diff").addEventListener("click", () => work("Comparing recorded compilation facts…", async () => { if (!$("compare").value) return; renderDiff(await api({ action: "diff", before: $("compare").value, after: opened.capsule.capsuleHash })); showStatus("Semantic comparison complete."); }));
-$("clear").addEventListener("click", () => { controls = []; renderControls(); renderCandidates(); });
+$("clear").addEventListener("click", () => { controls = []; renderControls(); renderCandidates(); if (snapshotEvidence) renderInspectorControls(snapshotEvidence.path); });
 $("filter").addEventListener("change", renderCandidates);
 $("more").addEventListener("click", () => work("Loading history summaries…", () => refreshHistory(true)));
 $("copy").addEventListener("click", () => work("Copying exact context…", async () => { if (opened?.payload) { await navigator.clipboard.writeText(opened.payload); showStatus("Exact compiled context copied."); } }));
+$("share").addEventListener("click", () => { if (!opened) return; renderSnapshot(); $("share-panel").hidden = false; $("share-close").focus(); });
+$("share-close").addEventListener("click", () => { $("share-panel").hidden = true; $("share").focus(); });
+$("snapshot-download").addEventListener("click", downloadSnapshot);
+$("share-panel").addEventListener("click", (event) => { if (event.target === $("share-panel")) $("share-close").click(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("share-panel").hidden) $("share-close").click(); });
 $("delete").addEventListener("click", () => work("Deleting selected history metadata…", async () => { if (!opened || !window.confirm("Delete this Capsule from local history? This does not securely erase disk pages.")) return; await api({ action: "delete", id: opened.capsule.capsuleHash }); opened = null; $("workspace").hidden = true; tab("history"); await refreshHistory(); showStatus("Capsule removed from local history."); }));
 $("import").addEventListener("change", () => work("Validating imported Capsule…", async () => { const file = $("import").files[0]; if (!file) return; if (file.size > 8 * 1024 * 1024) throw new Error("Capsule exceeds the 8 MiB import limit."); display(await api({ action: "import", capsule: JSON.parse(await file.text()) })); await refreshHistory(); showStatus("Capsule validated and saved. Source bodies were not imported."); }));
 function renderReview() {
