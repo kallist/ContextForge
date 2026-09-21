@@ -33,6 +33,11 @@ try {
   await page.getByRole("button", { name: "Build Context →", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Compiled and saved" }).waitFor();
   assert.ok(await page.locator("#candidates tr").count() > 1);
+  await page.locator("#share").click();
+  assert.deepEqual(await page.locator("#snapshot").evaluate((canvas) => [canvas.width, canvas.height]), [1200, 630]);
+  const download = page.waitForEvent("download"); await page.locator("#snapshot-download").click();
+  assert.match((await download).suggestedFilename(), /^repobound-context-[a-f0-9]{8}\.png$/u);
+  await page.locator("#share-close").click();
   await view(page,"context");
   assert.ok((await page.locator("#payload").textContent()).includes("ContextForge Context Pack"));
   assert.ok(!(await page.locator("body").textContent()).includes("STUDIO_BROWSER_SECRET"));
@@ -72,10 +77,11 @@ try {
   const screenshots = resolve(".studio-output"); await mkdir(screenshots, { recursive: true });
   await page.screenshot({ path: join(screenshots, "studio-workflow.png"), fullPage: true });
   await page.locator('[data-nav="context"]').click(); await page.locator("#mode-task").click();
-  await page.locator("#task").fill("fix ledger <img src=x onerror=window.contextforgeInjected=true>");
+  await page.locator("#task").fill("Investigate a deliberately long session synchronization task statement that must wrap safely in the 1200 by 630 Context Snapshot without hiding the budget or selected files <img src=x onerror=window.contextforgeInjected=true>");
   await page.locator("#refresh").uncheck();
   await page.getByRole("button", { name: "Build Context →", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Compiled and saved" }).waitFor();
+  await page.locator("#share").click(); assert.ok((await page.locator("#snapshot").evaluate((canvas) => canvas.toDataURL("image/png").length)) > 1000); await page.locator("#share-close").click();
   assert.equal(await page.locator("img").count(), 0);
   assert.equal(await page.evaluate(() => globalThis.contextforgeInjected), undefined);
   await page.reload(); await page.getByRole("status").filter({ hasText: "Ready." }).waitFor();
