@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "repobound-proof-v1",
+  "source": "Deterministic local fixtures executed through RepoBound v0.5.1",
+  "generatedFrom": {
+    "taskCapsule": "5a92ee4b45672972ac55d75faf55649272b368586866865919d5d209a773f84b",
+    "rebuiltCapsule": "433630ad6729a7285a3b0a3d0437bdecce94ec29693e75f3ea5eda192375f2cc",
+    "reviewCapsule": "f88df456f0d010903feb799f156fc6ad08958374640ca3bd98e6e61d5bb7d0b5"
+  },
+  "cases": [
+    {
+      "slug": "task-context",
+      "kind": "Task Context",
+      "title": "Fix session race condition",
+      "budget": 800,
+      "estimatedTokens": 669,
+      "selected": 4,
+      "dropped": 11,
+      "files": [
+        "AGENTS.md",
+        "src/session.ts",
+        "src/session-store.ts",
+        "docs/SESSION.md"
+      ],
+      "snapshot": "/assets/context-snapshot.png"
+    },
+    {
+      "slug": "review-context",
+      "kind": "Review Context",
+      "title": "Review a tracked ledger change",
+      "budget": 1000,
+      "estimatedTokens": 823,
+      "selected": 4,
+      "dropped": 7,
+      "changedFiles": [
+        "src/ledger.ts"
+      ],
+      "relationship": {
+        "from": "src/caller7.ts",
+        "to": "src/ledger.ts",
+        "type": "FILE_IMPORTS_FILE",
+        "classification": "STRUCTURAL_FACT"
+      },
+      "coverage": {
+        "represented": 1,
+        "available": 1
+      }
+    },
+    {
+      "slug": "context-debugging",
+      "kind": "Context Debugging",
+      "title": "Why was the integration test dropped?",
+      "file": "integration/session.integration.test.ts",
+      "initial": "DROPPED",
+      "control": "Include",
+      "rebuilt": "SELECTED",
+      "recordedDecision": [
+        "SECTION_LIMIT"
+      ],
+      "beforeCapsule": "5a92ee4b45672972ac55d75faf55649272b368586866865919d5d209a773f84b",
+      "afterCapsule": "433630ad6729a7285a3b0a3d0437bdecce94ec29693e75f3ea5eda192375f2cc"
+    }
+  ]
+}

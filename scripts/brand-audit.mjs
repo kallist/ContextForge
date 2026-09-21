@@ -24,13 +24,14 @@ function stripAllowedPublicLegacy(path, line) {
     "README.md": [
       "RepoBound is the new name of ContextForge.",
       "Existing ContextForge releases remain available",
-      "The historical `@kallist/contextforge@0.5.0` package continues to provide the `contextforge` command",
+      "The historical `@kallist/contextforge@0.5.0` package remains available but deprecated; it provides the old `contextforge` command.",
+      "The historical [`@kallist/contextforge@0.5.0`](https://www.npmjs.com/package/@kallist/contextforge) package remains available but deprecated.",
       "`@kallist/contextforge@0.5.0`",
       "[@kallist/contextforge@0.5.0](https://www.npmjs.com/package/@kallist/contextforge)",
       "MIGRATION_FROM_CONTEXTFORGE.md",
     ],
     "README_ZH.md": ["RepoBound 是原 ContextForge 的新名称。", "既有 ContextForge 发布仍然保留", "`@kallist/contextforge@0.5.0`", "`contextforge` 命令", "MIGRATION_FROM_CONTEXTFORGE.md"],
-    "site/index.html": ["renamed continuation of ContextForge", "<code>@kallist/contextforge@0.5.0</code>", "<code>contextforge</code> command"],
+    "site/index.html": ["<code>@kallist/contextforge@0.5.0</code>", "<code>contextforge</code> command"],
   }[path] ?? (path.startsWith("repobound/references/") ? [".contextforge/history", ".contextforgeignore"] : []);
   return allowed.reduce((value, fragment) => value.replaceAll(fragment, ""), line);
 }
@@ -50,7 +51,7 @@ function category(path, line) {
   if (/^(?:README(?:_ZH)?\.md|site\/|docs\/brand\/|docs\/adr\/ADR-REPOBOUND|docs\/AGENT_SKILL\.md|docs\/RELEASE_(?:NOTES_V0\.5\.1|CHECKLIST)\.md)/u.test(path)) return "OLD_PACKAGE_MIGRATION_DOCUMENTATION";
   if (/^(?:package(?:-lock)?\.json)$/u.test(path) && /contextforge/u.test(line)) return "LEGACY_PACKAGE_EXECUTABLE";
   if (/^(?:test\/|scripts\/|\.github\/)/u.test(path)) return "BACKWARD_COMPATIBILITY_TEST";
-  if (/^(?:src\/|benchmarks\/|repobound\/|docs\/(?:ARCHITECTURE|PRODUCT_SPEC|CONTEXT_CAPSULE|EXPLAIN_CONTRACT|ENGINEERING_REFERENCE)\.md|AGENTS\.md|CONTRIBUTING\.md)/u.test(path)) return "PROTOCOL_SERIALIZED_COMPATIBILITY";
+  if (/^(?:src\/|benchmarks\/|repobound\/|docs\/visual\/|docs\/(?:ARCHITECTURE|PRODUCT_SPEC|CONTEXT_CAPSULE|EXPLAIN_CONTRACT|ENGINEERING_REFERENCE)\.md|AGENTS\.md|CONTRIBUTING\.md)/u.test(path)) return "PROTOCOL_SERIALIZED_COMPATIBILITY";
   return undefined;
 }
 
@@ -92,7 +93,7 @@ assert.doesNotMatch(readme, /^#{1,6} .*ContextForge.*$/mu);
 assert.match(readmeZh, /^# RepoBound$/mu);
 assert.doesNotMatch(readmeZh, /^#{1,6} .*ContextForge.*$/mu);
 assert.match(site, /<title>RepoBound —/u);
-assert.match(site, /<a class="brand" href="#">◈ RepoBound<\/a>/u);
+assert.match(site, /<a class="brand" href="#"><span>RB<\/span> RepoBound<\/a>/u);
 assert.doesNotMatch(site, /<(?:title|h1|h2|h3|header|nav)[^>]*>[^<]*ContextForge/iu);
 assert.match(skill, /^name: repobound$/mu);
 assert.match(cli, /RepoBound — safe repository context discovery/u);
