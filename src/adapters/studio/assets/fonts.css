@@ -1,0 +1,20 @@
+/* RepoBound bundled fonts — latin subset, served locally. No CDN at runtime.
+   IBM Plex Sans (c) 2017 IBM Corp. and JetBrains Mono (c) 2020 The JetBrains Mono
+   Project Authors, both under the SIL Open Font License 1.1. Licence texts ship in
+   ./fonts/licenses/. Both files are variable fonts covering the weights listed below. */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/plex-sans-latin-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-latin-var.woff2") format("woff2");
+}

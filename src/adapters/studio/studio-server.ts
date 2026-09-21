@@ -31,7 +31,15 @@ const requestSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("delete"), id }),
   z.strictObject({ action: z.literal("prune"), keep: z.number().int().min(0).max(2000) }),
 ]);
-const staticFiles = new Map([["/", ["index.html", "text/html; charset=utf-8"]], ["/studio.css", ["studio.css", "text/css; charset=utf-8"]], ["/studio.js", ["studio.js", "text/javascript; charset=utf-8"]]]);
+const fontFaces = ["plex-sans-latin-var.woff2", "jetbrains-mono-latin-var.woff2"];
+const assetRoutes: readonly (readonly [string, string, string])[] = [
+  ["/", "index.html", "text/html; charset=utf-8"],
+  ["/studio.css", "studio.css", "text/css; charset=utf-8"],
+  ["/studio.js", "studio.js", "text/javascript; charset=utf-8"],
+  ["/fonts.css", "fonts.css", "text/css; charset=utf-8"],
+  ...fontFaces.map((name): readonly [string, string, string] => [`/fonts/${name}`, `fonts/${name}`, "font/woff2"]),
+];
+const staticFiles = new Map(assetRoutes.map(([route, name, mime]) => [route, [name, mime] as const]));
 const MAX_BODY = MAX_CAPSULE_BYTES + 64 * 1024;
 function json(response: ServerResponse, status: number, data: unknown): void {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" }); response.end(JSON.stringify(data));
@@ -65,7 +73,7 @@ export async function startStudio(application: BoundContextForgeApplication & Li
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
-    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
     const handle = async (): Promise<void> => {
       if (request.headers.host !== origin.slice(7) || (request.headers.origin !== undefined && request.headers.origin !== origin) || (request.headers["sec-fetch-site"] !== undefined && !["same-origin", "none"].includes(String(request.headers["sec-fetch-site"])))) { json(response, 403, { code: "ORIGIN_REJECTED" }); return; }
       const file = staticFiles.get(request.url ?? "");
