@@ -93,7 +93,7 @@ try {
   const toHex = (rgb) => "#" + rgb.match(/\d+/gu).slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
   const bgHex = toHex(report.contrast.background);
   report.contrast.measured = Object.fromEntries(Object.entries(report.contrast)
-    .filter(([k, v]) => v && typeof v === "object" && v.color)
+    .filter(([, v]) => v && typeof v === "object" && v.color)
     .map(([k, v]) => [k, { hex: toHex(v.color), size: v.size, ratioOnBackground: ratio(toHex(v.color), bgHex) }]));
 
   // ---- capture: context workbench at the three target viewports -------------
