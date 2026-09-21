@@ -6,9 +6,11 @@
 
 RepoBound is a local-first repository context compiler for coding agents. It finds task-relevant code, builds a bounded context pack, explains what was selected or dropped, and lets you control, compare and replay that context.
 
-[![Real RepoBound Studio: task, selected files and context budget](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
+[![Real RepoBound Studio: the task, the capacity ruler showing the declared budget against estimator tokens, and the selected file list](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
 
 **See what your coding agent gets. Change it before the agent starts coding.**
+
+The workbench states one hard fact first: how much of the declared token budget the selected context actually uses. Each row is either **Selected** or **Dropped** — considered but not selected, never hidden — and selecting any row shows the recorded evidence behind that decision.
 
 [Proof Lab](https://kallist.github.io/RepoBound/proof/) · [Documentation](docs/PRODUCT_SPEC.md) · [GitHub Pages](https://kallist.github.io/RepoBound/)
 
@@ -31,7 +33,7 @@ Agent user? Start with the [Agent integration guide](docs/AGENT_SKILL.md). Studi
 ## A 30-second tour
 
 1. Enter **Fix session race condition** and build task context.
-2. Inspect selected and dropped files, the budget, and **Exact context**.
+2. Read the capacity ruler, then select selected or dropped files to inspect the recorded evidence and **Exact context**.
 3. Include a dropped test, rebuild, inspect **Dropped → Selected**, and replay.
 
 The images and [18-second WebM demo](https://kallist.github.io/RepoBound/assets/repobound-hero.webm) come from a real local Studio running a synthetic session fixture. They demonstrate context selection, not a model fixing a bug. Reproduce from a checkout with `npm ci`, `npx playwright install chromium`, `npm run build` and `node scripts/launch-assets.mjs` (Linux may require `npx playwright install --with-deps chromium`). The demo uses 800 estimator tokens to expose budget pressure; ordinary tasks default to 8,000 in Studio.

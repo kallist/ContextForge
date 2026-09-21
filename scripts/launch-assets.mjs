@@ -57,7 +57,8 @@ try {
   await writeFile("docs/assets/context-snapshot.png", snapshotBytes); await copyFile("docs/assets/context-snapshot.png", "docs/assets/social-card.png");
   await page.locator("#share-close").click();
   await page.locator('[data-nav="context"]').click(); await page.locator('[data-tab="proposal"]').click();
-  await testRow.getByRole("combobox").selectOption("PIN"); await page.locator("#recompile").click(); await page.locator("#status").filter({ hasText: "New Capsule saved" }).waitFor(); await pause(100);
+  await testRow.getByRole("button").click(); await page.locator("#status").filter({ hasText: "Explain: OK" }).waitFor();
+  await page.getByRole("toolbar", { name: "Actions for selected files" }).getByRole("button", { name: "Include", exact: true }).click(); await page.locator("#recompile").click(); await page.locator("#status").filter({ hasText: "New Capsule saved" }).waitFor(); await pause(100);
   const rebuilt = apiResults.findLast((result) => result.diff); assert.ok(rebuilt, "Rebuild response must be recorded");
   const transition = rebuilt.diff.candidates.find((candidate) => candidate.path === "integration/session.integration.test.ts");
   assert.equal(transition?.before?.disposition, "DROPPED"); assert.equal(transition?.after?.disposition, "SELECTED");
@@ -90,7 +91,8 @@ try {
   const demo = await videoContext.newPage(); await demo.goto(studio.url); await demo.locator("#status").filter({ hasText: "Ready." }).waitFor(); await pause(800);
   await demo.locator("#task").pressSequentially("Fix session race condition", { delay: 32 }); await pause(500); await demo.locator("#budget").fill("800"); await demo.locator("#compile").click(); await demo.locator("#status").filter({ hasText: "Compiled and saved" }).waitFor(); await pause(2200);
   await demo.locator("#filter").selectOption("DROPPED"); const videoRow = demo.locator("#candidates tr").filter({ hasText: "integration/session.integration.test.ts" }); await videoRow.getByRole("button").click(); await demo.locator("#status").filter({ hasText: "Explain: OK" }).waitFor(); await pause(2400);
-  await demo.locator('[data-nav="context"]').click(); await demo.locator('[data-tab="proposal"]').click(); await videoRow.getByRole("combobox").selectOption("PIN"); await pause(1300); await demo.locator("#recompile").click(); await demo.locator("#status").filter({ hasText: "New Capsule saved" }).waitFor(); await pause(2600);
+  await demo.locator('[data-nav="context"]').click(); await demo.locator('[data-tab="proposal"]').click(); await videoRow.getByRole("button").click(); await demo.locator("#status").filter({ hasText: "Explain: OK" }).waitFor(); await pause(900);
+  await demo.getByRole("toolbar", { name: "Actions for selected files" }).getByRole("button", { name: "Include", exact: true }).click(); await pause(1300); await demo.locator("#recompile").click(); await demo.locator("#status").filter({ hasText: "New Capsule saved" }).waitFor(); await pause(2600);
   const video = demo.video(); await demo.close(); await videoContext.close(); const videoPath = await video.path(); await copyFile(videoPath, "docs/assets/repobound-hero.webm");
   assert.ok((await stat("docs/assets/repobound-hero.webm")).size < 20 * 1024 * 1024, "Hero WebM must remain under 20 MiB");
   assert.deepEqual(errors, []); assert.deepEqual(remote, []);

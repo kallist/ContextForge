@@ -2,8 +2,8 @@
   "schemaVersion": "repobound-proof-v1",
   "source": "Deterministic local fixtures executed through RepoBound v0.5.1",
   "generatedFrom": {
-    "taskCapsule": "5a92ee4b45672972ac55d75faf55649272b368586866865919d5d209a773f84b",
-    "rebuiltCapsule": "433630ad6729a7285a3b0a3d0437bdecce94ec29693e75f3ea5eda192375f2cc",
+    "taskCapsule": "bca3dc6fbe1cdf8d2a5b72630541b305b7dc6f1cd95dfbdea2c8318624f0f176",
+    "rebuiltCapsule": "ec9fbc6dc09cf4c97329ca20ab75b45b3e3a4462b9ad1015c12de50613bf4da6",
     "reviewCapsule": "f88df456f0d010903feb799f156fc6ad08958374640ca3bd98e6e61d5bb7d0b5"
   },
   "cases": [
@@ -56,8 +56,8 @@
       "recordedDecision": [
         "SECTION_LIMIT"
       ],
-      "beforeCapsule": "5a92ee4b45672972ac55d75faf55649272b368586866865919d5d209a773f84b",
-      "afterCapsule": "433630ad6729a7285a3b0a3d0437bdecce94ec29693e75f3ea5eda192375f2cc"
+      "beforeCapsule": "bca3dc6fbe1cdf8d2a5b72630541b305b7dc6f1cd95dfbdea2c8318624f0f176",
+      "afterCapsule": "ec9fbc6dc09cf4c97329ca20ab75b45b3e3a4462b9ad1015c12de50613bf4da6"
     }
   ]
 }

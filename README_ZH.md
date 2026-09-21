@@ -6,9 +6,11 @@
 
 RepoBound 是编程 Agent 的仓库上下文控制层。它按任务寻找相关代码，在声明预算内生成上下文包，解释文件为何入选或被丢弃，并让你在交给 Agent 前控制、比较和重放上下文。
 
-[![真实 RepoBound Studio：任务、文件选择和预算](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
+[![真实 RepoBound Studio：任务、预算刻度尺与入选文件列表](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
 
 **先看见 Agent 会拿到什么，再在编码开始前调整它。**
+
+工作台首先陈述一个硬事实：入选的上下文实际占用了声明 token 预算的多少。每一行要么是 **Selected**，要么是 **Dropped**——被考虑但未入选，永远不会被隐藏。选中任意一行即可查看该决定背后的已记录证据。
 
 [Proof Lab](https://kallist.github.io/RepoBound/proof/) · [文档](docs/PRODUCT_SPEC.md) · [GitHub Pages](https://kallist.github.io/RepoBound/)
 
@@ -25,7 +27,7 @@ repobound studio
 
 ## 30 秒了解
 
-输入“Fix session race condition”，构建上下文。查看入选和丢弃的文件、预算与 Exact context。将一个丢弃的测试设为 Include，重建后查看 Dropped → Selected，再验证重放。
+输入“Fix session race condition”，构建上下文。先读预算刻度尺，再选中入选或丢弃的文件查看已记录证据与 Exact context。将一个丢弃的测试设为 Include，重建后查看 Dropped → Selected，再验证重放。
 
 截图与 [18 秒 WebM 演示](https://kallist.github.io/RepoBound/assets/repobound-hero.webm) 来自真实产品运行的合成 session fixture，不代表模型完成了代码修复。演示使用 800 估算 tokens 以显示预算压力；Studio 普通任务默认 8,000。从源码运行：依次执行 `npm ci`、`npx playwright install chromium`、`npm run build` 和 `node scripts/launch-assets.mjs`。Linux 可能需要 `npx playwright install --with-deps chromium` 安装系统依赖。
 
