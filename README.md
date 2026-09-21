@@ -6,9 +6,13 @@
 
 RepoBound is a local-first repository context compiler for coding agents. It finds task-relevant code, builds a bounded context pack, explains what was selected or dropped, and lets you control, compare and replay that context.
 
-![Real RepoBound Studio: task, selected files and context budget](docs/assets/repobound-hero.png)
+[![Real RepoBound Studio: task, selected files and context budget](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
 
-[![MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+**See what your coding agent gets. Change it before the agent starts coding.**
+
+[Proof Lab](https://kallist.github.io/RepoBound/proof/) · [Documentation](docs/PRODUCT_SPEC.md) · [GitHub Pages](https://kallist.github.io/RepoBound/)
+
+[![MIT](https://img.shields.io/badge/license-MIT-C58A35)](LICENSE)
 
 > RepoBound is the new name of ContextForge. Existing ContextForge releases remain available, and v0.5.1 preserves the validated engine, serialized contracts and local-state compatibility.
 
@@ -20,7 +24,7 @@ npm install -g @kallist/repobound
 repobound studio
 ```
 
-These are the v0.5.1 release-target commands; `@kallist/repobound` is not public until the final release gate completes. The historical `@kallist/contextforge@0.5.0` package continues to provide the `contextforge` command. RepoBound provides only the canonical `repobound` command, so both packages can coexist during migration.
+`@kallist/repobound@0.5.1` is the current public package. The historical `@kallist/contextforge@0.5.0` package remains available but deprecated; it provides the old `contextforge` command. RepoBound provides the canonical `repobound` command, so both packages can coexist during migration.
 
 Agent user? Start with the [Agent integration guide](docs/AGENT_SKILL.md). Studio is the quickest way to see the product; the CLI exposes the full workflow.
 
@@ -30,7 +34,7 @@ Agent user? Start with the [Agent integration guide](docs/AGENT_SKILL.md). Studi
 2. Inspect selected and dropped files, the budget, and **Exact context**.
 3. Include a dropped test, rebuild, inspect **Dropped → Selected**, and replay.
 
-The images come from a real local Studio running a synthetic session fixture. They demonstrate context selection, not a model fixing a bug. Reproduce from a checkout with `npm ci`, `npx playwright install chromium`, `npm run build` and `node scripts/launch-assets.mjs` (Linux may require `npx playwright install --with-deps chromium`). The demo uses 800 estimator tokens to expose budget pressure; ordinary tasks default to 8,000 in Studio 2.0.
+The images and [18-second WebM demo](https://kallist.github.io/RepoBound/assets/repobound-hero.webm) come from a real local Studio running a synthetic session fixture. They demonstrate context selection, not a model fixing a bug. Reproduce from a checkout with `npm ci`, `npx playwright install chromium`, `npm run build` and `node scripts/launch-assets.mjs` (Linux may require `npx playwright install --with-deps chromium`). The demo uses 800 estimator tokens to expose budget pressure; ordinary tasks default to 8,000 in Studio.
 
 ## Why RepoBound?
 
@@ -53,7 +57,7 @@ This refers to repository context supplied by RepoBound. System instructions, co
 | CLI | Full scripting, Review and lifecycle workflows |
 | Studio | Visual inspection and human context controls |
 
-RepoBound v0.5.1 includes one canonical Agent Skill. After the repository rename, install it in the project where you want to use it:
+RepoBound v0.5.1 includes one canonical Agent Skill. Install it in the project where you want to use it:
 
 ```sh
 npx skills@1.5.26 add kallist/RepoBound --skill repobound --agent codex --copy --yes
@@ -89,6 +93,12 @@ Review traces bounded structural evidence, not complete runtime impact. Stage ne
 ![Exact repository context in the real RepoBound Studio](docs/assets/repobound-context.png)
 ![Recorded evidence for a dropped candidate](docs/assets/repobound-why.png)
 
+## Share a factual Context Snapshot
+
+![RepoBound Context Snapshot generated from a real deterministic Capsule](docs/assets/context-snapshot.png)
+
+The Snapshot reports recorded task, budget, selection, and Why evidence. It does not claim coding success, accuracy, productivity, completeness, or token savings. Explore the three real fixture cases in the [RepoBound Proof Lab](https://kallist.github.io/RepoBound/proof/).
+
 ## Measured evidence
 
 The frozen offline benchmark measures context selection, not coding-agent success. Results are mixed; no general token-saving or accuracy claim follows. The historical matrix contains 720 cases and the Capsule conformance matrix contains 240. For measured outcomes and limitations, see [V0.2 evidence](docs/V0.2_FINAL_EVALUATION.md) and the [benchmark protocol](docs/BENCHMARK.md).
@@ -107,10 +117,10 @@ No model API, source upload, telemetry or account is required. Studio binds loop
 
 ## Install and documentation
 
-The release target is `@kallist/repobound@0.5.1` in [kallist/RepoBound](https://github.com/kallist/RepoBound). Before final publication, the current public stable package remains [@kallist/contextforge@0.5.0](https://www.npmjs.com/package/@kallist/contextforge).
+The current release is [`@kallist/repobound@0.5.1`](https://www.npmjs.com/package/@kallist/repobound) in [kallist/RepoBound](https://github.com/kallist/RepoBound). The historical [`@kallist/contextforge@0.5.0`](https://www.npmjs.com/package/@kallist/contextforge) package remains available but deprecated.
 
 [Agent setup](docs/AGENT_SKILL.md) · [Migration guide](docs/brand/MIGRATION_FROM_CONTEXTFORGE.md) · [Lifecycle guide](docs/V0.3_PRODUCT_GUIDE.md) · [Review guide](docs/V0.4_PRODUCT_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Engineering reference](docs/ENGINEERING_REFERENCE.md) · [Product specification](docs/PRODUCT_SPEC.md)
 
 ## Contributing
 
-Read [CONTRIBUTING](CONTRIBUTING.md) for development and validation, and [SECURITY](SECURITY.md) for private vulnerability reporting. Discuss ideas in [Discussions](https://github.com/kallist/RepoBound/discussions) after the repository rename. [MIT licensed](LICENSE).
+Read [CONTRIBUTING](CONTRIBUTING.md) for development and validation, and [SECURITY](SECURITY.md) for private vulnerability reporting. Discuss ideas in [Discussions](https://github.com/kallist/RepoBound/discussions). [MIT licensed](LICENSE).

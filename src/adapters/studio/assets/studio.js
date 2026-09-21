@@ -171,6 +171,7 @@ function canvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   if (line && lines.length < maxLines) lines.push(line);
   const consumed = lines.join(" ").split(/\s+/u).length;
   if (consumed < words.length && lines.length) { while (ctx.measureText(`${lines.at(-1)}…`).width > maxWidth) lines[lines.length - 1] = lines.at(-1).slice(0, -1); lines[lines.length - 1] += "…"; }
+  for (let index = 0; index < lines.length; index += 1) { if (ctx.measureText(lines[index]).width > maxWidth) { while (lines[index] && ctx.measureText(`${lines[index]}…`).width > maxWidth) lines[index] = lines[index].slice(0, -1); lines[index] += "…"; } }
   lines.forEach((value, index) => ctx.fillText(value, x, y + index * lineHeight)); return y + lines.length * lineHeight;
 }
 function fitPath(ctx, path, maxWidth) {

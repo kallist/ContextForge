@@ -64,7 +64,7 @@ try {
   await page.screenshot({ path: ".studio-output/studio-rebuild.png" });
   for (const [width, height] of [[1024, 768], [1280, 800], [1512, 982]]) {
     await page.setViewportSize({ width, height }); await page.locator('[data-nav="context"]').click(); await page.locator('[data-tab="proposal"]').click();
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.ok(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth));
     await page.screenshot({ path: `.studio-output/studio-launch-${width}.png` });
   }
 

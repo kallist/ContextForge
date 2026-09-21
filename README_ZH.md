@@ -6,7 +6,11 @@
 
 RepoBound 是编程 Agent 的仓库上下文控制层。它按任务寻找相关代码，在声明预算内生成上下文包，解释文件为何入选或被丢弃，并让你在交给 Agent 前控制、比较和重放上下文。
 
-![真实 RepoBound Studio：任务、文件选择和预算](docs/assets/repobound-hero.png)
+[![真实 RepoBound Studio：任务、文件选择和预算](docs/assets/repobound-hero.png)](https://kallist.github.io/RepoBound/proof/)
+
+**先看见 Agent 会拿到什么，再在编码开始前调整它。**
+
+[Proof Lab](https://kallist.github.io/RepoBound/proof/) · [文档](docs/PRODUCT_SPEC.md) · [GitHub Pages](https://kallist.github.io/RepoBound/)
 
 > RepoBound 是原 ContextForge 的新名称。既有 ContextForge 发布仍然保留；v0.5.1 保持已验证的引擎、序列化协议和本地状态兼容。
 
@@ -17,13 +21,13 @@ npm install -g @kallist/repobound
 repobound studio
 ```
 
-以上是 v0.5.1 最终发布后的目标命令；在最终发布门禁完成前，`@kallist/repobound` 尚未公开。旧的 `@kallist/contextforge@0.5.0` 包继续提供 `contextforge` 命令；新的 `@kallist/repobound` 只提供规范的 `repobound` 命令，两个包可以在迁移期间同时安装。Agent 用户可阅读[集成指南](docs/AGENT_SKILL.md)。
+`@kallist/repobound@0.5.1` 已公开发布。旧的 `@kallist/contextforge@0.5.0` 包仍可用但已弃用，并继续提供旧的 `contextforge` 命令；`@kallist/repobound` 提供规范的 `repobound` 命令，两个包可以在迁移期间同时安装。Agent 用户可阅读[集成指南](docs/AGENT_SKILL.md)。
 
 ## 30 秒了解
 
 输入“Fix session race condition”，构建上下文。查看入选和丢弃的文件、预算与 Exact context。将一个丢弃的测试设为 Include，重建后查看 Dropped → Selected，再验证重放。
 
-截图来自真实产品运行的合成 session fixture，不代表模型完成了代码修复。演示使用 800 估算 tokens 以显示预算压力；Studio 2.0 普通任务默认 8,000。从源码运行：依次执行 `npm ci`、`npx playwright install chromium`、`npm run build` 和 `node scripts/launch-assets.mjs`。Linux 可能需要 `npx playwright install --with-deps chromium` 安装系统依赖。
+截图与 [18 秒 WebM 演示](https://kallist.github.io/RepoBound/assets/repobound-hero.webm) 来自真实产品运行的合成 session fixture，不代表模型完成了代码修复。演示使用 800 估算 tokens 以显示预算压力；Studio 普通任务默认 8,000。从源码运行：依次执行 `npm ci`、`npx playwright install chromium`、`npm run build` 和 `node scripts/launch-assets.mjs`。Linux 可能需要 `npx playwright install --with-deps chromium` 安装系统依赖。
 
 ## 为什么使用它
 
@@ -42,7 +46,7 @@ RepoBound 的可见范围是它提供的仓库上下文；系统指令、对话�
 | CLI | 完整自动化、Review 与生命周期操作 |
 | Studio | 可视化检查与人工控制 |
 
-RepoBound v0.5.1 提供一个规范的 Agent Skill。仓库完成改名后，在需要使用它的项目目录中安装：
+RepoBound v0.5.1 提供一个规范的 Agent Skill。在需要使用它的项目目录中安装：
 
 ```sh
 npx skills@1.5.26 add kallist/RepoBound --skill repobound --agent codex --copy --yes
@@ -67,6 +71,12 @@ Include / Exclude / Prefer 调整现有安全候选，重建产生新的不可�
 ![真实的精确上下文](docs/assets/repobound-context.png)
 ![被丢弃候选的记录证据](docs/assets/repobound-why.png)
 
+## 可分享的 Context Snapshot
+
+![由真实确定性 Capsule 生成的 RepoBound Context Snapshot](docs/assets/context-snapshot.png)
+
+Snapshot 只展示已记录的任务、预算、选择和 Why 证据，不声称编码成功率、准确率、生产力、完整性或 token 节省有所提升。三个真实 fixture 案例见 [RepoBound Proof Lab](https://kallist.github.io/RepoBound/proof/)。
+
 ## 实测与边界
 
 冻结离线矩阵包含 720 个历史案例，Capsule 一致性矩阵包含 240 个案例。实测结果与局限见[评估证据](docs/V0.2_FINAL_EVALUATION.md)和[基准协议](docs/BENCHMARK.md)。结果有利有弊，不支持一般性的 token 节省或 Agent 准确率提升结论。
@@ -85,4 +95,4 @@ Include / Exclude / Prefer 调整现有安全候选，重建产生新的不可�
 
 ## 安装、文档与贡献
 
-[迁移说明](docs/brand/MIGRATION_FROM_CONTEXTFORGE.md) · [Agent 集成](docs/AGENT_SKILL.md) · [架构](docs/ARCHITECTURE.md) · [工程参考](docs/ENGINEERING_REFERENCE.md) · [贡献指南](CONTRIBUTING.md) · [未来 RepoBound 仓库](https://github.com/kallist/RepoBound) · [MIT 许可证](LICENSE)
+[迁移说明](docs/brand/MIGRATION_FROM_CONTEXTFORGE.md) · [Agent 集成](docs/AGENT_SKILL.md) · [架构](docs/ARCHITECTURE.md) · [工程参考](docs/ENGINEERING_REFERENCE.md) · [贡献指南](CONTRIBUTING.md) · [源码仓库](https://github.com/kallist/RepoBound) · [MIT 许可证](LICENSE)

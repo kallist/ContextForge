@@ -25,7 +25,7 @@ try {
     await page.goto(origin + route);
     assert.ok((await page.locator("body").innerText()).includes("RepoBound"));
     for (const [width, height] of [[390, 844], [1024, 768], [1512, 982]]) {
-      await page.setViewportSize({ width, height }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.setViewportSize({ width, height }); assert.ok(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth));
       assert.equal(await page.locator("img").evaluateAll((images) => images.filter((image) => !image.complete || image.naturalWidth === 0).length), 0);
       if (route === "/" && width === 1512) await page.screenshot({ path: ".studio-output/site-home-desktop.png", fullPage: true });
       if (route === "/" && width === 390) await page.screenshot({ path: ".studio-output/site-home-mobile.png", fullPage: true });

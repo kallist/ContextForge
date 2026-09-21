@@ -6,35 +6,40 @@
 
 ## Current commit
 
-`274076fcd00ec25097a03e84b3655e7e18e0024a` (visual work not committed yet)
+`25f155a5507d1d9c43e53b321c86d1999d6d01f6` (latest implementation commit before this handoff refresh)
 
 ## Completed
 
-- Repository, architecture, public copy, Studio, Pages, and browser-test audit.
-- Visual system and acceptance specifications frozen in `docs/visual/`.
+- Studio 3.0 warm-light Context → Why workbench and responsive layout.
+- Contextual controls, preserved deep views, keyboard focus, and no-green state system.
+- Local Canvas Context Snapshot with 1200×630 PNG download.
+- Deterministic task/review/debugging fixture evidence and proof manifest.
+- Three-case static Proof Lab at `/proof/`.
+- 12–20 second WebM Hero, Pages redesign, README/README_ZH visual-first refresh.
+- Stale public pre-release copy removed from README and Pages surfaces.
+- Real Chromium screenshots reviewed at required Studio, Pages, Proof, and mobile sizes.
 
 ## Remaining
 
-- Studio 3.0 implementation and screenshots.
-- Context Snapshot implementation, deterministic fixture, PNG validation.
-- Three-case Proof Lab, Pages alignment, Hero demo, README refresh.
-- Targeted validation, final review, logical commits, push, and one Draft PR.
+- Commit this README/handoff refresh.
+- Push the branch and create one Draft PR; do not merge.
+- Hosted CI and Pages preview remain pending until the Draft PR is created.
 
 ## Files changed
 
-- `docs/visual/DESIGN_SYSTEM.md`
-- `docs/visual/STUDIO_3_SPEC.md`
-- `docs/visual/SNAPSHOT_SPEC.md`
-- `docs/visual/PROOF_LAB_SPEC.md`
-- `docs/visual/VISUAL_ACCEPTANCE.md`
-- `docs/visual/DEEPSEEK_HANDOFF.md`
+- `src/adapters/studio/assets/{index.html,studio.css,studio.js}`
+- `scripts/{studio-e2e,launch-assets,build-site,site-e2e,launch-validate,brand-audit}.mjs`
+- `site/index.html`, `site/site.css`, `site/proof/**`
+- `docs/assets/{repobound-hero.png,repobound-context.png,repobound-why.png,context-snapshot.png,repobound-hero.webm,social-card.png,repobound-flow.svg}`
+- `docs/visual/**`, `README.md`, `README_ZH.md`
 
 ## Design decisions frozen
 
 - Warm-light neutral system with restrained dark amber `#a96818` emphasis.
 - Native HTML/CSS/JS; Canvas snapshot; static Proof Lab.
 - Context → Why workbench is the central Studio composition.
-- Snapshot and Proof data must come from real deterministic RepoBound fixtures.
+- Snapshot and Proof data come from real deterministic RepoBound fixtures.
+- Public evidence says what RepoBound produced, never what a coding model achieved.
 
 ## Do not change
 
@@ -46,32 +51,45 @@ MCP, SQLite schema, or `.contextforge` state semantics.
 
 ## Exact next task
 
-Refactor `src/adapters/studio/assets/index.html` and `studio.css` into the Studio 3.0
-Context → Why workbench while retaining current element IDs and API-backed behavior.
-Then adapt `studio.js` for inline inspection and contextual controls.
+Commit the documentation refresh, push `feat/visual-launch-system`, and create one
+Draft PR titled `feat: introduce RepoBound visual launch system`. Then observe the
+required hosted checks without merging.
 
 ## Acceptance criteria
 
-- Meets `STUDIO_3_SPEC.md` and `VISUAL_ACCEPTANCE.md`.
-- Existing Studio API/browser tests stay behaviorally strong.
-- 1512×982, 1280×800, and 1024×768 screenshots inspected with no overflow.
+- `npm run lint`, `typecheck`, `test`, `build`, `studio:e2e`, `site:e2e`, and
+  `launch:validate` pass in the final recorded run.
+- Diff contains no compiler/retrieval/ranking/Pack/database/MCP semantic change.
+- Draft PR includes screenshots, Snapshot, Hero, design summary, claim boundary,
+  and actual validation results. It remains unmerged.
 
 ## Known issues
 
-- Current public README and Pages contain stale “not public until release” copy.
-- Current Studio uses a dark green-accent dashboard-like layout.
-- Current launch asset script creates a manually styled dark social card.
+- Hosted CI: not run yet for this branch.
+- Published Pages `/proof/`: not deployed until merge to `main`; local static build is tested.
+- Hero is WebM plus a static poster; no large GIF is produced.
+- The legacy `brand:core-freeze` gate rejects all intended `src/adapters/studio/assets/**`
+  changes because it was designed for the earlier rename-only migration. It was not
+  weakened. An exact frozen-engine path diff against `origin/main` passed instead.
 
 ## Validation commands
 
 ```sh
 npm run lint
 npm run typecheck
+npm test
 npm run build
 npm run studio:e2e
 npm run site:e2e
 npm run launch:validate
+npm run brand:audit
 ```
+
+Final local evidence: lint PASS; typecheck PASS; production/test builds PASS;
+`npm test` 216 passed / 0 failed; Studio Chromium PASS; five-route Pages Chromium
+PASS at 390/1024/1512; launch validation PASS; brand audit PASS; `git diff --check`
+PASS; frozen compiler/application/composition/SQLite/MCP/filesystem/parser/Git/
+benchmark path diff PASS.
 
 ## Visual references
 
@@ -81,6 +99,8 @@ npm run launch:validate
 
 ## Last screenshots
 
-- Baseline v0.5.1 assets: `docs/assets/repobound-hero.png`,
-  `docs/assets/repobound-context.png`, `docs/assets/repobound-why.png`.
-- Studio 3.0 screenshots: not captured yet.
+- Studio: `.studio-output/studio-launch-{1024,1280,1512}.png`
+- Snapshot: `docs/assets/context-snapshot.png` (1200×630)
+- Proof Lab: `.studio-output/proof-lab-{desktop,mobile}.png`
+- Pages: `.studio-output/site-home-{desktop,mobile}.png`
+- Hero: `docs/assets/repobound-hero.webm`
