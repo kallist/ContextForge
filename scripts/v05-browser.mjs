@@ -26,16 +26,23 @@ try{
  assert.equal(await page.locator('h1').innerText(),'What should your agent see?');assert.equal(await page.locator('[data-nav]').count(),3);assert.equal(await page.locator('#budget').inputValue(),'8000');assert.equal(new URL(page.url()).hash,'');
  await page.locator('#task').fill('Fix session expiration race condition');await page.locator('#budget').fill('1200');const buildStart=performance.now();await page.locator('#compile').click();await page.locator('#status').filter({hasText:'Compiled and saved'}).waitFor();const buildMs=performance.now()-buildStart;
  const parent=await page.locator('#identity').textContent();await view(page,'context');assert.ok((await page.locator('#payload').textContent()).includes('<img src=x onerror='));assert.equal(await page.locator('img').count(),0);assert.equal(await page.evaluate(()=>globalThis.injected),undefined);
- await view(page,'proposal');await page.locator('#filter').selectOption('DROPPED');const row=page.locator('#candidates tr').filter({hasText:'src/'}).first();const label=await row.locator('select').getAttribute('aria-label');
- await row.getByRole('button').focus();await page.keyboard.press('Enter');await page.locator('#status').filter({hasText:'Explain: OK'}).waitFor();assert.equal(await page.locator('[data-nav="why"]').getAttribute('aria-current'),'page');assert.ok((await page.locator('#explain').textContent()).includes('RECORDED DECISION'));assert.ok(await page.locator('#explain').evaluate(e=>e===globalThis.document.activeElement));
- await view(page,'proposal');await page.getByRole('combobox',{name:label,exact:true}).selectOption('PIN');await page.locator('#recompile').click();await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();assert.notEqual(await page.locator('#identity').textContent(),parent);assert.ok((await page.locator('#changes').textContent()).includes('DROPPED → SELECTED'));
+ await view(page,'proposal');await page.locator('#filter').selectOption('DROPPED');const row=page.locator('#candidates tr').filter({hasText:'src/'}).first();
+ await row.getByRole('button').focus();await page.keyboard.press('Enter');await page.locator('#status').filter({hasText:'Explain: OK'}).waitFor();assert.equal(await page.locator('[data-nav="context"]').getAttribute('aria-current'),'page');assert.ok((await page.locator('#explain').textContent()).includes('Decision details'));assert.ok(await page.locator('#explain').evaluate(e=>e===globalThis.document.activeElement));
+ await view(page,'proposal');await applyControl('Include');await page.locator('#recompile').click();await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();assert.notEqual(await page.locator('#identity').textContent(),parent);assert.ok((await page.locator('#changes').textContent()).includes('DROPPED → SELECTED'));
  // Each control goes through the visible UI and the real CLI-served API.
- for(const kind of ['EXCLUDE','PREFER','FOCUS','RANGE']){
+ async function applyControl(label){
+ await view(page,'proposal');await page.locator('#filter').selectOption('ALL');
+ const target=page.locator('#candidates tr').filter({hasText:'src/'}).first();
+ assert.ok(await target.count()>0,'A considered file must exist to control');
+ await target.getByRole('button').click();await page.locator('#status').filter({hasText:'Explain: OK'}).waitFor();
+ await page.getByRole('toolbar',{name:'Actions for selected files'}).getByRole('button',{name:label,exact:true}).click();
+}
+for(const kind of ['PIN','EXCLUDE','PREFER','FOCUS','RANGE']){
   await view(page,'proposal');await page.locator('#filter').selectOption('ALL');await page.locator('#clear').click();
   if(kind==='RANGE')page.once('dialog',d=>d.accept('1-3'));
-  await page.getByRole('combobox',{name:label,exact:true}).selectOption(kind);await page.locator('#whatif-budget').fill('3000');
+  await applyControl({PIN:'Include',EXCLUDE:'Exclude',PREFER:'Prefer',FOCUS:'Focus',RANGE:'Range'}[kind]);await page.locator('#whatif-budget').fill('3000');
   await page.locator('#recompile').click();await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();assert.ok((await page.locator('#provenance').textContent()).includes(kind));
-  if(kind==='EXCLUDE'){await view(page,'proposal');const controlled=page.locator('#candidates tr').filter({has:page.getByRole('combobox',{name:label,exact:true})});assert.ok((await controlled.textContent()).includes('DROPPED'));}
+  if(kind==='EXCLUDE'){await view(page,'proposal');const controlled=page.locator('#candidates tr').filter({hasText:'src/'}).first();assert.ok((await controlled.textContent()).includes('DROPPED'));}
  }
  await view(page,'replay');await page.locator('#verify').click();await page.locator('#status').filter({hasText:'Replay: EXACT_MATCH'}).waitFor();
  await page.locator('[data-nav="history"]').click();assert.ok(await page.locator('.history-entry').count()>=6);await page.locator('.history-entry').first().click();await page.locator('#status').filter({hasText:'Saved metadata opened'}).waitFor();
@@ -53,7 +60,7 @@ try{
  await page.locator('#mode-review').click();await page.locator('#review-budget').fill('1000');await page.locator('#review-compile').click();await page.locator('#status').filter({hasText:'Review Context saved'}).waitFor();
  await view(page,'review');assert.ok((await page.locator('#review-detail').textContent()).includes('ledger'));assert.ok(await page.locator('.impact-card').count()>0);
  await view(page,'proposal');await page.locator('#filter').selectOption('DROPPED');const reviewRow=page.locator('#candidates tr').filter({hasText:'src/'}).first();await reviewRow.getByRole('button').click();await page.locator('#status').filter({hasText:'Explain: OK'}).waitFor();
- await view(page,'proposal');await reviewRow.getByRole('combobox').selectOption('PIN');await page.locator('#recompile').click();await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();assert.ok((await page.locator('#changes').textContent()).includes('DROPPED → SELECTED'));
+ await page.getByRole('toolbar',{name:'Actions for selected files'}).getByRole('button',{name:'Include',exact:true}).click();await page.locator('#recompile').click();await page.locator('#status').filter({hasText:'New Capsule saved'}).waitFor();assert.ok((await page.locator('#changes').textContent()).includes('DROPPED → SELECTED'));
  await view(page,'coverage');assert.ok((await page.locator('#coverage').textContent()).includes('BOUNDED CANDIDATES'));
  await view(page,'replay');await page.locator('#verify').click();await page.locator('#status').filter({hasText:'Replay: EXACT_MATCH'}).waitFor();
  assert.deepEqual(remote,[]);assert.deepEqual(errors,[]);

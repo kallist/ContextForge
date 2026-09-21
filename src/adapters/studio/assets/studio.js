@@ -1,8 +1,8 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1) || sessionStorage.getItem("contextforge-capability") || "";
-if (location.hash) { sessionStorage.setItem("contextforge-capability", token); history.replaceState(null, "", "/"); }
-let opened = null, entries = [], controls = [], offset = 0, activeCandidateId = null, snapshotEvidence = null, replayStatus = null, snapshotTransition = null;
+if (location.hash) { sessionStorage.setItem("contextforge-capability", token); globalThis.history.replaceState(null, "", "/"); }
+let opened = null, entries = [], controls = [], offset = 0, activeCandidateId = null, snapshotEvidence = null, replayStatus = null, snapshotTransition = null, selectedPaths = new Set(), inspectedPath = null;
 const node = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = String(text); if (className) e.className = className; return e; };
 const showStatus = (text) => { $("status").textContent = text; };
 async function api(request) {
@@ -30,7 +30,7 @@ function tab(name) {
   document.querySelectorAll("[data-panel]").forEach((e) => { e.hidden = e.dataset.panel !== panel; });
   document.querySelectorAll(".view-tabs [data-tab]").forEach((e) => { e.classList.toggle("active", e.dataset.tab === name || (name === "evidence" && e.dataset.tab === "proposal")); });
 }
-document.querySelectorAll("[data-nav]").forEach((e) => e.addEventListener("click", () => tab({ context: "proposal", why: "evidence", history: "history" }[e.dataset.nav])));
+document.querySelectorAll("[data-nav]").forEach((e) => e.addEventListener("click", () => tab({ context: "proposal", changes: "changes", history: "history" }[e.dataset.nav])));
 document.querySelectorAll("[data-history-action]").forEach((e) => e.addEventListener("click", () => { if (opened) tab(e.dataset.historyAction); else showStatus("Open a saved context first."); }));
 function mode(review) { $("task-composer").hidden = review; $("review-composer").hidden = !review; $("mode-task").setAttribute("aria-pressed", String(!review)); $("mode-review").setAttribute("aria-pressed", String(review)); }
 $("mode-task").addEventListener("click", () => mode(false));
@@ -53,15 +53,80 @@ async function refreshHistory(more = false) {
   $("storage").textContent = `${data.stats.count} saved · ${(data.stats.storedBytes / 1024).toFixed(1)} KiB compressed metadata`;
 }
 const reasonLabels = { SELECTED: "Included in the context", REQUIRED_INSTRUCTION: "Required repository instruction", BUDGET_EXHAUSTED: "Available budget was exhausted", LOWER_PRIORITY: "Not allocated by the recorded priority decision", DUPLICATE: "Already represented in context", STALE_SOURCE: "Source differs from the indexed version", SECTION_LIMIT: "The section allocation could not fit this candidate", UNSUPPORTED_CONTENT: "Content representation is unsupported", NO_USEFUL_RANGE: "No useful source range was available", SOURCE_VERIFICATION_LIMIT: "Source verification reached its bound", GLOBAL_BUDGET: "The total context budget prevented inclusion", SAFETY_LIMIT: "A safety bound prevented inclusion", REDUNDANT_RANGE: "Source range is already represented" };
+function renderRuler() {
+  const ruler = document.querySelector(".ruler"); if (!ruler || !opened) return;
+  const b = opened.capsule.deterministic.budget;
+  const used = Math.max(0, Math.round(b.estimatedTokens)), budget = Math.max(1, Math.round(b.requested));
+  const util = Math.max(0, Math.min(1, used / budget));
+  const usedBar = ruler.querySelector(".ruler-used"), remainingBar = ruler.querySelector(".ruler-remaining");
+  if (usedBar) usedBar.style.width = (util * 100).toFixed(2) + "%";
+  if (remainingBar) remainingBar.style.width = ((1 - util) * 100).toFixed(2) + "%";
+  const budgetLabel = ruler.querySelector("[data-ruler-budget]"), mark = ruler.querySelector("[data-ruler-mark]");
+  if (budgetLabel) budgetLabel.textContent = budget.toLocaleString() + " budget";
+  if (mark) mark.textContent = used.toLocaleString() + " used";
+  ruler.setAttribute("aria-label", "Context budget ruler. " + used.toLocaleString() + " of " + budget.toLocaleString() + " estimator tokens used by " + opened.capsule.deterministic.selected.length + " selected files; " + Math.max(0, budget - used).toLocaleString() + " remaining. " + opened.capsule.deterministic.dropped.length + " files were considered but not selected.");
+}
 function fact(parent, label, value) { const e = node("div", undefined, "fact"); e.append(node("small", label), node("p", value)); parent.append(e); }
+function renderSelectionBar() {
+  const bar = $("selection-bar"); if (!bar) return;
+  const paths = [...selectedPaths];
+  if (!paths.length) { bar.hidden = true; bar.replaceChildren(); return; }
+  bar.hidden = false; bar.replaceChildren();
+  bar.append(node("span", paths.length === 1 ? "1 file selected" : paths.length + " files selected", "selection-count"));
+  for (const [kind, label] of [["PIN", "Include"], ["PREFER", "Prefer"], ["EXCLUDE", "Exclude"]]) {
+    const button = node("button", label);
+    button.classList.toggle("active", paths.every((path) => controls.some((control) => control.kind === kind && control.path === path)));
+    button.addEventListener("click", () => { for (const path of paths) applyControl(path, kind); renderControls(); renderCandidates(); renderInspectorControls(inspectedPath); showStatus(label + " applied to " + paths.length + (paths.length === 1 ? " file" : " files") + " in the next build. Rebuild to create a new Capsule."); });
+    bar.append(button);
+  }
+  const clear = node("button", "Clear selection"); clear.addEventListener("click", () => { selectedPaths.clear(); renderCandidates(); }); bar.append(clear);
+}
+function buildInspector(target, path, state, result) {
+  const sentences = (result.facts.decisions || []).map((d) => reasonLabels[d.reason] || "A recorded decision applied").filter(Boolean);
+  const lead = node("p", undefined, "reason-lead");
+  lead.append(node("strong", state === "SELECTED" ? "Included in this context. " : state === "DROPPED" ? "Considered, not selected. " : "Excluded by a recorded boundary. "), sentences.length ? sentences.join(". ") + "." : "The recorded decision is shown below.");
+  target.append(lead);
+  const evidence = (result.facts.evidence || []);
+  if (evidence.length) {
+    const list = node("ul", undefined, "evidence-list");
+    for (const e of evidence.slice(0, 40)) {
+      const item = node("li", undefined, "evidence-item");
+      item.append(node("span", e.code + (e.querySignal ? " · " + e.querySignal : ""), "evidence-reason"));
+      item.append(node("span", String(e.family) + " evidence", "evidence-source"));
+      list.append(item);
+    }
+    target.append(node("h4", "Recorded evidence"), list);
+    if (evidence.length > 40) target.append(node("p", "First 40 evidence records shown. Export the Capsule for the complete captured set.", "muted"));
+  }
+  const relations = (result.facts.review?.impact || []).filter((r) => r.from === path || r.to === path).slice(0, 20);
+  if (relations.length) {
+    const list = node("ul", undefined, "evidence-list");
+    for (const r of relations) {
+      const item = node("li", undefined, "evidence-item");
+      item.append(node("span", r.from + " → " + r.to, "evidence-relation"));
+      item.append(node("span", String(r.type) + " · " + String(r.classification), "evidence-source"));
+      list.append(item);
+    }
+    target.append(node("h4", "Structural relationships"), list);
+  }
+  const codes = node("details");
+  codes.append(node("summary", "Decision details"), node("pre", (result.facts.decisions || []).map((d) => d.reason + " (" + d.decisionSource + ")").join("\n")));
+  if (result.facts.selection) codes.append(node("p", "Context role: " + result.facts.selection.role, "muted"));
+  if (result.facts.ranges?.length) codes.append(node("p", "Ranges: " + result.facts.ranges.map((r) => "L" + r.startLine + "–" + r.endLine).join(", "), "mono muted"));
+  if (result.facts.symbols?.length) codes.append(node("p", "Symbols: " + result.facts.symbols.map((s) => s.qualifiedName).join(", "), "mono muted"));
+  target.append(codes);
+}
+function renderExplainInto(target, path, state, result) { target.replaceChildren(node("h3", path)); buildInspector(target, path, state, result); }
+
+
 function display(data) {
-  opened = data; controls = structuredClone(data.capsule.deterministic.overrides[0]?.controls || []); activeCandidateId = null; snapshotEvidence = null; replayStatus = null;
+  opened = data; controls = structuredClone(data.capsule.deterministic.overrides[0]?.controls || []); activeCandidateId = null; snapshotEvidence = null; replayStatus = null; selectedPaths = new Set(); inspectedPath = null;
   snapshotTransition = data.diff?.candidates?.find((item) => item.before?.disposition && item.after?.disposition && item.before.disposition !== item.after.disposition) || null; renderControls();
   const c = data.capsule.deterministic;
   $("workspace").hidden = false; $("identity").textContent = data.capsule.capsuleHash.slice(0, 12);
-  $("usage").textContent = `${c.budget.estimatedTokens.toLocaleString()} / ${c.budget.requested.toLocaleString()}`;
+  $("usage").textContent = `${c.budget.estimatedTokens.toLocaleString()} of ${c.budget.requested.toLocaleString()} estimator tokens`;
   $("budget-bar").value = 100 * c.budget.utilization;
-  $("counts").textContent = `${c.selected.length} selected · ${c.dropped.length} dropped`;
+  $("counts").textContent = `${c.selected.length} selected · ${c.dropped.length} considered, not selected`;
   $("generation").textContent = `gen ${c.repository.activeGeneration} · ${c.repository.gitCommit?.slice(0, 8) || "no Git"}`;
   $("repo-label").textContent = c.repository.gitCommit ? `Repository · ${c.repository.gitCommit.slice(0, 8)}` : "Local repository";
   $("index-state").lastChild.textContent = " Indexed";
@@ -74,67 +139,71 @@ function display(data) {
   $("copy").disabled = !data.payload;
   $("explain").replaceChildren(node("div", undefined, "inspector-empty"));
   $("explain").firstChild.append(node("span", "→", "inspector-glyph"), node("h3", "Select a file"), node("p", "Inspect why it was selected, dropped, or excluded. These are recorded compiler facts."));
-  $("inspector-controls").hidden = true; $("inspector-controls").replaceChildren(); $("replay-result").replaceChildren();
+  $("inspector-controls").hidden = true; $("inspector-controls").replaceChildren(); $("replay-result").replaceChildren(); renderRuler();
   renderCandidates(); renderCoverage(data.coverage); renderReview();
   if (data.diff) { renderDiff(data.diff); tab("changes"); } else { $("changes").replaceChildren(node("p", "Choose a prior Capsule to compare, or try human controls.")); tab("proposal"); }
 }
 function renderCandidates() {
   if (!opened) return;
   const c = opened.capsule.deterministic; $("candidates").replaceChildren();
-  const files = new Map(c.files.map((f) => [f.id, f]));
+  const fileMap = new Map(c.files.map((f) => [f.id, f]));
+  let shown = 0;
   for (const candidate of [...c.candidates].sort((a, b) => Number(b.disposition === "SELECTED") - Number(a.disposition === "SELECTED"))) {
     if ($("filter").value !== "ALL" && candidate.disposition !== $("filter").value) continue;
-    const file = files.get(candidate.fileRef), selection = c.selected.find((s) => s.candidateRef === candidate.id);
-    const tr = node("tr"); tr.dataset.candidate = candidate.id; tr.dataset.state = candidate.disposition; tr.classList.toggle("active", activeCandidateId === candidate.id);
-    const fileCell = node("td"), button = node("button", `${candidate.rank || "—"}  ${file.path}`);
+    const file = fileMap.get(candidate.fileRef), selection = c.selected.find((s) => s.candidateRef === candidate.id);
+    const tr = node("tr"); tr.dataset.candidate = candidate.id; tr.dataset.state = candidate.disposition;
+    tr.dataset.selected = String(selectedPaths.has(file.path));
+    tr.classList.toggle("active", activeCandidateId === candidate.id);
+    const fileCell = node("td"), button = node("button");
+    button.append(node("span", (candidate.rank || "—") + "  ", "rank"), node("span", file.path));
     button.addEventListener("click", () => work("Reading captured explanation…", async () => {
       const result = await api({ action: "explain", id: opened.capsule.capsuleHash, query: { type: `WHY_${candidate.disposition}`, subject: candidate.id } });
-      activeCandidateId = candidate.id;
-      const target = $("explain"); target.replaceChildren(node("h3", file.path));
-      fact(target, "SELECTION", { SELECTED: "Included in this repository context", DROPPED: "Considered but not selected for this context", EXCLUDED: "Excluded by a recorded boundary" }[candidate.disposition]);
-      fact(target, "RECORDED DECISION", result.facts.decisions.map((d) => reasonLabels[d.reason] || "See the recorded reason below").join(" · "));
-      const detail = node("details"); detail.append(node("summary", "Exact decision codes and provenance"), node("pre", result.facts.decisions.map((d) => d.reason + " (" + d.decisionSource + ")").join(" · "))); target.append(detail);
-      if (result.facts.selection) fact(target, "CONTEXT ROLE", result.facts.selection.role);
-      if (result.facts.ranges?.length) fact(target, "RANGES", result.facts.ranges.map((r) => `L${r.startLine}–${r.endLine}`).join(", "));
-      if (result.facts.symbols?.length) fact(target, "SYMBOLS", result.facts.symbols.map((s) => s.qualifiedName).join(", "));
-      for (const e of (result.facts.evidence || []).slice(0, 40)) fact(target, `${e.stage} · ${e.derivation}`, `${e.code} · ${e.family}${e.querySignal ? ` · ${e.querySignal}` : ""}`);
-      for (const r of (result.facts.review?.impact || []).filter((r) => r.from === file.path || r.to === file.path).slice(0, 20)) fact(target, `${r.type} · ${r.classification}`, `${r.from} → ${r.to}`);
-      if ((result.facts.evidence?.length || 0) > 40) fact(target, "BOUNDED DISPLAY", "First 40 evidence records shown. Export Capsule for full captured details.");
+      activeCandidateId = candidate.id; inspectedPath = file.path;
+      selectedPaths.clear(); selectedPaths.add(file.path);
+      const target = $("explain"); renderExplainInto(target, file.path, candidate.disposition, result);
       snapshotEvidence = { path: file.path, state: candidate.disposition, decision: result.facts.decisions.map((d) => reasonLabels[d.reason] || d.reason).join(" · "), relationship: result.facts.review?.impact?.find((r) => r.from === file.path || r.to === file.path) };
       renderInspectorControls(file.path);
       renderCandidates();
       tab("evidence");
       target.tabIndex = -1; target.focus();
-      showStatus(`Explain: ${result.status}. These are compiler facts, not a model's reasoning.`);
+      showStatus(`Explain: ${result.status}. These are recorded compiler facts, not a model's reasoning.`);
     }));
-    fileCell.append(button); const state = node("td"); state.append(node("span", candidate.disposition, `tag ${candidate.disposition}`));
-    const controlCell = node("td"), select = node("select"); select.setAttribute("aria-label", `Control ${file.path}`);
-    for (const optionName of ["—", "PIN", "EXCLUDE", "PREFER", "FOCUS", "RANGE"]) { const option = node("option", { "—": "Automatic", PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus (advanced)", RANGE: "Range (advanced)" }[optionName]); option.value = optionName; select.append(option); }
-    select.value = controls.find((control) => control.path === file.path)?.kind || "—";
-    select.addEventListener("change", () => { if (!setControl(file.path, select.value)) select.value = "—"; renderCandidates(); });
-    controlCell.append(select); tr.append(fileCell, state, node("td", selection?.estimatedTokens || "—"), controlCell); $("candidates").append(tr);
+    fileCell.append(button);
+    const state = node("td"); state.append(node("span", candidate.disposition, `tag ${candidate.disposition}`));
+    tr.append(fileCell, state, node("td", selection ? selection.estimatedTokens.toLocaleString() : "—"));
+    shown += 1; $("candidates").append(tr);
   }
+  if (!shown) { const tr = node("tr"), cell = node("td", "No file matches this filter. Choose All to see every considered file.", "muted"); cell.colSpan = 3; tr.append(cell); $("candidates").append(tr); }
+  renderSelectionBar();
 }
-function setControl(path, kind) {
+function applyControl(path, kind) {
   controls = controls.filter((control) => control.path !== path);
-  if (kind === "—") { renderControls(); renderInspectorControls(path); return true; }
+  if (kind === "—") return true;
   let control = { kind, path };
   if (kind === "FOCUS") control.path = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path;
   if (kind === "RANGE") {
     const text = window.prompt("Inclusive verified line range, for example 2-8", "1-3");
-    if (!/^\d+-\d+$/.test(text || "")) { renderControls(); return false; }
+    if (!/^\d+-\d+$/.test(text || "")) return false;
     const [startLine, endLine] = text.split("-").map(Number); control = { ...control, startLine, endLine };
   }
-  controls.push(control); renderControls(); renderInspectorControls(path); return true;
+  controls.push(control); return true;
 }
 function renderInspectorControls(path) {
-  const target = $("inspector-controls"); target.hidden = false; target.replaceChildren();
-  for (const [kind, label] of [["PIN", "Include"], ["PREFER", "Prefer"], ["EXCLUDE", "Exclude"]]) {
+  const target = $("inspector-controls");
+  if (!path) { target.hidden = true; target.replaceChildren(); return; }
+  target.hidden = false; target.replaceChildren();
+  target.append(node("span", "Next build", "eyebrow"));
+  for (const [kind, label] of [["PIN", "Include"], ["PREFER", "Prefer"], ["EXCLUDE", "Exclude"], ["FOCUS", "Focus"], ["RANGE", "Range"]]) {
     const button = node("button", label); button.classList.toggle("active", controls.some((control) => control.kind === kind && control.path === path));
-    button.addEventListener("click", () => { setControl(path, kind); renderCandidates(); showStatus(`${label} ${path} in the next build. Rebuild to create a new Capsule.`); }); target.append(button);
+    button.addEventListener("click", () => { if (!applyControl(path, kind)) return; renderControls(); renderCandidates(); renderInspectorControls(path); showStatus(`${label} ${path} in the next build. Rebuild to create a new Capsule.`); });
+    target.append(button);
   }
 }
-function renderControls() { $("pending").replaceChildren(...controls.map((c) => node("span", `${({ PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus", RANGE: "Range" })[c.kind]} ${c.path}${c.kind === "RANGE" ? ` L${c.startLine}–${c.endLine}` : ""}`, "chip"))); }
+function renderControls() {
+  const pending = $("pending"); pending.replaceChildren();
+  if (!controls.length) { pending.append(node("span", "No pending controls. The recorded Capsule above is unchanged.", "muted")); return; }
+  pending.append(...controls.map((c) => node("span", `${({ PIN: "Include", EXCLUDE: "Exclude", PREFER: "Prefer", FOCUS: "Focus", RANGE: "Range" })[c.kind]} ${c.path}${c.kind === "RANGE" ? ` L${c.startLine}–${c.endLine}` : ""}`, "chip")));
+}
 function renderCoverage(coverage) {
   const target = $("coverage"); target.replaceChildren();
   fact(target, "BOUNDED CANDIDATES", `${coverage.candidates.selected} selected of ${coverage.candidates.available} captured; ${coverage.candidates.excluded} safety exclusions.`);
@@ -187,37 +256,37 @@ function renderSnapshot() {
   const selectedPaths = c.selected.map((selection) => c.candidates.find((candidate) => candidate.id === selection.candidateRef)).filter(Boolean).map((candidate) => fileMap.get(candidate.fileRef)).filter(Boolean).slice(0, 5);
   ctx.clearRect(0, 0, 1200, 630); ctx.fillStyle = "#f8f6f1"; ctx.fillRect(0, 0, 1200, 630);
   ctx.strokeStyle = "#d4cbbd"; ctx.lineWidth = 1; ctx.strokeRect(28.5, 28.5, 1143, 573);
-  ctx.fillStyle = "#211f1b"; ctx.font = "700 22px Segoe UI, Arial, sans-serif"; ctx.fillText("RepoBound", 66, 76);
-  ctx.strokeStyle = "#211f1b"; ctx.strokeRect(42.5, 49.5, 16, 20); ctx.font = "700 7px Consolas, monospace"; ctx.fillText("RB", 45, 62);
-  ctx.fillStyle = "#a96818"; ctx.font = "700 12px Segoe UI, Arial, sans-serif"; ctx.fillText("CONTEXT SNAPSHOT", 932, 71);
-  ctx.fillStyle = "#827a70"; ctx.font = "12px Consolas, monospace"; ctx.fillText(opened.capsule.capsuleHash.slice(0, 12), 1038, 92);
+  ctx.fillStyle = "#211f1b"; ctx.font = "600 22px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("RepoBound", 66, 76);
+  ctx.strokeStyle = "#211f1b"; ctx.strokeRect(42.5, 49.5, 16, 20); ctx.font = "500 7px 'JetBrains Mono', monospace"; ctx.fillText("RB", 45, 62);
+  ctx.fillStyle = "#a96818"; ctx.font = "600 12px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("CONTEXT SNAPSHOT", 932, 71);
+  ctx.fillStyle = "#827a70"; ctx.font = "12px 'JetBrains Mono', monospace"; ctx.fillText(opened.capsule.capsuleHash.slice(0, 12), 1038, 92);
   ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(66, 108.5); ctx.lineTo(1134, 108.5); ctx.stroke();
-  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText("TASK", 66, 144);
-  ctx.fillStyle = "#211f1b"; ctx.font = "600 35px Segoe UI, Arial, sans-serif";
+  ctx.fillStyle = "#a96818"; ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("TASK", 66, 144);
+  ctx.fillStyle = "#211f1b"; ctx.font = "600 35px 'IBM Plex Sans', system-ui, sans-serif";
   const taskBottom = canvasText(ctx, c.task.text || (c.review ? "Review tracked Git change" : "Redacted task"), 66, 184, 640, 43, 3);
   const metricsY = Math.max(310, taskBottom + 30);
-  ctx.fillStyle = "#211f1b"; ctx.font = "650 27px Segoe UI, Arial, sans-serif"; ctx.fillText(String(c.selected.length), 66, metricsY); ctx.fillText(String(c.dropped.length), 190, metricsY); ctx.fillText(`${(c.budget.estimatedTokens / 1000).toFixed(c.budget.estimatedTokens >= 1000 ? 1 : 2)}k`, 330, metricsY);
-  ctx.fillStyle = "#827a70"; ctx.font = "700 10px Segoe UI, Arial, sans-serif"; ctx.fillText("SELECTED", 66, metricsY + 23); ctx.fillText("DROPPED", 190, metricsY + 23); ctx.fillText(`/ ${(c.budget.requested / 1000).toFixed(c.budget.requested >= 1000 ? 0 : 2)}k BUDGET`, 330, metricsY + 23);
+  ctx.fillStyle = "#211f1b"; ctx.font = "600 27px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(String(c.selected.length), 66, metricsY); ctx.fillText(String(c.dropped.length), 190, metricsY); ctx.fillText(`${(c.budget.estimatedTokens / 1000).toFixed(c.budget.estimatedTokens >= 1000 ? 1 : 2)}k`, 330, metricsY);
+  ctx.fillStyle = "#827a70"; ctx.font = "600 10px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("SELECTED", 66, metricsY + 23); ctx.fillText("DROPPED", 190, metricsY + 23); ctx.fillText(`/ ${(c.budget.requested / 1000).toFixed(c.budget.requested >= 1000 ? 0 : 2)}k BUDGET`, 330, metricsY + 23);
   ctx.fillStyle = "#e7e1d7"; ctx.fillRect(66, metricsY + 42, 620, 4); ctx.fillStyle = "#a96818"; ctx.fillRect(66, metricsY + 42, Math.min(620, 620 * c.budget.utilization), 4);
-  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText("KEY CONTEXT", 66, metricsY + 84);
-  ctx.font = "14px Consolas, monospace"; selectedPaths.forEach((path, index) => { ctx.fillStyle = index === 0 ? "#a96818" : "#5f5a52"; ctx.fillRect(66, metricsY + 105 + index * 28, index === 0 ? 3 : 1, 16); ctx.fillStyle = "#211f1b"; ctx.fillText(fitPath(ctx, path, 585), 81, metricsY + 118 + index * 28); });
+  ctx.fillStyle = "#a96818"; ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("KEY CONTEXT", 66, metricsY + 84);
+  ctx.font = "13px 'JetBrains Mono', monospace"; selectedPaths.forEach((path, index) => { ctx.fillStyle = index === 0 ? "#a96818" : "#5f5a52"; ctx.fillRect(66, metricsY + 105 + index * 28, index === 0 ? 3 : 1, 16); ctx.fillStyle = "#211f1b"; ctx.fillText(fitPath(ctx, path, 585), 81, metricsY + 118 + index * 28); });
   ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(748.5, 132); ctx.lineTo(748.5, 533); ctx.stroke();
-  ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText(snapshotTransition ? "LAST CHANGE" : "WHY", 790, 144);
+  ctx.fillStyle = "#a96818"; ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(snapshotTransition ? "LAST CHANGE" : "WHY", 790, 144);
   if (snapshotTransition) {
-    ctx.fillStyle = "#211f1b"; ctx.font = "600 17px Consolas, monospace"; ctx.fillText(fitPath(ctx, snapshotTransition.path, 344), 790, 181);
-    ctx.fillStyle = "#a96818"; ctx.font = "700 15px Segoe UI, Arial, sans-serif"; ctx.fillText(`${snapshotTransition.before.disposition} → ${snapshotTransition.after.disposition}`, 790, 214);
+    ctx.fillStyle = "#211f1b"; ctx.font = "500 16px 'JetBrains Mono', monospace"; ctx.fillText(fitPath(ctx, snapshotTransition.path, 344), 790, 181);
+    ctx.fillStyle = "#a96818"; ctx.font = "600 15px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(`${snapshotTransition.before.disposition} → ${snapshotTransition.after.disposition}`, 790, 214);
   } else if (snapshotEvidence) {
-    ctx.fillStyle = "#211f1b"; ctx.font = "600 17px Consolas, monospace"; ctx.fillText(fitPath(ctx, snapshotEvidence.path, 344), 790, 181);
-    ctx.fillStyle = "#a96818"; ctx.font = "700 12px Segoe UI, Arial, sans-serif"; ctx.fillText(snapshotEvidence.state, 790, 207);
-    ctx.fillStyle = "#5f5a52"; ctx.font = "15px Segoe UI, Arial, sans-serif"; canvasText(ctx, snapshotEvidence.decision, 790, 242, 330, 24, 5);
-    if (snapshotEvidence.relationship) { ctx.fillStyle = "#827a70"; ctx.font = "12px Consolas, monospace"; canvasText(ctx, `${snapshotEvidence.relationship.from} → ${snapshotEvidence.relationship.to}`, 790, 390, 330, 20, 3); }
+    ctx.fillStyle = "#211f1b"; ctx.font = "500 16px 'JetBrains Mono', monospace"; ctx.fillText(fitPath(ctx, snapshotEvidence.path, 344), 790, 181);
+    ctx.fillStyle = "#a96818"; ctx.font = "600 12px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(snapshotEvidence.state, 790, 207);
+    ctx.fillStyle = "#5f5a52"; ctx.font = "15px 'IBM Plex Sans', system-ui, sans-serif"; canvasText(ctx, snapshotEvidence.decision, 790, 242, 330, 24, 5);
+    if (snapshotEvidence.relationship) { ctx.fillStyle = "#827a70"; ctx.font = "12px 'JetBrains Mono', monospace"; canvasText(ctx, `${snapshotEvidence.relationship.from} → ${snapshotEvidence.relationship.to}`, 790, 390, 330, 20, 3); }
   } else {
-    ctx.fillStyle = "#211f1b"; ctx.font = "600 19px Segoe UI, Arial, sans-serif"; ctx.fillText("Recorded selection", 790, 183);
-    ctx.fillStyle = "#5f5a52"; ctx.font = "15px Segoe UI, Arial, sans-serif"; canvasText(ctx, "Open a file in Why to add its recorded decision to this Snapshot.", 790, 220, 330, 24, 4);
+    ctx.fillStyle = "#211f1b"; ctx.font = "600 19px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("Recorded selection", 790, 183);
+    ctx.fillStyle = "#5f5a52"; ctx.font = "15px 'IBM Plex Sans', system-ui, sans-serif"; canvasText(ctx, "Open a file in Why to add its recorded decision to this Snapshot.", 790, 220, 330, 24, 4);
   }
-  if (replayStatus) { ctx.fillStyle = "#a96818"; ctx.font = "700 11px Segoe UI, Arial, sans-serif"; ctx.fillText(`REPLAY ${replayStatus}`, 790, 488); }
+  if (replayStatus) { ctx.fillStyle = "#a96818"; ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(`REPLAY ${replayStatus}`, 790, 488); }
   ctx.strokeStyle = "#e7e1d7"; ctx.beginPath(); ctx.moveTo(66, 548.5); ctx.lineTo(1134, 548.5); ctx.stroke();
-  ctx.fillStyle = "#5f5a52"; ctx.font = "12px Segoe UI, Arial, sans-serif"; ctx.fillText("Local-first  ·  Hard declared estimator budget  ·  Context evidence, not agent outcome", 66, 580);
+  ctx.fillStyle = "#5f5a52"; ctx.font = "12px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText("Local-first  ·  Hard declared estimator budget  ·  Context evidence, not agent outcome", 66, 580);
 }
 function downloadSnapshot() {
   renderSnapshot(); $("snapshot").toBlob((blob) => { if (!blob || !opened) return; const url = URL.createObjectURL(blob), link = document.createElement("a"); link.href = url; link.download = `repobound-context-${opened.capsule.capsuleHash.slice(0, 8)}.png`; link.click(); URL.revokeObjectURL(url); }, "image/png");
@@ -226,7 +295,7 @@ $("compile").addEventListener("click", () => work("Compiling safe sources and sa
 $("recompile").addEventListener("click", () => work("Applying controls under the same safety and budget rules…", async () => { if (!opened) return; const task = $("replay-task").value; display(await api({ action: "recompile", id: opened.capsule.capsuleHash, budget: Number($("whatif-budget").value), controls, ...(task ? { task } : {}) })); $("replay-task").value = ""; await refreshHistory(); showStatus("New Capsule saved. The original is unchanged; inspect the semantic diff."); }));
 $("verify").addEventListener("click", () => work("Verifying current sources and recompiling recorded inputs…", async () => { const task = $("replay-task").value; const data = await api({ action: "verify", id: opened.capsule.capsuleHash, ...(task ? { task } : {}) }); display(data.opened); replayStatus = data.replay.status; $("replay-task").value = ""; tab("replay"); $("replay-result").append(node("h3", data.replay.status), node("p", data.replay.reason)); if (data.replay.changedFiles.length) fact($("replay-result"), "MISMATCHED FILE IDENTITIES", data.replay.changedFiles.join(", ")); showStatus(`Replay: ${data.replay.status}`); }));
 $("diff").addEventListener("click", () => work("Comparing recorded compilation facts…", async () => { if (!$("compare").value) return; renderDiff(await api({ action: "diff", before: $("compare").value, after: opened.capsule.capsuleHash })); showStatus("Semantic comparison complete."); }));
-$("clear").addEventListener("click", () => { controls = []; renderControls(); renderCandidates(); if (snapshotEvidence) renderInspectorControls(snapshotEvidence.path); });
+$("clear").addEventListener("click", () => { controls = []; selectedPaths.clear(); renderControls(); renderCandidates(); renderInspectorControls(inspectedPath); showStatus("Pending controls cleared. The recorded Capsule was not changed."); });
 $("filter").addEventListener("change", renderCandidates);
 $("more").addEventListener("click", () => work("Loading history summaries…", () => refreshHistory(true)));
 $("copy").addEventListener("click", () => work("Copying exact context…", async () => { if (opened?.payload) { await navigator.clipboard.writeText(opened.payload); showStatus("Exact compiled context copied."); } }));
@@ -264,7 +333,7 @@ function renderReview() {
       const path = relation.from === change.path ? relation.to : relation.from;
       const item = candidate(path), card = node("article", undefined, "impact-card");
       card.append(node("small", labels[relation.type] || relation.type, "relation-label"), node("h4", path, "mono"), node("p", `${relation.from} → ${relation.to}`, "relation-chain"), node("span", relation.classification === "HEURISTIC" ? "Heuristic association" : "Structural fact", `provenance ${relation.classification}`), node("span", item?.disposition || "NOT AVAILABLE", `tag ${item?.disposition || ""}`));
-      if (item) { const pin = node("button", "PIN"); pin.setAttribute("aria-label", `Pin ${path}`); pin.addEventListener("click", () => { controls = controls.filter((control) => control.path !== path); controls.push({ kind: "PIN", path }); renderControls(); renderCandidates(); showStatus(`Pinned ${path}. Recompile to create a new Capsule.`); }); card.append(pin); }
+      if (item) { const pin = node("button", "PIN"); pin.setAttribute("aria-label", `Pin ${path}`); pin.addEventListener("click", () => { applyControl(path, "PIN"); renderControls(); renderCandidates(); showStatus(`Include ${path} in the next build. Rebuild to create a new Capsule.`); }); card.append(pin); }
       $("review-impact").append(card);
     }
     if (!links.length) $("review-impact").append(node("p", "No supported one-hop relationship captured. This does not prove there is no impact.", "muted"));

@@ -37,7 +37,9 @@ try {
   await view(page,"proposal");
   await view(page,"proposal"); await page.locator("#filter").selectOption("DROPPED");
   assert.ok(await page.locator("#candidates tr").count() > 0, "Demo must demonstrate a real budget loss");
-  const row = page.locator("#candidates tr").first(); await row.getByRole("combobox").selectOption("PIN");
+  const row = page.locator("#candidates tr").first(); await row.getByRole("button").click();
+  await page.getByRole("status").filter({ hasText: "Explain: OK" }).waitFor();
+  await page.getByRole("toolbar", { name: "Actions for selected files" }).getByRole("button", { name: "Include", exact: true }).click();
   await page.getByRole("button", { name: "Rebuild context", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "New Capsule saved" }).waitFor();
   assert.ok((await page.locator("#changes").textContent()).includes("DROPPED → SELECTED"));

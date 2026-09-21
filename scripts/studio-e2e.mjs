@@ -44,11 +44,11 @@ try {
   await view(page,"proposal");
   await page.locator("#candidates tr").filter({ has: page.locator(".tag.SELECTED") }).first().getByRole("button").click();
   await page.getByRole("status").filter({ hasText: "Explain: OK" }).waitFor();
-  assert.ok((await page.locator("#explain").textContent()).includes("RECORDED DECISION"));
+  assert.ok((await page.locator("#explain").textContent()).includes("Decision details"));
   await view(page,"proposal"); await page.locator("#filter").selectOption("DROPPED");
   const droppedRow = page.locator("#candidates tr").first(); await droppedRow.getByRole("button").click();
   await page.getByRole("status").filter({ hasText: "Explain: OK" }).waitFor();
-  await view(page,"proposal"); await droppedRow.getByRole("combobox").selectOption("PIN");
+  await view(page,"proposal"); await page.getByRole("toolbar", { name: "Actions for selected files" }).getByRole("button", { name: "Include", exact: true }).click();
   await view(page,"coverage");
   assert.ok((await page.locator("#coverage").textContent()).includes("BOUNDED CANDIDATES"));
   await page.getByRole("button", { name: "Rebuild context", exact: true }).click();
