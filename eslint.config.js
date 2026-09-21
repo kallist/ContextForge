@@ -34,8 +34,8 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
   },
   {
-    // Visual verification asserts against a real page, so its evaluate callbacks use browser globals.
-    files: ["scripts/visual-capture.mjs"],
+    // Verification scripts assert against a real page, so their evaluate callbacks use browser globals.
+    files: ["scripts/visual-capture.mjs", "scripts/proof-capture.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

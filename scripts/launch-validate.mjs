@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, access, readdir, stat } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
+import { assertFontPolicy } from './csp-policy.mjs';
 const docs=['README.md','README_ZH.md','docs/AGENT_SKILL.md','docs/ENGINEERING_REFERENCE.md',...(await readdir('docs/brand')).filter(x=>x.endsWith('.md')).map(x=>'docs/brand/'+x),...(await readdir('docs/v0.5')).filter(x=>x.endsWith('.md')).map(x=>'docs/v0.5/'+x)];
 let links=0;
 for(const file of docs){
@@ -19,7 +20,22 @@ for(const name of ['repobound-hero.png','repobound-context.png','repobound-why.p
 assert.ok((await stat('docs/assets/repobound-hero.webm')).size<20*1024*1024);
 const site=await readFile('site/index.html','utf8');assert.ok(!/<script|<iframe|<form|https?:[^"']+\.(?:css|js|woff)/i.test(site));
 for(const m of site.matchAll(/(?:src|href)="([^"#]+)"/g)){if(m[1].startsWith('https:'))continue; await access(resolve('.studio-output/site',m[1]));}
+// Font files are referenced from CSS, not from HTML, so the link check above never sees them.
+// Each page resolves ./fonts/ against its own directory, which means every page directory needs them.
+for(const css of [['site/site.css',''],['site/proof/proof.css','proof/']]){
+ const text=await readFile(css[0],'utf8');const urls=[...text.matchAll(/url\("\.\/(fonts\/[^"]+\.woff2)"\)/g)].map(m=>m[1]);
+ assert.ok(urls.length>=2,`${css[0]} must reference both bundled font files`);
+ for(const url of urls){
+  const built=resolve('.studio-output/site',css[1]+url);
+  await access(built);
+  const data=await readFile(built);
+  assert.ok(data.length>1000,`${built} is too small to be a real font`);
+  assert.equal(data.toString('hex',0,4),'774f4632',`${built} is not a woff2 file`);
+ }
+}
 const proofFiles=['site/proof/index.html','site/proof/task-context/index.html','site/proof/review-context/index.html','site/proof/context-debugging/index.html'];
+// A missing directive separator silently voids the whole policy, so validate each directive.
+for(const file of [...proofFiles,'site/index.html']){try{assertFontPolicy(file,await readFile(file,'utf8'));}catch(error){assert.fail(error.message);}}
 for(const file of proofFiles){const html=await readFile(file,'utf8');assert.ok(!/<script|<iframe|<form/i.test(html));assert.ok(!/(?:accuracy|productivity|token savings) (?:improved|increased)|complete impact coverage/i.test(html));}
 const proof=JSON.parse(await readFile('site/proof/data/cases.json','utf8'));assert.equal(proof.cases.length,3);const proofHome=await readFile('site/proof/index.html','utf8');
 for(const item of proof.cases){assert.ok(proofHome.includes(item.title));if('selected'in item){assert.ok(proofHome.includes(`<b>${item.selected}</b><span>SELECTED</span>`));assert.ok(proofHome.includes(`<b>${item.dropped}</b><span>DROPPED</span>`));}}
